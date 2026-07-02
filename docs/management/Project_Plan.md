@@ -1,63 +1,41 @@
-# Kế hoạch phát triển dự án (Project Development Plan)
-*Học phần: Nhập môn Công nghệ Phần mềm (CSC13002)*
-*Nhóm: SE Group10*
+# BẢNG TIMELINE PHÁT TRỂN DỰ ÁN (PROJECT TIMELINE)
+*Dự án: Hệ thống CMS Tích hợp AI & Phân phối Đa kênh*
+---
+
+## SPRINT 1: Đặc tả Yêu cầu & Khởi tạo Môi trường (01/07 – 14/07)
+**Mục tiêu:** Chốt tài liệu SRS (PA01) và dựng sẵn khung dự án trống cho cả hai bên Frontend và Backend
+
+| Thời gian | Phân mục công việc | Thành viên thực hiện | Nội dung chi tiết | Mốc đánh giá (Milestone) |
+| :--- | :--- | :--- | :--- | :--- |
+| **01/07 – 07/07**<br>*(Tuần 1)* | **Phân tích & Lên Kịch bản**| • Cả nhóm<br>• PM<br>• FE | • Khảo sát yêu cầu thực tế, xác định phạm vi hoạt động.<br>• Lên cấu trúc tài liệu tổng quan, định hình luồng đi Workspace.<br>• Vẽ sơ đồ Use Case và viết Problem Statement.. | |
+| **08/07 – 14/07**<br>*(Tuần 2)* | **Thiết kế UI Thô & Khởi tạo Code**. | • FE<br>• BE. | • Thiết kế Mockup/Wireframe Figma; khởi tạo base ReactJS..<br>• Viết Requirement Overview; cài đặt base Node.js & DB local.. |  **Hạn chót (14/07):**<br>Tổng hợp, rà soát chéo và nộp tài liệu **PA01** hoàn chỉnh.. |
 
 ---
 
-## 👥 Danh sách thành viên & Vai trò
-*   **PM (Project Manager & QA Leader)**: Lê Tấn Thành (24127540)
-*   **FE (UI/UX Designer & Frontend Developer)**: Lê Song Anh Tài (24127234)
-*   **BE (Tech Lead, Backend Developer)**: Nguyễn Trọng Tài (23127008)
-*   **BE (Backend Developer & Backend QA)**: Nguyễn Bách Nhuận (24127479)
+## SPRINT 2: Thiết kế Hệ thống & Code Bản Prototype (15/07 – 28/07)
+**Mục tiêu:** Chốt kiến trúc hệ thống, database (PA02), hoàn thành code luồng Đăng ký/Đăng nhập và tạo Workspace..
+
+| Thời gian | Phân mục công việc | Thành viên thực hiện | Nội dung chi tiết | Mốc đánh giá (Milestone) |
+| :--- | :--- | :--- | :--- | :--- |
+| **15/07 – 21/07**<br>*(Tuần 3)* | **Thiết kế Kỹ thuật Chi tiết**. | • PM<br>• FE<br>• BE. | • Thiết kế mô hình khái niệm dữ liệu thực thể (EERD)..<br>• Hoàn thiện UI/UX Figma cho Dashboard Supervisor & Creator..<br>• Thiết kế kiến trúc hệ thống, sơ đồ phân rã và DB chi tiết.. | |
+| **22/07 – 28/07**<br>*(Tuần 4)* | **Lập trình Core & Demo**. | • FE + BE. | • Lập trình luồng Đăng ký/Đăng nhập (JWT, phân quyền)..<br>• Lập trình tính năng Tạo/Tham gia Workspace theo ID.. | **Hạn chót (28/07):**<br>Nộp tài liệu **PA02** + Chạy demo nội bộ bản Prototype.. |
 
 ---
 
-## 📅 Kế hoạch chi tiết theo các giai đoạn (PA01 - PA04)
+## SPRINT 3: Code Tăng trưởng & Kế hoạch Kiểm thử (29/07 – 11/08)
+**Mục tiêu:** Lập trình hoàn thiện 80% tính năng và thực thi kiểm thử thủ công trực tiếp trên sản phẩm để lấy số liệu báo cáo PA03..
 
-### 📋 Giai đoạn 1: PA01 - Đặc tả yêu cầu phần mềm (SRS)
-**Hạn chót nộp bài (Deadline): 14/07/2026**
-
-| Thời gian | Nội dung công việc | Vai trò chịu trách nhiệm | Thành viên thực hiện |
-| :--- | :--- | :---: | :--- |
-| **01/07 - 04/07** | Khảo sát yêu cầu, xác định phạm vi & Phân tích yêu cầu (*Requirement Analysis*) | **PM** | Lê Tấn Thành |
-| **05/07 - 08/07** | Viết mô tả bài toán (*Problem Statement*) & Thiết kế sơ đồ Use Case | **FE** | Lê Song Anh Tài |
-| **08/07 - 11/07** | Thiết kế bản vẽ giao diện (*Mockup / Figma Wireframe*) | **FE** | Lê Song Anh Tài |
-| **08/07 - 11/07** | Mô tả tổng quan yêu cầu chức năng & phi chức năng (*Requirement Overview*) | **BE** | Nguyễn Trọng Tài, Nguyễn Bách Nhuận |
-| **12/07 - 14/07** | Review chéo nội dung, tổng hợp tài liệu `PA01` và nộp bài | **Cả nhóm** | Tất cả thành viên |
+| Thời gian | Phân mục công việc | Thành viên thực hiện | Nội dung chi tiết | Mốc đánh giá (Milestone) |
+| :--- | :--- | :--- | :--- | :--- |
+| **29/07 – 04/08**<br>*(Tuần 5)* | **Lập trình Tập trung & Kế hoạch Test**. | • PM<br>• FE + BE<br>• BE + n8n. | • Xây dựng kế hoạch kiểm thử tổng thể (Test Plan)..<br>• Code Kanban Task, module Post (CRUD, Draft), Statistics..<br>• Cấu hình webhook kết nối Node.js với n8n làm AI Assistant.. | |
+| **05/08 – 11/08**<br>*(Tuần 6)* | **Kịch bản Test & Thực thi Test**. | • Cả nhóm<br>• BE + n8n. | • Mỗi thành viên tự viết Test Cases cho module phụ trách..<br>• Thực hiện test thủ công, cập nhật trạng thái Passed/Failed..<br>• Hoàn thiện cổng Distribution tự up bài lên FB/Instagram.. | **Hạn chót (11/08):**<br>Tổng hợp và nộp tài liệu **PA03**.. |
 
 ---
 
-### 🎨 Giai đoạn 2: PA02 - Thiết kế phần mềm (Software Design)
-**Hạn chót nộp bài (Deadline): 28/07/2026**
+## SPRINT 4: Đóng gói, Kiểm thử Tự động & Nghiệm thu (12/08 – 25/08)
+**Mục tiêu:** Đóng gói ứng dụng với Docker, viết kịch bản Katalon Studio, quay video demo sản phẩm và tổng duyệt thuyết trình (PA04)..
 
-| Thời gian | Nội dung công việc | Vai trò chịu trách nhiệm | Thành viên thực hiện |
-| :--- | :--- | :---: | :--- |
-| **15/07 - 18/07** | Thiết kế mô hình khái niệm dữ liệu (*Conceptual Model / EERD*) | **PM** | Lê Tấn Thành |
-| **15/07 - 20/07** | Hoàn thiện thiết kế chi tiết giao diện & trải nghiệm người dùng (*UI/UX Design*) | **FE** | Lê Song Anh Tài |
-| **19/07 - 23/07** | Thiết kế kiến trúc hệ thống (*Architectural Design*) & Sơ đồ phân rã hệ thống | **BE** | Nguyễn Trọng Tài, Nguyễn Bách Nhuận |
-| **21/07 - 25/07** | Thiết kế cấu trúc dữ liệu lưu trữ (*Data Design*) | **BE** | Nguyễn Trọng Tài, Nguyễn Bách Nhuận |
-| **26/07 - 28/07** | Ghép các phần thiết kế, kiểm tra tính nhất quán, tổng hợp tài liệu `PA02` và nộp bài | **Cả nhóm** | Tất cả thành viên |
-
----
-
-### 🧪 Giai đoạn 3: PA03 - Kế hoạch và Kịch bản kiểm thử (Software Testing)
-**Hạn chót nộp bài (Deadline): 11/08/2026**
-
-| Thời gian | Nội dung công việc | Vai trò chịu trách nhiệm | Thành viên thực hiện |
-| :--- | :--- | :---: | :--- |
-| **29/07 - 02/08** | Xây dựng kế hoạch kiểm thử tổng thể (*Test Plan*) | **PM** | Lê Tấn Thành |
-| **03/08 - 08/08** | Viết kịch bản kiểm thử (*Test Cases*) cho các module | **Cả nhóm** | Mỗi thành viên phụ trách viết cho phần mình phát triển |
-| **09/08 - 11/08** | Chạy thử nghiệm thực tế, cập nhật kết quả kiểm thử (*Passed/Failed*) & Nộp tài liệu `PA03` | **Cả nhóm** | Tất cả thành viên |
-
----
-
-### 💻 Giai đoạn 4: PA04 - Hoàn thiện sản phẩm, Kiểm thử tự động & Báo cáo
-**Hạn chót nộp bài (Deadline): 25/08/2026**
-
-| Thời gian | Nội dung công việc | Vai trò chịu trách nhiệm | Thành viên thực hiện |
-| :--- | :--- | :---: | :--- |
-| **12/08 - 18/08** | Lập trình và hoàn thiện phần mềm hoạt động (*Working Software*) | **FE / BE** | Lê Song Anh Tài, Nguyễn Trọng Tài, Nguyễn Bách Nhuận |
-| **15/08 - 20/08** | Thiết lập và chạy kịch bản kiểm thử tự động (*Automated Testing* bằng Katalon) | **BE** | Nguyễn Trọng Tài, Nguyễn Bách Nhuận |
-| **19/08 - 22/08** | Quay video minh họa hoạt động phần mềm (*Working Software Video Demo*) | **FE** | Lê Song Anh Tài (phối hợp cùng nhóm) |
-| **21/08 - 24/08** | Chuẩn bị slide và nội dung thuyết trình dự án (*Project Presentation*) | **PM** | Lê Tấn Thành |
-| **25/08** | Tổng duyệt thuyết trình thử, nộp toàn bộ tài liệu và code `PA04` | **Cả nhóm** | Tất cả thành viên |
+| Thời gian | Phân mục công việc | Thành viên thực hiện | Nội dung chi tiết | Mốc đánh giá (Milestone) |
+| :--- | :--- | :--- | :--- | :--- |
+| **12/08 – 18/08**<br>*(Tuần 7)* | **Hoàn thiện & Automation Test**. | • FE<br>• BE. | • Tinh chỉnh UI/UX, code nốt Urgent Tasks, Today's Deadline..<br>• Đóng gói Docker-compose. Viết kịch bản Katalon Automation Test.. | |
+| **19/08 – 25/08**<br>*(Tuần 8)* | **Video Demo & Tổng duyệt**. | • FE<br>• PM. | • Quay và dựng video minh họa hoạt động phần mềm thực tế..<br>• Chuẩn bị slide, kịch bản thuyết trình và tổng duyệt nội bộ.. | **Hạn chót (25/08):**<br>Nộp mã nguồn GitHub, video demo, log test tự động và báo cáo **PA04**.. |
