@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: omni_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: omni_platforms_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Automatically initialize database schema on startup
+      - ./src/backend/database/file_database.sql:/docker-entrypoint-initdb.d/file_database.sql
+
+  backend:
+    build: ./src/backend
+    container_name: omni_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:123@db:5432/omni_platforms_dev
+      - JWT_SECRET_KEY=change-this-to-a-long-random-secret-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - CORS_ORIGINS=http://localhost:5173
+    depends_on:
+      - db
+
+  frontend:
+    build: ./src/frontend
+    container_name: omni_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: omni_n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=omni_platforms_dev
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=123
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  n8n_data:
