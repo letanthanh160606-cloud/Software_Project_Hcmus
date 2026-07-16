@@ -4,11 +4,47 @@ import { useNavigate } from 'react-router-dom';
 
 export default function SignIn() {
     const navigate = useNavigate();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
     const [showPass, setShowPass] = useState(false);
 
     const orangeGradient = 'linear-gradient(90deg, #F5820D 0%, #FA4A06 100%)';
     const textGray = '#A09893';
     const DeFont = 'Satoshi';
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        try {
+            const response = await fetch('http://localhost:8000/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    password: password,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                const errMsg = data.detail ? (typeof data.detail === 'string' ? data.detail : data.detail[0]?.msg) : 'Login failed';
+                throw new Error(errMsg);
+            }
+
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            alert('Login successful!');
+            // navigate('/dashboard'); // Hoặc chuyển đến trang khác
+        } catch (err) {
+            setError(err.message);
+        }
+    };
 
     return (
         <div style={{
@@ -41,7 +77,7 @@ export default function SignIn() {
             />
 
             {/* Layout */}
-            <form onSubmit={(e) => e.preventDefault()} style={{ display: 'contents' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
             <div style={{
                 width: 'auto',
                 height: 'auto',
@@ -63,6 +99,11 @@ export default function SignIn() {
                     <div style={{ color: 'black', fontSize: '14px', fontFamily: DeFont, fontWeight: '400', wordWrap: 'break-word' }}>Your Personal Content Distributor</div>
                 </div>
 
+                {error && (
+                    <div style={{ color: '#FA4A06', fontSize: '14px', fontFamily: DeFont, textAlign: 'center', fontWeight: '600' }}>
+                        {error}
+                    </div>
+                )}
 
                 {/* Fields */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '320px', fontFamily: DeFont }}>
@@ -74,6 +115,8 @@ export default function SignIn() {
                             type="email"
                             placeholder="Peter@example.com"
                             style={inputStyle}
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
                     </div>
@@ -86,6 +129,8 @@ export default function SignIn() {
                                 type={showPass ? 'text' : 'password'}
                                 placeholder="Enter your password"
                                 style={{ ...inputStyle, paddingRight: '50px' }}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                             <button
