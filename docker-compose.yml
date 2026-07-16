@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: 123
       POSTGRES_DB: omni_platforms_dev
     ports:
-      - "5432:5432"
+      - "5433:5432" # change here for not conflict ports
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Automatically initialize database schema on startup
@@ -56,6 +56,8 @@ services:
       - DB_POSTGRESDB_DATABASE=omni_platforms_dev
       - DB_POSTGRESDB_USER=postgres
       - DB_POSTGRESDB_PASSWORD=123
+      - WEBHOOK_URL=https://limeade-unreached-hangover.ngrok-free.dev/
+
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
