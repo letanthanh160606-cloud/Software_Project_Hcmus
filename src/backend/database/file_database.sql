@@ -156,6 +156,7 @@ CREATE TABLE "Users".users (
     username text NOT NULL,
     email text NOT NULL,
     password_hash text NOT NULL,
+    account_type public.account_type_enum DEFAULT 'individual'::public.account_type_enum NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
