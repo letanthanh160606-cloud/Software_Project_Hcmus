@@ -25,6 +25,17 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
     return pwd_context.verify(plain_password, password_hash)
 
 
+# Workspace PINs are hashed with the same Argon2id context as passwords.
+# Kept as separate named functions so call sites read clearly and so the
+# hashing scheme for PINs can diverge from passwords later if needed.
+def hash_pin(plain_pin: str) -> str:
+    return pwd_context.hash(plain_pin)
+
+
+def verify_pin(plain_pin: str, pin_hash: str) -> bool:
+    return pwd_context.verify(plain_pin, pin_hash)
+
+
 def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None) -> tuple[str, int]:
     expires_delta = timedelta(minutes=settings.jwt_access_token_expire_minutes)
     expire_at = datetime.now(timezone.utc) + expires_delta
@@ -41,4 +52,12 @@ def decode_access_token(token: str) -> dict[str, Any]:
     return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
 
 
-__all__ = ["hash_password", "verify_password", "create_access_token", "decode_access_token", "JWTError"]
+__all__ = [
+    "hash_password",
+    "verify_password",
+    "hash_pin",
+    "verify_pin",
+    "create_access_token",
+    "decode_access_token",
+    "JWTError",
+]

@@ -143,6 +143,38 @@ $$;
 
 ALTER FUNCTION public.set_updated_at() OWNER TO postgres;
 
+--
+-- Name: generate_workspace_id(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.generate_workspace_id() RETURNS character varying(16)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    chars text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; -- bỏ ký tự dễ nhầm: I, L, O, 0, 1
+    result text;
+    i integer;
+    new_id character varying(16);
+    already_used boolean;
+BEGIN
+    LOOP
+        result := '';
+        FOR i IN 1..16 LOOP
+            result := result || substr(chars, floor(random() * length(chars) + 1)::int, 1);
+        END LOOP;
+        new_id := result;
+        SELECT EXISTS (
+            SELECT 1 FROM workspaces.workspaces WHERE workspace_uuid = new_id
+        ) INTO already_used;
+        EXIT WHEN NOT already_used;
+    END LOOP;
+    RETURN new_id;
+END;
+$$;
+
+
+ALTER FUNCTION public.generate_workspace_id() OWNER TO postgres;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -170,7 +202,7 @@ ALTER TABLE "Users".users OWNER TO postgres;
 
 CREATE TABLE workspaces.knowledge_base_documents (
     id uuid DEFAULT uuidv7() NOT NULL,
-    owner_workspace_id uuid,
+    owner_workspace_id character varying(16),
     owner_user_id uuid,
     title text NOT NULL,
     file_path text NOT NULL,
@@ -264,7 +296,7 @@ ALTER TABLE workspaces.post_reviews OWNER TO postgres;
 
 CREATE TABLE workspaces.posts (
     id uuid DEFAULT uuidv7() NOT NULL,
-    workspace_id uuid,
+    workspace_id character varying(16),
     author_id uuid NOT NULL,
     title text,
     content text DEFAULT ''::text NOT NULL,
@@ -274,7 +306,6 @@ CREATE TABLE workspaces.posts (
     ai_generated boolean DEFAULT false NOT NULL,
     seo_keywords jsonb,
     seo_hashtags jsonb,
-    seo_score numeric(5,2),
     submitted_at timestamp with time zone,
     reviewed_by uuid,
     reviewed_at timestamp with time zone,
@@ -294,7 +325,7 @@ ALTER TABLE workspaces.posts OWNER TO postgres;
 
 CREATE TABLE workspaces.prompt_templates (
     id uuid DEFAULT uuidv7() CONSTRAINT prompt_templates_prompt_templates_not_null NOT NULL,
-    owner_workspace_id uuid,
+    owner_workspace_id character varying(16),
     owner_user_id uuid,
     title text NOT NULL,
     content text NOT NULL,
@@ -315,7 +346,7 @@ ALTER TABLE workspaces.prompt_templates OWNER TO postgres;
 
 CREATE TABLE workspaces.social_accounts (
     social_acc_id uuid DEFAULT uuidv7() NOT NULL,
-    workspace_id uuid,
+    workspace_id character varying(16),
     user_id uuid,
     platform public.platform_enum NOT NULL,
     platform_account_id text NOT NULL,
@@ -339,7 +370,7 @@ ALTER TABLE workspaces.social_accounts OWNER TO postgres;
 
 CREATE TABLE workspaces.workspace_members (
     user_id uuid NOT NULL,
-    workspace_id uuid NOT NULL,
+    workspace_id character varying(16) NOT NULL,
     status public.membership_status_enum DEFAULT 'active'::public.membership_status_enum NOT NULL,
     joined_at timestamp with time zone DEFAULT now() NOT NULL,
     removed_at timestamp with time zone
@@ -353,16 +384,13 @@ ALTER TABLE workspaces.workspace_members OWNER TO postgres;
 --
 
 CREATE TABLE workspaces.workspaces (
-    workspace_uuid uuid DEFAULT uuidv7() NOT NULL,
-    invite_code character varying(8) NOT NULL,
-    slug character varying(50) NOT NULL,
+    workspace_uuid character varying(16) DEFAULT public.generate_workspace_id() NOT NULL,
     workspacename text NOT NULL,
     manager_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     pin_hash text DEFAULT ''::text NOT NULL,
-    CONSTRAINT slug_format CHECK (((slug)::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text)),
-    CONSTRAINT slug_length CHECK (((char_length((slug)::text) >= 3) AND (char_length((slug)::text) <= 50)))
+    CONSTRAINT workspace_uuid_length CHECK ((char_length((workspace_uuid)::text) = 16))
 );
 
 
@@ -481,14 +509,6 @@ ALTER TABLE ONLY workspaces.workspace_members
 
 
 --
--- Name: workspaces workspaces_invite_code_key; Type: CONSTRAINT; Schema: workspaces; Owner: postgres
---
-
-ALTER TABLE ONLY workspaces.workspaces
-    ADD CONSTRAINT workspaces_invite_code_key UNIQUE (invite_code);
-
-
---
 -- Name: workspaces workspaces_pin_hash_key; Type: CONSTRAINT; Schema: workspaces; Owner: postgres
 --
 
@@ -502,14 +522,6 @@ ALTER TABLE ONLY workspaces.workspaces
 
 ALTER TABLE ONLY workspaces.workspaces
     ADD CONSTRAINT workspaces_pkey PRIMARY KEY (workspace_uuid);
-
-
---
--- Name: workspaces workspaces_slug_key; Type: CONSTRAINT; Schema: workspaces; Owner: postgres
---
-
-ALTER TABLE ONLY workspaces.workspaces
-    ADD CONSTRAINT workspaces_slug_key UNIQUE (slug);
 
 
 --
@@ -636,13 +648,6 @@ CREATE INDEX workspace_members_workspace_idx ON workspaces.workspace_members USI
 --
 
 CREATE INDEX workspaces_manager_id_idx ON workspaces.workspaces USING btree (manager_id);
-
-
---
--- Name: workspaces_slug_lower_idx; Type: INDEX; Schema: workspaces; Owner: postgres
---
-
-CREATE UNIQUE INDEX workspaces_slug_lower_idx ON workspaces.workspaces USING btree (lower((slug)::text));
 
 
 --
