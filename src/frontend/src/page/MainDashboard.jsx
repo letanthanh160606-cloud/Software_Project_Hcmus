@@ -10,8 +10,9 @@ import pcicon from '../assets/pcicon.png';
 import pmicon from '../assets/pmicon.png';
 
 export default function MainDashboard() {
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState('Dashboard');
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState('manager'); // TESTING - YET TO HAVE APPROPRIATE TOKEN
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -26,15 +27,19 @@ export default function MainDashboard() {
   }, []);
 
   const menuItems = [
-    { label: 'Dashboard', icon: <img src={dbicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Content', icon: <img src={cticon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Statistics', icon: <img src={sicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Distribution', icon: <img src={disicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Calendar', icon: <img src={caicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Team Workspace', icon: <img src={wsicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Prompt & Context', icon: <img src={pcicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Post Management', icon: <img src={pmicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> }
+    { label: 'Dashboard', roles: ['all'], icon: <img src={dbicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Content', roles: ['all'], icon: <img src={cticon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Statistics', roles: ['all'], icon: <img src={sicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Distribution', roles: ['individual', 'manager'], icon: <img src={disicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Calendar', roles: ['all'], icon: <img src={caicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Team Workspace', roles: ['member', 'manager'], icon: <img src={wsicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Prompt & Context', roles: ['all'], icon: <img src={pcicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
+    { label: 'Post Management', roles: ['all'], icon: <img src={pmicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> }
   ];
+
+  const visibleMenuItems = menuItems.filter(
+    (item) => item.roles.includes('all') || item.roles.includes(userRole)
+  );
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
@@ -72,8 +77,8 @@ export default function MainDashboard() {
 
       {/* Fixed Left Navigation Sidebar */}
       <aside style={{ 
-        position: 'fixed', top: '70px', left: 0, bottom: 0, width: '260px', zIndex: 90,
-        paddingLeft: '24px', paddingRight: '24px', boxSizing: 'border-box'
+          position: 'fixed', top: '70px', left: 0, bottom: 0, width: '260px', zIndex: 90,
+          paddingLeft: '24px', paddingRight: '24px', boxSizing: 'border-box'
       }}>
         <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.08)', marginBottom: '24px', marginTop: 0 }} />
 
@@ -81,12 +86,14 @@ export default function MainDashboard() {
           display: 'flex', flexDirection: 'column', gap: '10px',
           fontFamily: 'Satoshi, system-ui, sans-serif', padding: 0, margin: 0, listStyle: 'none'
         }}>
-          {menuItems.map((item, index) => {
-            const isActive = activeTab === index;
+          {visibleMenuItems.map((item) => {
+            // 3. Match against the unique label instead of array indexes to ensure flawless active states
+            const isActive = activeTab === item.label;
+            
             return (
-              <li key={index} style={{ width: '100%' }}>
+              <li key={item.label} style={{ width: '100%' }}>
                 <button 
-                  onClick={() => setActiveTab(index)}
+                  onClick={() => setActiveTab(item.label)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -99,15 +106,15 @@ export default function MainDashboard() {
                     cursor: 'pointer',
                     padding: '12px 16px',
                     borderRadius: '12px',
+                    border: 'none', // Prevents default button borders styling clashes
                     
-                    // 2. Dynamic properties conditional on the active element
+                    // Dynamic active styles
                     fontWeight: isActive ? '500' : '400',
                     color: isActive ? '#1e1e1e' : '#5c5c5c',
                     backgroundColor: isActive ? 'rgba(255, 255, 255, 0.55)' : 'rgba(255, 255, 255, 0)',
                     border: isActive ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0)',
                     boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.03)' : 'none',
 
-                    // 3. Smooth transition configuration
                     transition: 'background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease, box-shadow 0.25s ease'
                   }}
                 >
@@ -131,7 +138,7 @@ export default function MainDashboard() {
         paddingLeft: '23px', paddingTop: '0px', boxSizing: 'border-box', height: '1000px'
       }}>
         <h2 style={{ fontFamily: 'Satoshi', fontWeight: '500', color: '#1e1e1e', paddingTop: '0px'}}>
-          {menuItems[activeTab].label} Content Space
+          {activeTab} Content Space
         </h2>
 
       </main>
