@@ -90,7 +90,9 @@ export default function SignInUp() {
             justifyContent: 'center',
             alignItems: 'center',
             height: '100vh',
-            width: '100%',
+            width: '100vw',
+            margin: 0,
+            padding: 0,
             overflow: 'hidden',
             position: 'relative',
             gap: '35px'
