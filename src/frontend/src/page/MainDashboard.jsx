@@ -8,6 +8,7 @@ import caicon from '../assets/caicon.png';
 import wsicon from '../assets/wsicon.png';
 import pcicon from '../assets/pcicon.png';
 import pmicon from '../assets/pmicon.png';
+import DBmodule from '../component/DBmodule.jsx';
 
 export default function MainDashboard() {
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -132,14 +133,18 @@ export default function MainDashboard() {
       {/* Main Panel Window */}
       <main style={{ 
         marginTop: '70px', marginLeft: '260px', marginRight: '24px', marginBottom: '24px',
-        minHeight: 'calc(100vh - 100px)', background: 'rgba(255, 255, 255, 0.35)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '24px',
-        border: '1px solid rgba(255, 255, 255, 0.25)', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)',
-        paddingLeft: '23px', paddingTop: '0px', boxSizing: 'border-box', height: '1000px'
+        minHeight: 'calc(100vh - 100px)',borderRadius: '20px',
+        padding: '0px', boxSizing: 'border-box', height: '100%', overflow: 'hidden'
       }}>
-        <h2 style={{ fontFamily: 'Satoshi', fontWeight: '500', color: '#1e1e1e', paddingTop: '0px'}}>
-          {activeTab} Content Space
-        </h2>
+        <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}> 
+          {activeTab === 'Dashboard' ? (
+            <DBmodule />
+          ) : (
+            <div style={{backgroundColor: 'black', color: '#5c5c5c' }}>
+              <h2 style={{padding: '0px', margin: '0px'}}>{activeTab} Module</h2>
+            </div>
+          )}
+        </div>
 
       </main>
 
