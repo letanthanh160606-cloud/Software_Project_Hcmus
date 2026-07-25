@@ -82,8 +82,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         subject=str(user.users_uuid),
         extra_claims={"role": role, "account_type": user.account_type},
     )
+    user_response = UserResponse.model_validate(user)
+    user_response.role = role
 
-    return TokenResponse(access_token=access_token, expires_in=expires_in, user=user)
+    return TokenResponse(access_token=access_token, expires_in=expires_in, user=user_response)
 
 
 @router.get("/me", response_model=UserResponse)

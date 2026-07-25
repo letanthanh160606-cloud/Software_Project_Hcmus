@@ -78,6 +78,7 @@ class UserResponse(BaseModel):
     username: str
     email: EmailStr
     account_type: str
+    role: str = ""
     created_at: datetime
 
 
