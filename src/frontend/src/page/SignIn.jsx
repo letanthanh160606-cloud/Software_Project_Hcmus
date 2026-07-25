@@ -40,7 +40,7 @@ export default function SignIn() {
             localStorage.setItem('user', JSON.stringify(data.user));
 
             alert('Login successful!');
-            // navigate('/dashboard'); // Hoặc chuyển đến trang khác
+            navigate('/dashboard'); // Hoặc chuyển đến trang khác
         } catch (err) {
             setError(err.message);
         }
@@ -56,7 +56,7 @@ export default function SignIn() {
             width: '100%',
             overflow: 'hidden',
             position: 'relative',
-            gap: '35px'
+            gap: '35px',
         }}>
 
             {/* Background Image */}
