@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import User, Workspace, WorkspaceMember
+from app.models import Post, User, Workspace, WorkspaceMember
 from app.security import hash_password, hash_pin
 
 
@@ -109,3 +109,60 @@ def derive_role(db: Session, user: User) -> str:
         return "member"
 
     return "individual"
+
+def user_can_access_workspace(
+    db: Session,
+    *,
+    user: User,
+    workspace_id: str,
+) -> bool:
+    workspace = db.get(Workspace, workspace_id)
+
+    if workspace is None:
+        return False
+
+    # User là manager của workspace.
+    if workspace.manager_id == user.users_uuid:
+        return True
+
+    # User là member đang active của workspace.
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user.users_uuid,
+            WorkspaceMember.status == "active",
+        )
+    )
+
+    return membership is not None
+
+def create_post(
+    db: Session,
+    *,
+    author: User,
+    workspace_id: str | None,
+    title: str | None,
+    content: str,
+    prompt_template_id=None,
+    knowledge_base_id=None,
+    seo_keywords: list[str] | None = None,
+    seo_hashtags: list[str] | None = None,
+) -> Post:
+    post = Post(
+        workspace_id=workspace_id,
+        author_id=author.users_uuid,
+        title=title,
+        content=content,
+        status="draft",
+        prompt_template_id=prompt_template_id,
+        knowledge_base_id=knowledge_base_id,
+        ai_generated=False,
+        seo_keywords=seo_keywords,
+        seo_hashtags=seo_hashtags,
+    )
+
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+
+    return post
