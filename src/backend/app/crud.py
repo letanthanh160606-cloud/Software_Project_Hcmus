@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -166,3 +167,9 @@ def create_post(
     db.refresh(post)
 
     return post
+
+def get_post_by_id(
+    db: Session,
+    post_id: uuid.UUID,
+) -> Post | None:
+    return db.get(Post, post_id)
