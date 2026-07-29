@@ -100,3 +100,65 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+
+class PostCreate(BaseModel):
+    workspace_id: str | None = Field(
+        default=None,
+        min_length=WORKSPACE_ID_LENGTH,
+        max_length=WORKSPACE_ID_LENGTH,
+    )
+
+    title: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    content: str = ""
+
+    prompt_template_id: uuid.UUID | None = None
+    knowledge_base_id: uuid.UUID | None = None
+
+    seo_keywords: list[str] | None = None
+    seo_hashtags: list[str] | None = None
+
+class PostUpdate(BaseModel):
+    title: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    content: str | None = None
+
+    prompt_template_id: uuid.UUID | None = None
+    knowledge_base_id: uuid.UUID | None = None
+
+    seo_keywords: list[str] | None = None
+    seo_hashtags: list[str] | None = None
+
+class PostResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    workspace_id: str | None
+    author_id: uuid.UUID
+
+    title: str | None
+    content: str
+    status: str
+
+    prompt_template_id: uuid.UUID | None
+    knowledge_base_id: uuid.UUID | None
+
+    ai_generated: bool
+    seo_keywords: list[str] | None
+    seo_hashtags: list[str] | None
+
+    submitted_at: datetime | None
+    reviewed_by: uuid.UUID | None
+    reviewed_at: datetime | None
+    reject_reason: str | None
+    published_at: datetime | None
+
+    created_at: datetime
+    updated_at: datetime
