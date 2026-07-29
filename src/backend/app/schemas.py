@@ -122,6 +122,20 @@ class PostCreate(BaseModel):
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
 
+class PostUpdate(BaseModel):
+    title: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    content: str | None = None
+
+    prompt_template_id: uuid.UUID | None = None
+    knowledge_base_id: uuid.UUID | None = None
+
+    seo_keywords: list[str] | None = None
+    seo_hashtags: list[str] | None = None
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

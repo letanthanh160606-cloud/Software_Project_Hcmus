@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Post, User, Workspace, WorkspaceMember
 from app.security import hash_password, hash_pin
+from app.schemas import PostUpdate
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -198,3 +199,19 @@ def get_posts(
     )
 
     return list(db.scalars(statement).all())
+
+def update_post(
+    db: Session,
+    *,
+    post: Post,
+    post_update: PostUpdate,
+) -> Post:
+    update_data = post_update.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        setattr(post, field, value)
+
+    db.commit()
+    db.refresh(post)
+
+    return post
