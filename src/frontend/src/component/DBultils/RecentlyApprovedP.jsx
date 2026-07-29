@@ -55,14 +55,14 @@ export default function RecentlyApproveP() {
     }}>
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#554E43' }}>Recently Approved Posts</h2>
+        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>Recently Approved Posts</h2>
         <span style={{ fontSize: '14px', color: '#554E43', cursor: 'pointer', fontWeight: '500' }}>See all &gt;</span>
       </div>
 
-      {/* Table Header (Static) */}
+      {/* Table Header */}
       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', tableLayout: 'fixed' }}>
         <thead>
-          <tr style={{ color: '#7E7A72', fontSize: '14px' }}>
+          <tr style={{ color: '#7E7A72', fontSize: '13px' }}>
             <th style={{ width: '40%', padding: '10px 5px', fontWeight: '600', borderBottom: '1px solid #E6DEC9' }}>Name</th>
             <th style={{ width: '25%', padding: '10px 5px', fontWeight: '600', borderBottom: '1px solid #E6DEC9' }}>Published Date</th>
             <th style={{ width: '18%', padding: '10px 5px', fontWeight: '600', borderBottom: '1px solid #E6DEC9' }}>Attachment</th>
@@ -76,7 +76,7 @@ export default function RecentlyApproveP() {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', tableLayout: 'fixed' }}>
           <tbody>
             {approvedPosts.map((post) => (
-              <tr key={post.id} style={{ borderBottom: '1px solid #E6DEC9', color: '#888175', fontSize: '13px' }}>
+              <tr key={post.id} style={{ borderBottom: '1px solid #E6DEC9', color: '#888175', fontSize: '12px' }}>
                 {/* Task Name */}
                 <td style={{
                   width: '40%',
