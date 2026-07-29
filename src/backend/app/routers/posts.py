@@ -70,6 +70,42 @@ def create_post(
             detail="Post could not be created because related data is invalid",
         ) from exc
 
+@router.get(
+    "",
+    response_model=list[PostResponse],
+)
+def get_posts(
+    workspace_id: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Post]:
+    if workspace_id is not None:
+        workspace = crud.get_workspace_by_id(
+            db,
+            workspace_id,
+        )
+
+        if workspace is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workspace not found",
+            )
+
+        if not crud.user_can_access_workspace(
+            db,
+            user=current_user,
+            workspace_id=workspace_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this workspace",
+            )
+
+    return crud.get_posts(
+        db,
+        author=current_user,
+        workspace_id=workspace_id,
+    )
 
 @router.get(
     "/{post_id}",

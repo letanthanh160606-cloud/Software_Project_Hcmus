@@ -173,3 +173,28 @@ def get_post_by_id(
     post_id: uuid.UUID,
 ) -> Post | None:
     return db.get(Post, post_id)
+
+
+def get_posts(
+    db: Session,
+    *,
+    author: User,
+    workspace_id: str | None,
+) -> list[Post]:
+    statement = select(Post)
+
+    if workspace_id is not None:
+        statement = statement.where(
+            Post.workspace_id == workspace_id,
+        )
+    else:
+        statement = statement.where(
+            Post.workspace_id.is_(None),
+            Post.author_id == author.users_uuid,
+        )
+
+    statement = statement.order_by(
+        Post.created_at.desc(),
+    )
+
+    return list(db.scalars(statement).all())
