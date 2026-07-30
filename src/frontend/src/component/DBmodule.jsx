@@ -139,6 +139,7 @@ export default function DBmodule() {
         minHeight: 'calc(100vh - 70px)',
       }}>
       
+      {/* Main Canvas */}
       <div style={{
         display: 'flex',
         flexDirection: 'row',
@@ -148,7 +149,6 @@ export default function DBmodule() {
         padding: '0px'
       }}>
         
-        {/* Main Canvas */}
         <div style={{
             width: '70%',
             minHeight: '100%',
@@ -219,7 +219,7 @@ export default function DBmodule() {
                   zIndex: 2, 
                   position: 'absolute', 
                   top: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   fontWeight: '700',
                   fontFamily: 'Satoshi',
                   color: '#7E7A72'
@@ -288,7 +288,7 @@ export default function DBmodule() {
                   zIndex: 2, 
                   position: 'absolute', 
                   top: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   fontWeight: '700',
                   fontFamily: 'Satoshi',
                   color: '#7E7A72'

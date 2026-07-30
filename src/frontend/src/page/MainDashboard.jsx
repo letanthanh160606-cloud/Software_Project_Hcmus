@@ -9,7 +9,6 @@ import wsicon from '../assets/wsicon.png';
 import pcicon from '../assets/pcicon.png';
 import pmicon from '../assets/pmicon.png';
 import DBmodule from '../component/DBmodule.jsx';
-import Contmodule from '../component/Contmodule.jsx';
 
 export default function MainDashboard() {
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -108,7 +107,7 @@ export default function MainDashboard() {
                     cursor: 'pointer',
                     padding: '12px 16px',
                     borderRadius: '12px',
-                    border: 'none',
+                    border: 'none', // Prevents default button borders styling clashes
                     
                     // Dynamic active styles
                     fontWeight: isActive ? '500' : '400',
@@ -140,8 +139,6 @@ export default function MainDashboard() {
         <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}> 
           {activeTab === 'Dashboard' ? (
             <DBmodule />
-          ) : activeTab === 'Content' ? (
-            <Contmodule />
           ) : (
             <div style={{backgroundColor: 'black', color: '#5c5c5c' }}>
               <h2 style={{padding: '0px', margin: '0px'}}>{activeTab} Module</h2>

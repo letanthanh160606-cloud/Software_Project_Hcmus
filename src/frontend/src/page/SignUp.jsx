@@ -20,11 +20,6 @@ export default function SignInUp() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
 
-    // Business-only fields
-    const [workspaceName, setWorkspaceName] = useState('');
-    const [workspaceId, setWorkspaceId] = useState('');
-    const [workspacePin, setWorkspacePin] = useState('');
-
     // Common button/input style values matching the design
     const orangeGradient = 'linear-gradient(90deg, #F5820D 0%, #FA4A06 100%)';
     const lightBg = '#F6EFEA';
@@ -40,33 +35,18 @@ export default function SignInUp() {
             return;
         }
 
-                // Base payload, matches RegisterRequest for the "individual" flow
-        const payload = {
-            username: username,
-            email: email,
-            password: password,
-            account_type: accountType === 'Personal' ? 'individual' : 'business',
-        };
-
-        // Business flow needs extra fields depending on Manager vs Member
-        if (accountType === 'Business') {
-            payload.business_role = role.toLowerCase(); // 'Manager' -> 'manager', 'Member' -> 'member'
-            payload.workspace_pin = workspacePin;
-
-            if (role === 'Manager') {
-                payload.workspace_name = workspaceName;
-            } else {
-                payload.workspace_id = workspaceId;
-            }
-        } 
-
         try {
             const response = await fetch('http://localhost:8000/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password,
+                    account_type: accountType === 'Personal' ? 'individual' : 'business',
+                }),
             });
 
             const data = await response.json();
@@ -346,13 +326,7 @@ export default function SignInUp() {
                                         type="text"
                                         placeholder={role === 'Manager' ? 'Workspace name' : 'Workspace ID'}
                                         style={inputStyle}
-                                        value={role === 'Manager' ? workspaceName : workspaceId}
-                                        onChange={(e) =>
-                                            role === 'Manager'
-                                                ? setWorkspaceName(e.target.value)
-                                                : setWorkspaceId(e.target.value)
-                                        }
-                                        required={accountType === 'Business'}
+                                        required={role === 'Member'}
                                     />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -360,10 +334,8 @@ export default function SignInUp() {
                                     <div style={{ position: 'relative', width: '100%' }}>
                                         <input
                                             type={showPass3 ? 'text' : 'password'}
-                                            placeholder="4-8 digit PIN"
+                                            placeholder="Workspace password"
                                             style={{ ...inputStyle, paddingRight: '50px' }}
-                                            value={workspacePin}
-                                            onChange={(e) => setWorkspacePin(e.target.value)}
                                             required={accountType === 'Business'}
                                         />
                                         <button

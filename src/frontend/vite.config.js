@@ -8,8 +8,4 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
-  server: {
-    port: 5173,
-    strictPort: true, // Báo lỗi ngay nếu port 5173 đã bị chiếm, không tự chuyển port khác
-  },
 })
