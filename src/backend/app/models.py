@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, func, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, SmallInteger, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,12 +36,33 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
 
     account_type: Mapped[str] = mapped_column(AccountType, nullable=False, server_default="individual")
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     workspaces_managed: Mapped[list["Workspace"]] = relationship(back_populates="manager")
     memberships: Mapped[list["WorkspaceMember"]] = relationship(back_populates="user")
+
+
+class EmailVerification(Base):
+
+    __tablename__ = "email_verifications"
+    __table_args__ = {"schema": "public"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    otp_hash: Mapped[str] = mapped_column(String, nullable=False)
+    salt: Mapped[str] = mapped_column(String(32), nullable=False)
+    verification_token: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    verification_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    attempt_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
 
 
 class Workspace(Base):

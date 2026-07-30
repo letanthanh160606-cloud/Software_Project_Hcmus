@@ -9,6 +9,21 @@ PIN_PATTERN = re.compile(r"^\d{4,8}$")
 WORKSPACE_ID_LENGTH = 16
 
 
+class SendOTPRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6, description="6-digit OTP code")
+
+
+class VerifyOTPResponse(BaseModel):
+    message: str = "Email verified successfully"
+    verification_token: str
+    expires_in: int = 900  # 15 minutes in seconds
+
+
 class RegisterRequest(BaseModel):
     """
     Registration payload covering three flows, selected via account_type /
@@ -30,6 +45,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=2, max_length=100, description="Full name / display name")
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    verification_token: str = Field(..., description="Issued verification_token after successful OTP verification")
     account_type: Literal["individual", "business"] = "individual"
 
     # Only relevant when account_type == "business"

@@ -15,6 +15,17 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    smtp_server: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    email_from: str = ""
+
+    otp_expire_minutes: int = 5
+    otp_max_attempts: int = 5
+    otp_resend_interval: int = 60
+    verification_token_expire_minutes: int = 15
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
