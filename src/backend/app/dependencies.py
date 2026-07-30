@@ -8,7 +8,11 @@ from app.database import get_db
 from app.models import User
 from app.security import JWTError, decode_access_token
 
+from dataclasses import dataclass
+from app.models import Workspace, WorkspaceMember
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
 
 
 def get_current_user(
@@ -43,3 +47,34 @@ def get_current_user(
         raise credentials_error
 
     return user
+
+@dataclass
+class WorkspaceContext:
+    workspace: Workspace
+    role: str
+
+def get_workspace_context(
+    workspace_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> WorkspaceContext:
+    workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+
+    if workspace.manager_id == current_user.users_uuid:
+        return WorkspaceContext(workspace=workspace, role="manager")
+
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == current_user.users_uuid,
+            WorkspaceMember.status == "active",
+        )
+    )
+    if membership is not None:
+        return WorkspaceContext(workspace=workspace, role="member")
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
+                        detail="You do not have permission to access this workspace."
+                        )

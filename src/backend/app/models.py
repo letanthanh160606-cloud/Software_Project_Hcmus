@@ -84,3 +84,55 @@ class WorkspaceMember(Base):
 
     user: Mapped["User"] = relationship(back_populates="memberships")
     workspace: Mapped["Workspace"] = relationship(back_populates="members")
+
+
+class SocialAccount(Base):
+    __tablename__ = "social_accounts"
+    __table_args__ = {"schema": "workspaces"}
+
+    social_acc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    workspace_id: Mapped[str | None] = mapped_column(
+        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE"),
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
+    platform: Mapped[str] = mapped_column(String, nullable=False)  # facebook / linkedin
+    platform_account_id: Mapped[str] = mapped_column(String, nullable=False)
+    platform_account_name: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="connected")
+    connected_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Post(Base):
+    __tablename__ = "posts"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    workspace_id: Mapped[str | None] = mapped_column(
+        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE")
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=False)
+    title: Mapped[str | None] = mapped_column(String)
+    content: Mapped[str] = mapped_column(String, nullable=False, server_default="")
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
+    ai_generated: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class Task(Base):
+    __tablename__ = "tasks"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    workspace_id: Mapped[str] = mapped_column(
+        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE", ), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(String, nullable=False, server_default="")
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="todo")
+    priority: Mapped[str] = mapped_column(String, nullable=False, server_default="medium")
+    assigned_to: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

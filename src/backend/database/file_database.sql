@@ -861,6 +861,83 @@ ALTER TABLE ONLY workspaces.workspace_members
     ADD CONSTRAINT workspace_members_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES workspaces.workspaces(workspace_uuid) ON DELETE CASCADE;
 
 
+CREATE TYPE public.task_status_enum AS ENUM (
+    'todo',
+    'in_progress',
+    'review',
+    'completed',
+    'cancelled'
+);
+ALTER TYPE public.task_status_enum OWNER TO postgres;
+
+CREATE TYPE public.task_priority_enum AS ENUM (
+    'low',
+    'medium',
+    'high',
+    'urgent'
+);
+ALTER TYPE public.task_priority_enum OWNER TO postgres;
+
+CREATE TABLE workspaces.tasks (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    workspace_id character varying(16) NOT NULL,
+    title text NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    status public.task_status_enum DEFAULT 'todo'::public.task_status_enum NOT NULL,
+    priority public.task_priority_enum DEFAULT 'medium'::public.task_priority_enum NOT NULL,
+    assigned_to uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE workspaces.tasks OWNER TO postgres;
+
+CREATE TABLE workspaces.task_attachments (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    task_id uuid NOT NULL,
+    image_url text NOT NULL,
+    uploaded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE workspaces.task_attachments OWNER TO postgres;
+
+ALTER TABLE ONLY workspaces.tasks
+    ADD CONSTRAINT tasks_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY workspaces.task_attachments
+    ADD CONSTRAINT task_attachments_pkey PRIMARY KEY (id);
+
+
+CREATE INDEX tasks_workspace_id_idx ON workspaces.tasks USING btree (workspace_id);
+CREATE INDEX tasks_status_idx ON workspaces.tasks USING btree (status);
+CREATE INDEX task_attachments_task_id_idx ON workspaces.task_attachments USING btree (task_id);
+CREATE INDEX tasks_assigned_to_idx ON workspaces.tasks USING btree (assigned_to);
+
+
+CREATE TRIGGER trg_tasks_updated_at 
+    BEFORE UPDATE ON workspaces.tasks 
+    FOR EACH ROW 
+    EXECUTE FUNCTION public.set_updated_at();
+
+
+-- Linking task -> workspace
+ALTER TABLE ONLY workspaces.tasks
+    ADD CONSTRAINT tasks_workspace_id_fkey 
+    FOREIGN KEY (workspace_id) 
+    REFERENCES workspaces.workspaces(workspace_uuid) 
+    ON DELETE CASCADE;
+
+-- Linking task_attachment -> task
+ALTER TABLE ONLY workspaces.task_attachments
+    ADD CONSTRAINT task_attachments_task_id_fkey 
+    FOREIGN KEY (task_id) 
+    REFERENCES workspaces.tasks(id) 
+    ON DELETE CASCADE;
+
+ALTER TABLE ONLY workspaces.tasks
+    ADD CONSTRAINT tasks_assigned_to_fkey 
+    FOREIGN KEY (assigned_to) 
+    REFERENCES "Users".users(users_uuid) 
+    ON DELETE SET NULL;
+
 --
 -- PostgreSQL database dump complete
 --
