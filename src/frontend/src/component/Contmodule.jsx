@@ -80,7 +80,7 @@ function PlatformCard({ icon, platformName, accountName, selected, onToggle }) {
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          transition: 'background-color 0.2s ease, border-color 0.2s ease',
+          transition: 'background-color 0.2s ease, border-color 0.2s ease'
         }}
       >
         {selected && (
@@ -104,44 +104,53 @@ function PlatformCard({ icon, platformName, accountName, selected, onToggle }) {
 
 function KBItem({ title, aiEnabled, checked, onCheck }) {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '8px 0',
-      borderBottom: '1px solid rgba(0,0,0,0.06)',
-    }}>
+    <div 
+      // 1. Move onClick to the parent wrapper so clicking the text OR box works
+      onClick={aiEnabled ? onCheck : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 0',
+        // 2. Set cursor on the whole row
+        cursor: aiEnabled ? 'pointer' : 'not-allowed', 
+        opacity: aiEnabled ? 1 : 0.6, // Visual feedback when disabled
+        userSelect: 'none', // Prevents double-click highlighting text
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         {/* Checkbox dot */}
         <div
-          onClick={onCheck}
           style={{
-            width: '16px',
-            height: '16px',
+            width: '14px',
+            height: '14px',
             borderRadius: '4px',
             border: checked ? (aiEnabled ? '2px solid #FE7216' : '2px solid #9ca3af') : '2px solid #d1d5db',
             backgroundColor: checked ? (aiEnabled ? '#FE7216' : '#9ca3af') : 'transparent',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer',
             flexShrink: 0,
             transition: 'all 0.2s ease',
           }}
         >
           {checked && (
-            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+            <svg 
+              width="9" 
+              height="7" 
+              viewBox="0 0 9 7" 
+              fill="none" 
+              style={{ pointerEvents: 'none' }} // Ensures SVG doesn't block clicks
+            >
               <path d="M1 3.5L3 5.5L8 1" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
         </div>
+        
         <span style={{ fontSize: '13px', fontWeight: '500', color: '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
           {title}
         </span>
       </div>
-      <span style={{ fontSize: '12px', color: '#FE7216', fontWeight: '600', cursor: 'pointer', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
-        View
-      </span>
     </div>
   );
 }
@@ -280,6 +289,7 @@ export default function Contmodule() {
       <div style={{
         display: 'flex',
         flexDirection: 'row',
+        alignItems: 'flex-start',
         width: '100%',
         gap: '24px',
         margin: '0px', 
@@ -287,7 +297,6 @@ export default function Contmodule() {
       }}>
         <div style={{
           width: '70%',
-          minHeight: '100%',
           backgroundColor: 'rgba(255, 255, 255, 0.5)',
           borderRadius: '20px',
           padding: '20px',
@@ -295,6 +304,7 @@ export default function Contmodule() {
           display: 'flex',
           flexDirection: 'column',
           gap: componentGap,
+         
         }}>
 
           {/* Platform Selector Row */}
@@ -362,7 +372,7 @@ export default function Contmodule() {
           </div>
 
           {/* Post Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* Post Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
@@ -688,32 +698,11 @@ export default function Contmodule() {
                         boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                       }}  
                     >
-                      <span
-                        style={{
-                          fontFamily: 'Satoshi',
-                          fontSize: '13px'
-                        }}
-                      >{item.title}</span>
-                    
-                      <div
-                        style={{
-                          marginLeft: 'auto',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          disabled={!aiEnabled}
-                          onChange={() => toggleKB(item.id)}
-                          style={{
-                            cursor: aiEnabled ? 'pointer' : 'not-allowed',
-                            accentColor: '#fcfcfc'
-                          }}
-                        />
-                      </div>
+                      <KBItem title={item.title} aiEnabled={aiEnabled} checked={item.checked} onCheck={()=>toggleKB(item.id)}/>
+
+                      <span style={{ fontSize: '13px', color: '#FE7216', fontWeight: '600', cursor: 'pointer', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
+                      View
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -751,9 +740,10 @@ export default function Contmodule() {
             
             
             {promptTemplates.map((pt) => (
-              <PromptItem key={pt.id} title={pt.title} description={pt.description} />
+              <div>
+                <PromptItem key={pt.id} title={pt.title} description={pt.description} />
+              </div>
             ))}
-
             <SearchBar placeholder="Search" />
           </div>
         </div>
