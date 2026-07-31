@@ -136,6 +136,13 @@ class PostUpdate(BaseModel):
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
 
+class PostGenerateRequest(BaseModel):
+    prompt: str = Field(
+        min_length=1,
+        max_length=5000,
+    )
+
+    
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
