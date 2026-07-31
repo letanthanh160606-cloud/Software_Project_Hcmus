@@ -162,3 +162,9 @@ class PostResponse(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+class PostGenerateRequest(BaseModel):
+    prompt: str = Field(
+        min_length=1,
+        max_length=5000,
+    )
