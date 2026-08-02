@@ -1,6 +1,7 @@
 import bg from '../assets/Signinupbg.png';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function SignIn() {
     const navigate = useNavigate();
@@ -39,9 +40,10 @@ export default function SignIn() {
             localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify(data.user));
 
-            alert('Login successful!');
-            navigate('/dashboard'); // Hoặc chuyển đến trang khác
+            toast.success('Login successful!');
+            navigate('/dashboard');
         } catch (err) {
+            toast.error(err.message);
             setError(err.message);
         }
     };

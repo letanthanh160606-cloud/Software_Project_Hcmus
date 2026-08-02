@@ -71,7 +71,7 @@ export default function RecentlyApproveP() {
         </thead>
       </table>
 
-      {/* Table Body (Scrollable) */}
+      {/* Table Body */}
       <div className="custom-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', tableLayout: 'fixed' }}>
           <tbody>

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import SignUp from './page/SignUp';
 import SignIn from './page/SignIn';
 import MainDB from './page/MainDashboard';
@@ -18,6 +19,19 @@ const ProtectedRoute = ({ children }) => {
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster 
+        position="top-right" 
+        toastOptions={{
+          duration: 3500,
+          style: {
+            fontFamily: 'Satoshi, system-ui, sans-serif',
+            fontSize: '14px',
+            borderRadius: '12px',
+            background: '#2d2d2d',
+            color: '#fff',
+          },
+        }} 
+      />
       <Routes>
         {/* Auth Pages wrapped in PublicRoute */}
         <Route 

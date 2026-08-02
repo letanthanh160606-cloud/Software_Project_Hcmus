@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import bg from '../assets/MainDBbg.png';
 import dbicon from '../assets/dbicon.png';
 import cticon from '../assets/cticon.png';
@@ -11,6 +12,7 @@ import pcicon from '../assets/pcicon.png';
 import pmicon from '../assets/pmicon.png';
 import DBmodule from '../component/DBmodule.jsx';
 import Contmodule from '../component/Contmodule.jsx';
+import WSmodule from '../component/WSmodule.jsx';
 
 export default function MainDashboard() {
   const navigate = useNavigate();
@@ -45,6 +47,7 @@ export default function MainDashboard() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    toast.success('Logged out successfully');
     navigate('/signin');
   };
 
@@ -355,9 +358,11 @@ export default function MainDashboard() {
       }}>
         <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}> 
           {activeTab === 'Dashboard' ? (
-            <DBmodule />
+            <DBmodule user={user} />
           ) : activeTab === 'Content' ? (
             <Contmodule />
+          ) : activeTab === 'Team Workspace' ? (
+            <WSmodule user={user} userRole={user?.role} />
           ) : (
             <div style={{backgroundColor: 'black', color: '#5c5c5c' }}>
               <h2 style={{padding: '0px', margin: '0px'}}>{activeTab} Module</h2>

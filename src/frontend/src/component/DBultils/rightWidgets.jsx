@@ -92,8 +92,8 @@ export function ApprovalRequests() {
         style={{
           flex: 1,
           overflowY: 'auto',
-         paddingRight: '4px',
-         minHeight: '0px'
+          paddingRight: '4px',
+          minHeight: '0px'
       }}>
         {requests.map((req, idx) => (
           <div
