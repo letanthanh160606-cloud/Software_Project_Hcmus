@@ -8,7 +8,13 @@ from app import crud
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Post, User
-from app.schemas import PostCreate, PostResponse, PostUpdate
+from app.schemas import (
+    PostCreate,
+    PostGenerateRequest,
+    PostGenerateResponse,
+    PostResponse,
+    PostUpdate,
+)
 
 from app.services.ai_content_service import generate_post_content
 
@@ -106,6 +112,20 @@ def get_posts(
         db,
         author=current_user,
         workspace_id=workspace_id,
+    )
+
+@router.post(
+    "/generate",
+    response_model=PostGenerateResponse,
+)
+def generate_post(
+    payload: PostGenerateRequest,
+    _current_user: User = Depends(get_current_user),
+) -> PostGenerateResponse:
+    generated_content = generate_post_content(payload.prompt)
+
+    return PostGenerateResponse(
+        content=generated_content,
     )
 
 @router.get(

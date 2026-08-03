@@ -8,7 +8,7 @@ client = genai.Client(api_key=settings.gemini_api_key)
 
 def generate_post_content(prompt: str) -> str:
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         contents=prompt,
     )
 

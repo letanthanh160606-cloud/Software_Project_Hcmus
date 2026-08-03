@@ -217,21 +217,7 @@ def update_post(
     return post
 
 
-def update_post(
-    db: Session,
-    *,
-    post: Post,
-    post_update: PostUpdate,
-) -> Post:
-    update_data = post_update.model_dump(exclude_unset=True)
 
-    for field, value in update_data.items():
-        setattr(post, field, value)
-
-    db.commit()
-    db.refresh(post)
-
-    return post
 
 def delete_post(
     db: Session,
