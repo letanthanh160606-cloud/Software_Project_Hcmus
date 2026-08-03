@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 export default function AssignedTasksTable() {
   const [tasks, setTasks] = useState([]);
 
+  // Mock fetching BE data for demonstration
   useEffect(() => {
+    // Replace this with your actual API fetch call:
     const mockBackendData = [
       {
         id: 1,
@@ -74,6 +76,7 @@ export default function AssignedTasksTable() {
     setTasks(mockBackendData);
   }, []);
 
+  // Helper function for dynamic Priority Badge styling
   const getPriorityStyle = (priority) => {
     switch (priority) {
       case 'Low':
@@ -100,14 +103,14 @@ export default function AssignedTasksTable() {
     }}>
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>Assigned Tasks</h2>
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#554E43' }}>Assigned Tasks</h2>
         <span style={{ fontSize: '14px', color: '#554E43', cursor: 'pointer', fontWeight: '500' }}>See all &gt;</span>
       </div>
 
       {/* Table Header */}
       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', tableLayout: 'fixed' }}>
         <thead>
-          <tr style={{ color: '#7E7A72', fontSize: '13px' }}>
+          <tr style={{ color: '#7E7A72', fontSize: '14px' }}>
             <th style={{ width: '30%', padding: '10px 5px', fontWeight: '600', borderBottom: '1px solid #E6DEC9' }}>Name</th>
             <th style={{ width: '25%', padding: '10px 5px', fontWeight: '600', borderBottom: '1px solid #E6DEC9' }}>Date</th>
             <th style={{ width: '16%', padding: '10px 5px', fontWeight: '600', borderBottom: '1px solid #E6DEC9' }}>Priority</th>
@@ -121,7 +124,7 @@ export default function AssignedTasksTable() {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', tableLayout: 'fixed' }}>
           <tbody>
             {tasks.map((task) => (
-              <tr key={task.id} style={{ borderBottom: '1px solid #E6DEC9', color: '#888175', fontSize: '12px' }}>
+              <tr key={task.id} style={{ borderBottom: '1px solid #E6DEC9', color: '#888175', fontSize: '13px' }}>
                 {/* Task Name */}
                 <td style={{
                   width: '30%',

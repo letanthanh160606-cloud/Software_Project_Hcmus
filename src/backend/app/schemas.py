@@ -101,3 +101,79 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+
+class WorkspaceDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workspace_id: str = Field(validation_alias="workspace_uuid")
+    workspace_name: str = Field(validation_alias="workspacename")
+    manager_id: uuid.UUID
+    created_at: datetime
+    member_count: int = 0
+
+class MemberResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: uuid.UUID
+    username: str
+    email: EmailStr
+    status: str
+    joined_at: datetime
+
+class DistributorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    social_acc_id: uuid.UUID
+    platform: str
+    platform_account_name: str
+    status: str
+    connected_at: datetime
+
+class PostResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    workspace_id: str | None
+    author_id: uuid.UUID
+    title: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+class TaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    workspace_id: str
+    title: str
+    status: str
+    priority: str
+    assigned_to: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+class DistributorUpdateRequest(BaseModel):
+    platform_account_name: str | None = None
+    status: str | None = None
+
+class PostUpdateRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    status: Literal[
+        "draft", "pending_review", "rejected", "ready_for_distribution", "published", "failed"
+    ] | None = None
+
+
+class TaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = ""
+    priority: Literal["low", "medium", "high", "urgent"] = "medium"
+    assigned_to: uuid.UUID | None = None
+
+class TaskUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    content: str | None = None
+    status: Literal["todo", "in_progress", "review", "completed", "cancelled"] | None = None
+    priority: Literal["low", "medium", "high", "urgent"] | None = None
+    assigned_to: uuid.UUID | None = None

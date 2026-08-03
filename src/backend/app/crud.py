@@ -1,8 +1,11 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
+from app.models import Post, SocialAccount, Task
 
 from app.models import User, Workspace, WorkspaceMember
 from app.security import hash_password, hash_pin
+
+
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -109,3 +112,85 @@ def derive_role(db: Session, user: User) -> str:
         return "member"
 
     return "individual"
+
+def list_workspace_members(db: Session, workspace_id: str) -> list[WorkspaceMember]:
+    return db.scalars(
+        select(WorkspaceMember)
+        .where(WorkspaceMember.workspace_id == workspace_id, WorkspaceMember.status == "active")
+    ).all()
+
+def count_workspace_members(db: Session, workspace_id: str) -> int:
+    return db.scalar(
+        select(func.count()).select_from(WorkspaceMember)
+        .where(WorkspaceMember.workspace_id == workspace_id, WorkspaceMember.status == "active")
+    ) or 0
+
+def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
+    return db.scalars(
+        select(SocialAccount).where(SocialAccount.workspace_id == workspace_id)
+    ).all()
+
+def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
+    query = select(Post).where(Post.workspace_id == workspace_id)
+    if role == "member":
+        query = query.where(Post.author_id == user_id)
+    return db.scalars(query.order_by(Post.created_at.desc())).all()
+
+def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Task]:
+    query = select(Task).where(Task.workspace_id == workspace_id)
+    if role == "member":
+         query = query.where(Task.assigned_to == user_id)
+    return db.scalars(query.order_by(Task.created_at.desc())).all()
+
+def get_post_by_id(db: Session, post_id, workspace_id: str) -> Post | None:
+    return db.scalar(select(Post).where(Post.id == post_id, Post.workspace_id == workspace_id))
+
+def create_task(
+    db: Session, *, workspace_id: str, title: str,
+    content: str, priority: str, assigned_to,
+) -> Task:
+    task = Task(
+        workspace_id=workspace_id, title=title, content=content,
+        priority=priority, assigned_to=assigned_to,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+def update_post(db: Session, post: Post, updates: dict) -> Post:
+    for field, value in updates.items():
+        setattr(post, field, value)
+    db.commit()
+    db.refresh(post)
+    return post
+
+def update_distributor(db: Session, account: SocialAccount, updates: dict) -> SocialAccount:
+    for field, value in updates.items():
+        setattr(account, field, value)
+    db.commit()
+    db.refresh(account)
+    return account
+
+def update_task(db: Session, task: Task, updates: dict) -> Task:
+    for field, value in updates.items():
+        setattr(task, field, value)
+    db.commit()
+    db.refresh(task)
+    return task
+
+def soft_remove_member(db: Session, workspace_id: str, user_id) -> WorkspaceMember | None:
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.status == "active",
+        )
+    )
+    if membership is None:
+        return None 
+    membership.status = "removed"
+    membership.removed_at = func.now()
+    db.commit()
+    db.refresh(membership)
+    return membership

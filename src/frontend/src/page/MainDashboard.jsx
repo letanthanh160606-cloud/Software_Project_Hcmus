@@ -327,7 +327,7 @@ export default function MainDashboard() {
                     cursor: 'pointer',
                     padding: '12px 16px',
                     borderRadius: '12px',
-                    border: 'none',
+                    border: 'none', // Prevents default button borders styling clashes
                     
                     // Dynamic active styles
                     fontWeight: isActive ? '500' : '400',
