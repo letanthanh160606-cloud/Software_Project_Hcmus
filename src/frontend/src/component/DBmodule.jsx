@@ -34,9 +34,9 @@ ChartJS.register(
   Filler
 );
 
-export default function DBmodule() {
+export default function DBmodule({ user }) {
   const componentGap = '24px';
-  const userName = 'Harry Potter';
+  const userName = user?.username || 'Harry Potter';
   const [NIGincrease, setNIGincrease] = useState(true);
   const monthlyIncrease = 822006;
   const HPindex = 550744;
@@ -139,16 +139,16 @@ export default function DBmodule() {
         minHeight: 'calc(100vh - 70px)',
       }}>
       
+      {/* Main Canvas */}
       <div style={{
         display: 'flex',
         flexDirection: 'row',
         width: '100%',
         gap: '24px',
         margin: '0px', 
-        padding: '0px'
+        padding: '0px',
       }}>
         
-        {/* Main Canvas */}
         <div style={{
             width: '70%',
             minHeight: '100%',
@@ -219,7 +219,7 @@ export default function DBmodule() {
                   zIndex: 2, 
                   position: 'absolute', 
                   top: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   fontWeight: '700',
                   fontFamily: 'Satoshi',
                   color: '#7E7A72'
@@ -235,7 +235,7 @@ export default function DBmodule() {
                   fontWeight: '400',
                   color: '#7E7A72',
                   fontFamily: 'Satoshi'
-                }}>You guys did a wonderful job!</h1>
+                }}>You {user?.role === 'manager' ? 'guys' : ''} did a wonderful job!</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -288,7 +288,7 @@ export default function DBmodule() {
                   zIndex: 2, 
                   position: 'absolute', 
                   top: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   fontWeight: '700',
                   fontFamily: 'Satoshi',
                   color: '#7E7A72'

@@ -3,6 +3,7 @@ import layoutbg from '../assets/signinuplayoutbg.png'
 import bg2 from '../assets/Signinupbg2.png'
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function SignUp() {
     const navigate = useNavigate();
@@ -179,9 +180,10 @@ export default function SignUp() {
                 throw new Error(errMsg);
             }
 
-            alert('Registration successful! Redirecting to Sign In...');
+            toast.success('Registration successful! Redirecting to Sign In...');
             navigate('/signin');
         } catch (err) {
+            toast.error(err.message);
             setError(err.message);
         }
     };

@@ -67,7 +67,7 @@ export function ApprovalRequests() {
         alignItems: 'center',
         marginBottom: '15px'
       }}>
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#554E43' }}>
           Approval Requests
         </h2>
         <span
@@ -92,8 +92,8 @@ export function ApprovalRequests() {
         style={{
           flex: 1,
           overflowY: 'auto',
-         paddingRight: '4px',
-         minHeight: '0px'
+          paddingRight: '4px',
+          minHeight: '0px'
       }}>
         {requests.map((req, idx) => (
           <div
@@ -158,7 +158,7 @@ export function MyCalendar() {
         alignItems: 'center',
         marginBottom: '15px'
       }}>
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#554E43' }}>
           My Calendar
         </h2>
         <AddButton />
@@ -249,7 +249,7 @@ export function ChannelList() {
         alignItems: 'center',
         marginBottom: '15px'
       }}>
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#554E43' }}>
           Channel
         </h2>
         <AddButton />
