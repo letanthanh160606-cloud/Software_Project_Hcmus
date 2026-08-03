@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import toast from 'react-hot-toast';
 import facebook from '../assets/fblg.png';
 import linkedin from '../assets/linkedinlg.png';
 
@@ -258,7 +259,64 @@ export default function Contmodule() {
   // Media drag state
   const [isDragging, setIsDragging] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+
+  const handleCreatePost = async (e) => {
+    if (e) e.preventDefault();
+    if (!title.trim() && !body.trim()) {
+      toast.error('Please enter a title or content for your post.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const savedUserStr = localStorage.getItem('user');
+      let workspaceId = null;
+
+      if (savedUserStr) {
+        try {
+          const parsedUser = JSON.parse(savedUserStr);
+          workspaceId = parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid || null;
+        } catch (e) {
+          console.error("Error parsing user for workspace_id", e);
+        }
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('http://localhost:8000/posts', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          title: title.trim() || 'Untitled Post',
+          content: body.trim(),
+          seo_keywords: [],
+          seo_hashtags: []
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        const errMsg = data.detail ? (typeof data.detail === 'string' ? data.detail : data.detail[0]?.msg) : 'Failed to create post';
+        throw new Error(errMsg);
+      }
+
+      toast.success('Post created successfully!');
+      setTitle('');
+      setBody('');
+      setMediaFiles([]);
+    } catch (err) {
+      toast.error(err.message || 'Error creating post');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const togglePlatform = (id) => {
     setPlatforms((prev) => prev.map((p) => p.id === id ? { ...p, selected: !p.selected } : p));
@@ -559,6 +617,8 @@ export default function Contmodule() {
             {/* Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '140px' }}>
               <button
+                onClick={handleCreatePost}
+                disabled={isSubmitting}
                 style={{
                   padding: '12px 0',
                   borderRadius: '10px',
@@ -568,7 +628,8 @@ export default function Contmodule() {
                   fontFamily: 'Satoshi, system-ui, sans-serif',
                   fontSize: '14px',
                   fontWeight: '700',
-                  cursor: 'pointer',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1,
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
@@ -580,7 +641,7 @@ export default function Contmodule() {
                 onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(254,114,22,0.42)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(254,114,22,0.3)'; }}
               >
-                Submit
+                {isSubmitting ? 'Submitting...' : 'Submit'}
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                   <path d="M2.5 6.5H10.5M7 3L10.5 6.5L7 10" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

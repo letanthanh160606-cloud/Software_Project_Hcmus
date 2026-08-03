@@ -25,8 +25,9 @@ export default function SignUp() {
     const [workspaceId, setWorkspaceId] = useState('');
     const [workspacePin, setWorkspacePin] = useState('');
 
-    // Email verification state (Option A: Progressive Step Verification)
+    // Email verification state
     const [isEmailVerified, setIsEmailVerified] = useState(false);
+    const [verificationToken, setVerificationToken] = useState('');
     const [codeSent, setCodeSent] = useState(false);
     const [pinCode, setPinCode] = useState('');
     const [pinError, setPinError] = useState('');
@@ -54,8 +55,8 @@ export default function SignUp() {
         return () => clearInterval(interval);
     }, [resendTimer]);
 
-    // Step 1: Send OTP / Verification PIN to email
-    const handleSendCode = (e) => {
+    // Step 1: Send OTP to email via FastAPI backend
+    const handleSendCode = async (e) => {
         if (e) e.preventDefault();
         setPinError('');
         setPinSuccess('');
@@ -66,42 +67,62 @@ export default function SignUp() {
         }
 
         setIsSendingCode(true);
-        // Simulate sending verification code via API
-        setTimeout(() => {
-            setIsSendingCode(false);
+        try {
+            const response = await fetch('http://localhost:8000/auth/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to send verification code');
+            }
             setCodeSent(true);
             setResendTimer(60);
-            setPinSuccess(`Verification PIN sent to ${email}! (Demo PIN: 123456)`);
-        }, 800);
+            setPinSuccess(data.message || `Verification code sent to ${email}`);
+        } catch (err) {
+            setPinError(err.message);
+        } finally {
+            setIsSendingCode(false);
+        }
     };
 
-    // Step 1: Verify entered PIN
-    const handleVerifyPin = (e) => {
+    // Step 1: Verify entered 6-digit OTP via FastAPI backend
+    const handleVerifyPin = async (e) => {
         if (e) e.preventDefault();
         setPinError('');
         setPinSuccess('');
 
-        if (!pinCode || pinCode.trim().length < 4) {
-            setPinError('Please enter a valid verification PIN.');
+        if (!pinCode || pinCode.trim().length !== 6) {
+            setPinError('Please enter the 6-digit verification code.');
             return;
         }
 
         setIsVerifyingPin(true);
-        // Simulate PIN verification check (accepts 123456 or any 6-digit code)
-        setTimeout(() => {
-            setIsVerifyingPin(false);
-            if (pinCode.trim() === '123456' || pinCode.trim().length === 6) {
-                setIsEmailVerified(true);
-                setPinSuccess('Email verified successfully!');
-            } else {
-                setPinError('Invalid verification code. Please check your email or try 123456.');
+        try {
+            const response = await fetch('http://localhost:8000/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, otp: pinCode.trim() }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || 'Verification failed');
             }
-        }, 600);
+            setVerificationToken(data.verification_token);
+            setIsEmailVerified(true);
+            setPinSuccess('Email verified successfully!');
+        } catch (err) {
+            setPinError(err.message);
+        } finally {
+            setIsVerifyingPin(false);
+        }
     };
 
     // Reset email verification to change email
     const handleResetEmail = () => {
         setIsEmailVerified(false);
+        setVerificationToken('');
         setCodeSent(false);
         setPinCode('');
         setPinError('');
@@ -113,7 +134,7 @@ export default function SignUp() {
         e.preventDefault();
         setError('');
 
-        if (!isEmailVerified) {
+        if (!isEmailVerified || !verificationToken) {
             setError('Please verify your email address first.');
             return;
         }
@@ -128,6 +149,7 @@ export default function SignUp() {
             username: username,
             email: email,
             password: password,
+            verification_token: verificationToken,
             account_type: accountType === 'Personal' ? 'individual' : 'business',
         };
 
