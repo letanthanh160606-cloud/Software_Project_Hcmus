@@ -2,7 +2,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models import Post, SocialAccount, Task
 
-from app.models import User, Workspace, WorkspaceMember
+from app.models import Post, User, Workspace, WorkspaceMember
 from app.security import hash_password, hash_pin
 
 
@@ -194,3 +194,58 @@ def soft_remove_member(db: Session, workspace_id: str, user_id) -> WorkspaceMemb
     db.commit()
     db.refresh(membership)
     return membership
+
+def user_can_access_workspace(
+    db: Session,
+    *,
+    user: User,
+    workspace_id: str,
+) -> bool:
+    workspace = db.get(Workspace, workspace_id)
+
+    if workspace is None:
+        return False
+
+    if workspace.manager_id == user.users_uuid:
+        return True
+
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user.users_uuid,
+            WorkspaceMember.status == "active",
+        )
+    )
+
+    return membership is not None
+
+def create_post(
+    db: Session,
+    *,
+    author: User,
+    workspace_id: str | None,
+    title: str | None,
+    content: str,
+    prompt_template_id=None,
+    knowledge_base_id=None,
+    seo_keywords: list[str] | None = None,
+    seo_hashtags: list[str] | None = None,
+) -> Post:
+    post = Post(
+        workspace_id=workspace_id,
+        author_id=author.users_uuid,
+        title=title,
+        content=content,
+        status="draft",
+        prompt_template_id=prompt_template_id,
+        knowledge_base_id=knowledge_base_id,
+        ai_generated=False,
+        seo_keywords=seo_keywords,
+        seo_hashtags=seo_hashtags,
+    )
+
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+
+    return post

@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, func, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -24,6 +24,17 @@ MembershipStatus = Enum(
     create_type=False,
 )
 
+PostStatus = Enum(
+    "draft",
+    "pending_review",
+    "rejected",
+    "ready_for_distribution",
+    "published",
+    "failed",
+    name="post_status_enum",
+    schema="public",
+    create_type=False,
+)
 
 class User(Base):
 
@@ -85,7 +96,6 @@ class WorkspaceMember(Base):
     user: Mapped["User"] = relationship(back_populates="memberships")
     workspace: Mapped["Workspace"] = relationship(back_populates="members")
 
-
 class SocialAccount(Base):
     __tablename__ = "social_accounts"
     __table_args__ = {"schema": "workspaces"}
@@ -107,17 +117,111 @@ class Post(Base):
     __tablename__ = "posts"
     __table_args__ = {"schema": "workspaces"}
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
-    workspace_id: Mapped[str | None] = mapped_column(
-        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE")
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("uuidv7()"),
     )
-    author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=False)
-    title: Mapped[str | None] = mapped_column(String)
-    content: Mapped[str] = mapped_column(String, nullable=False, server_default="")
-    status: Mapped[str] = mapped_column(String, nullable=False, server_default="draft")
-    ai_generated: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    workspace_id: Mapped[str | None] = mapped_column(
+        String(16),
+        ForeignKey(
+            "workspaces.workspaces.workspace_uuid",
+            ondelete="CASCADE",
+        ),
+        nullable=True,
+    )
+
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "Users.users.users_uuid",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    title: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("''"),
+    )
+
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        server_default="draft",
+    )
+
+    prompt_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    knowledge_base_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    ai_generated: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+
+    seo_keywords: Mapped[list[str] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+
+    seo_hashtags: Mapped[list[str] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("Users.users.users_uuid"),
+        nullable=True,
+    )
+
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    reject_reason: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -125,7 +229,7 @@ class Task(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
     workspace_id: Mapped[str] = mapped_column(
-        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE", ), nullable=False
+        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(String, nullable=False, server_default="")

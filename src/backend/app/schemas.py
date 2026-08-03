@@ -112,6 +112,7 @@ class WorkspaceDetailResponse(BaseModel):
     created_at: datetime
     member_count: int = 0
 
+
 class MemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -120,6 +121,7 @@ class MemberResponse(BaseModel):
     email: EmailStr
     status: str
     joined_at: datetime
+
 
 class DistributorResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -130,16 +132,55 @@ class DistributorResponse(BaseModel):
     status: str
     connected_at: datetime
 
+
+class PostCreate(BaseModel):
+    workspace_id: str | None = Field(
+        default=None,
+        min_length=WORKSPACE_ID_LENGTH,
+        max_length=WORKSPACE_ID_LENGTH,
+    )
+
+    title: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    content: str = ""
+
+    prompt_template_id: uuid.UUID | None = None
+    knowledge_base_id: uuid.UUID | None = None
+
+    seo_keywords: list[str] | None = None
+    seo_hashtags: list[str] | None = None
+
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     workspace_id: str | None
     author_id: uuid.UUID
+
     title: str | None
+    content: str = ""
     status: str
+
+    prompt_template_id: uuid.UUID | None = None
+    knowledge_base_id: uuid.UUID | None = None
+
+    ai_generated: bool = False
+    seo_keywords: list[str] | None = None
+    seo_hashtags: list[str] | None = None
+
+    submitted_at: datetime | None = None
+    reviewed_by: uuid.UUID | None = None
+    reviewed_at: datetime | None = None
+    reject_reason: str | None = None
+    published_at: datetime | None = None
+
     created_at: datetime
     updated_at: datetime
+
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -153,9 +194,11 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class DistributorUpdateRequest(BaseModel):
     platform_account_name: str | None = None
     status: str | None = None
+
 
 class PostUpdateRequest(BaseModel):
     title: str | None = None
@@ -170,6 +213,7 @@ class TaskCreateRequest(BaseModel):
     content: str = ""
     priority: Literal["low", "medium", "high", "urgent"] = "medium"
     assigned_to: uuid.UUID | None = None
+
 
 class TaskUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
