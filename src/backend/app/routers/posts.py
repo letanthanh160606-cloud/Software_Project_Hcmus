@@ -10,6 +10,8 @@ from app.dependencies import get_current_user
 from app.models import Post, User
 from app.schemas import PostCreate, PostResponse, PostUpdate
 
+from app.services.ai_content_service import generate_post_content
+
 router = APIRouter(
     prefix="/posts",
     tags=["posts"],

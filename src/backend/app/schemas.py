@@ -142,7 +142,9 @@ class PostGenerateRequest(BaseModel):
         max_length=5000,
     )
 
-    
+class PostGenerateResponse(BaseModel):
+    content: str
+
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
