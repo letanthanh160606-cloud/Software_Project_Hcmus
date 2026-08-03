@@ -26,6 +26,7 @@ def _build_user(*, username: str, email: str, password: str, account_type: str) 
         email=email,
         password_hash=hash_password(password),
         account_type=account_type,
+        is_email_verified=True,
     )
 
 
