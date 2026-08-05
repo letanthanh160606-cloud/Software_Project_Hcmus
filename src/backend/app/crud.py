@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 from app.models import Post, SocialAccount, Task
 
@@ -148,11 +148,12 @@ def get_post_by_id(db: Session, post_id, workspace_id: str) -> Post | None:
 
 def create_task(
     db: Session, *, workspace_id: str, title: str,
-    content: str, priority: str, assigned_to,
+    content: str, priority: str, assigned_to, created_by, due_date=None,
 ) -> Task:
     task = Task(
         workspace_id=workspace_id, title=title, content=content,
-        priority=priority, assigned_to=assigned_to,
+        priority=priority, assigned_to=assigned_to, created_by=created_by,
+        due_date=due_date,
     )
     db.add(task)
     db.commit()
@@ -195,3 +196,47 @@ def soft_remove_member(db: Session, workspace_id: str, user_id) -> WorkspaceMemb
     db.commit()
     db.refresh(membership)
     return membership
+
+def create_personal_task(
+    db: Session, *, title: str, content: str, priority: str,
+    assigned_to, created_by, due_date=None,
+) -> Task:
+    task = Task(
+        workspace_id=None,
+        title=title,
+        content=content,
+        priority=priority,
+        assigned_to=created_by,
+        created_by=created_by,
+        due_date=due_date,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+def list_calendar_tasks(db: Session, *, user_id) -> list[Task]:
+    query = (
+        select(Task)
+        .where(or_(Task.created_by == user_id, Task.assigned_to == user_id))
+        .order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.created_at.desc())
+    )
+    return db.scalars(query).all()
+
+def count_todo_tasks_for_user(db: Session, user_id) -> int:
+    return db.scalar(
+        select(func.count()).select_from(Task).where(
+            Task.assigned_to == user_id,
+            Task.status.notin_(["completed", "cancelled"]),
+        )
+    ) or 0
+
+def count_tasks_assigned_to_others(db: Session, user_id) -> int:
+    return db.scalar(
+        select(func.count()).select_from(Task).where(
+            Task.created_by == user_id,
+            Task.assigned_to.isnot(None),
+            Task.assigned_to != user_id,
+            Task.status.notin_(["completed", "cancelled"]),
+        )
+    ) or 0
