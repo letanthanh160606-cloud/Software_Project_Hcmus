@@ -286,6 +286,7 @@ export default function Calenmodule({ user, userRole }) {
                 overflow: 'hidden',
                 position: 'relative',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                backgroundColor: 'rgba(255, 255, 255, 0.75)'
               }}
             >
               <img
