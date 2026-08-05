@@ -144,7 +144,7 @@ export default function DBmodule({ user }) {
         display: 'flex',
         flexDirection: 'row',
         width: '100%',
-        gap: '24px',
+        gap: '20px',
         margin: '0px', 
         padding: '0px',
       }}>

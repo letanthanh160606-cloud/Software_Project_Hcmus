@@ -284,7 +284,7 @@ export default function WSmodule({ user }) {
           }}>
             <h1 style={{
               margin: 0,
-              fontSize: '16px',
+              fontSize: '15px',
               fontWeight: '700',
               color: '#443e36',
               letterSpacing: '-0.2px'

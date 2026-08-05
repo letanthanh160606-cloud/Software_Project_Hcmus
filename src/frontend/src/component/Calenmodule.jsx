@@ -20,7 +20,7 @@ export default function Calenmodule({ user, userRole }) {
   const isManager = role === 'manager';
   const isWorkspaceUser = role === 'manager' || role === 'member';
 
-  // Fixed Real-World Today Date (does NOT change when navigating months)
+  // Fixed Real-World Today Date
   const today = new Date();
 
   // Calendar Browsing Date State (changes when switching months)
@@ -69,27 +69,47 @@ export default function Calenmodule({ user, userRole }) {
 
   const isCurrentRealMonth = today.getFullYear() === currentYear && today.getMonth() === currentMonth;
 
-  /* ───────────────────────────── Mock Tasks Data ───────────────────────────── */
+  /* ───────────────────────────── Fixed Mock Tasks Data ───────────────────────────── */
+  // Tasks have fixed calendar dates (e.g. Day 10, Day 14, Day 15, Day 19, Day 23) in the current month
+  const realYear = today.getFullYear();
+  const realMonth = today.getMonth();
+
   const mockTaskDefinitions = [
     {
       id: 1,
-      dateOffset: 0, // Today
+      day: 10,
+      month: realMonth,
+      year: realYear,
+      time: '18:00',
+      title: '[SE - Sprint Review]',
+      priority: 'low',
+      type: 'Low Priority'
+    },
+    {
+      id: 2,
+      day: 14,
+      month: realMonth,
+      year: realYear,
       time: '14:30',
       title: '[Design Sync]',
       priority: 'medium',
       type: 'Medium Priority'
     },
     {
-      id: 2,
-      dateOffset: 0, // Today
+      id: 3,
+      day: 15,
+      month: realMonth,
+      year: realYear,
       time: '23:59',
       title: '[SE - PA00]',
       priority: 'high',
       type: 'High Priority (Urgent)'
     },
     {
-      id: 3,
-      dateOffset: 0, // Today
+      id: 4,
+      day: 15,
+      month: realMonth,
+      year: realYear,
       time: '23:59',
       title: '[SE - PA00]',
       priority: 'workspace',
@@ -97,82 +117,76 @@ export default function Calenmodule({ user, userRole }) {
       workspaceOnly: true
     },
     {
-      id: 4,
-      dateOffset: 3,
-      time: '18:00',
-      title: '[Code Review & QA]',
-      priority: 'low',
-      type: 'Low Priority'
-    },
-    {
       id: 5,
-      dateOffset: 5,
+      day: 19,
+      month: realMonth,
+      year: realYear,
       time: '23:59',
-      title: '[SE - PA01 Submission]',
+      title: '[SE - PA00]',
       priority: 'medium',
       type: 'Medium Priority'
     },
     {
       id: 6,
-      dateOffset: 10,
+      day: 23,
+      month: realMonth,
+      year: realYear,
       time: '20:00',
-      title: '[Deploy Staging Backend]',
+      title: '[Deploy Backend]',
       priority: 'workspace',
       type: 'Workspace Task',
       workspaceOnly: true
-    },
-    {
-      id: 7,
-      dateOffset: 12,
-      time: '16:00',
-      title: '[Security Audit]',
-      priority: 'high',
-      type: 'High Priority (Urgent)'
     }
   ];
 
-  /* FIXED TIMELINE TASKS: Anchored to real TODAY date/deadlines */
+  /* 
+    FIXED TIMELINE TASKS: Deadlines are fixed calendar dates and will NOT increment when today advances.
+  */
   const fixedTimelineTasks = mockTaskDefinitions.map((t) => {
-    const deadlineDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + t.dateOffset);
+    const deadlineDate = new Date(t.year, t.month, t.day);
     const dayName = deadlineDate.toLocaleDateString('en-US', { weekday: 'long' });
     const monthName = deadlineDate.toLocaleDateString('en-US', { month: 'long' });
-    const yearNum = deadlineDate.getFullYear();
-    const dayNum = deadlineDate.getDate();
 
     return {
       ...t,
-      dateNum: dayNum,
-      monthNum: deadlineDate.getMonth(),
-      yearNum: yearNum,
-      fullDate: `${dayName}, ${dayNum} ${monthName} ${yearNum}`,
+      dateNum: t.day,
+      monthNum: t.month,
+      yearNum: t.year,
+      fullDate: `${dayName}, ${t.day} ${monthName} ${t.year}`,
       deadlineDate: deadlineDate
     };
   });
 
-  /* DYNAMIC TIMELINE FILTERING */
+  /* 
+    DYNAMIC TIMELINE FILTERING: Filtered relative to real today's date against fixed deadline dates.
+  */
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   const visibleTimelineTasks = fixedTimelineTasks.filter((t) => {
+    // Role filter
     if (t.workspaceOnly && !isWorkspaceUser) return false;
 
-    const taskDate = new Date(t.deadlineDate.getFullYear(), t.deadlineDate.getMonth(), t.deadlineDate.getDate());
+    // Timeframe filter
+    const taskDate = new Date(t.yearNum, t.monthNum, t.dateNum);
     const diffTime = taskDate.getTime() - startOfToday.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
     if (timeframe === 'Next 7 days') {
-      return diffDays >= 0 && diffDays <= 7;
+      return diffDays >= -7 && diffDays <= 7;
     } else if (timeframe === 'Next 14 days') {
-      return diffDays >= 0 && diffDays <= 14;
+      return diffDays >= -14 && diffDays <= 14;
     } else if (timeframe === 'This Month') {
       return (
-        taskDate.getMonth() === today.getMonth() &&
-        taskDate.getFullYear() === today.getFullYear()
+        t.monthNum === today.getMonth() &&
+        t.yearNum === today.getFullYear()
       );
     }
     return true;
   });
 
-  /* CALENDAR GRID INDICATORS */
+  /* 
+    CALENDAR GRID INDICATORS: Shows indicator bars for tasks on the currently VIEWED month.
+  */
   const getIndicatorsForDate = (dayNum) => {
     const matchingTasks = fixedTimelineTasks.filter((t) => {
       const isSameYear = t.yearNum === currentYear;
@@ -191,10 +205,11 @@ export default function Calenmodule({ user, userRole }) {
         display: 'flex',
         flexDirection: 'row',
         width: '100%',
-        gap: '20px',
+        gap: '24px',
         margin: 0,
         padding: 0,
         fontFamily: 'Satoshi, system-ui, sans-serif',
+        alignItems: 'flex-start'
       }}
     >
       {/* MAIN CANVAS (70%) */}
@@ -210,42 +225,29 @@ export default function Calenmodule({ user, userRole }) {
           gap: '20px',
         }}
       >
-        {/* TOP 3 BOXES */}
+        {/* ──── TOP 3 BOXES ──── */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            display: 'flex',
+            flexDirection: 'row',
             gap: '20px',
             width: '100%',
+            height: '100px'
           }}
         >
           {/* Box 1: Your Task */}
-          <div
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.75)',
-              borderRadius: '16px',
-              padding: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              height: '110px',
-              boxSizing: 'border-box',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c' }}>
-                  Your Task
-                </div>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '24px' }}>
-                  Your unfinished tasks
-                </div>
-              </div>
-              <div style={{ fontSize: '46px', fontWeight: '800', color: '#4b5563', lineHeight: 1 }}>
-                4
-              </div>
-            </div>
+          <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.75)', borderRadius: '15px', padding: '15px', height: '100%', width: '100%', boxSizing: 'border-box', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', position: 'relative' }} > 
+            <div> 
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', position: 'absolute', left: '15px', top: '15px' }}> 
+                Your Task 
+              </div> 
+              <div style={{ fontSize: '12px', color: '#9ca3af', position: 'absolute', bottom: '15px', left: '15px' }}> 
+                Your unfinished tasks 
+              </div> 
+            </div> 
+            <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}> 
+              4 
+            </div> 
           </div>
 
           {/* Box 2: Tasks Assigned to others (Manager) OR calendar_1stbg.png image (Member/Individual) */}
@@ -253,36 +255,34 @@ export default function Calenmodule({ user, userRole }) {
             <div
               style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.75)',
-                borderRadius: '16px',
-                padding: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                height: '110px',
+                borderRadius: '15px',
+                padding: '15px',
                 boxSizing: 'border-box',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                height: '100%',
+                width: '100%',
+                position: 'relative'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c' }}>
-                    Tasks Assigned to others
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '24px' }}>
-                    Team's unfinished tasks
-                  </div>
-                </div>
-                <div style={{ fontSize: '46px', fontWeight: '800', color: '#4b5563', lineHeight: 1 }}>
-                  12
-                </div>
-              </div>
+              <div> 
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', position: 'absolute', left: '15px', top: '15px' }}> 
+                  Tasks Assigned to others
+                </div> 
+                <div style={{ fontSize: '12px', color: '#9ca3af', position: 'absolute', bottom: '15px', left: '15px' }}> 
+                  Team's unfinished tasks
+                </div> 
+              </div> 
+              <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}> 
+                12
+              </div> 
             </div>
           ) : (
-
+            /* calendar_1stbg.png image when box 2 is not used */
             <div
               style={{
                 borderRadius: '16px',
-                height: '110px',
+                height: '100%',
+                width: '100%',
                 overflow: 'hidden',
                 position: 'relative',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
@@ -296,14 +296,15 @@ export default function Calenmodule({ user, userRole }) {
             </div>
           )}
 
-
+          {/* Box 3: calendar_2ndbg.png image background */}
           <div
             style={{
               borderRadius: '16px',
-              height: '110px',
+              height: '100%',
               overflow: 'hidden',
               position: 'relative',
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              width: '100%'
             }}
           >
             <img
@@ -318,7 +319,7 @@ export default function Calenmodule({ user, userRole }) {
         <div
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.75)',
-            borderRadius: '16px',
+            borderRadius: '15px',
             padding: '20px',
             display: 'flex',
             flexDirection: 'column',
@@ -338,14 +339,14 @@ export default function Calenmodule({ user, userRole }) {
                 setShowTaskModal(true);
               }}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '25px',
+                height: '25px',
                 borderRadius: '50%',
                 backgroundColor: '#FE7216',
                 border: 'none',
                 color: '#fff',
                 fontSize: '20px',
-                fontWeight: '600',
+                fontWeight: '200',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -538,6 +539,7 @@ export default function Calenmodule({ user, userRole }) {
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
+          height: '480px'
         }}
       >
         {/* Header & Dropdown */}
@@ -577,8 +579,7 @@ export default function Calenmodule({ user, userRole }) {
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            paddingRight: '4px',
-            maxHeight: '480px',
+            paddingRight: '4px'
           }}
         >
           {visibleTimelineTasks.length > 0 ? (
@@ -644,7 +645,7 @@ export default function Calenmodule({ user, userRole }) {
         </div>
       </div>
 
-      {/* TASK DETAIL / CREATE MODAL */}
+      {/* ──── TASK DETAIL / CREATE MODAL ──── */}
       {showTaskModal && (
         <div
           style={{
