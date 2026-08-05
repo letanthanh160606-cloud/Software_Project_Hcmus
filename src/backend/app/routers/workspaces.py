@@ -16,6 +16,7 @@ from app.schemas import (
     PostUpdateRequest,
     TaskCreateRequest,
     TaskResponse,
+    TaskUpdateRequest,
     WorkspaceDetailResponse,
 )
 
@@ -142,6 +143,35 @@ def create_task(
         priority=payload.priority,
         assigned_to=payload.assigned_to,
     )
+
+@router.patch(
+    "/{workspace_id}/tasks/{task_id}",
+    response_model=TaskResponse,
+)
+def update_task(
+    task_id: uuid.UUID,
+    payload: TaskUpdateRequest,
+    db: Session = Depends(get_db),
+    context: WorkspaceContext = Depends(get_workspace_context),
+):
+    task = crud.get_task_by_id(
+        db,
+        task_id=task_id,
+        workspace_id=context.workspace_id,
+    )
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+
+    return crud.update_task(
+        db,
+        task=task,
+        payload=payload,
+    )
+
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
 def remove_member(
