@@ -35,7 +35,7 @@ ChartJS.register(
 );
 
 export default function DBmodule({ user }) {
-  const componentGap = '24px';
+  const componentGap = '20px';
   const userName = user?.username || 'Harry Potter';
   const [NIGincrease, setNIGincrease] = useState(true);
   const monthlyIncrease = 822006;
