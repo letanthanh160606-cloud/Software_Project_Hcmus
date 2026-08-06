@@ -202,13 +202,15 @@ class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    workspace_id: str
+    workspace_id: str | None = None
     title: str
     status: str
     priority: str
-    assigned_to: uuid.UUID | None
+    assigned_to: uuid.UUID | None = None
+    due_date: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    created_by: uuid.UUID | None = None
 
 
 class DistributorUpdateRequest(BaseModel):
@@ -229,6 +231,7 @@ class TaskCreateRequest(BaseModel):
     content: str = ""
     priority: Literal["low", "medium", "high", "urgent"] = "medium"
     assigned_to: uuid.UUID | None = None
+    due_date: datetime | None = None
 
 
 class TaskUpdateRequest(BaseModel):
@@ -237,3 +240,24 @@ class TaskUpdateRequest(BaseModel):
     status: Literal["todo", "in_progress", "review", "completed", "cancelled"] | None = None
     priority: Literal["low", "medium", "high", "urgent"] | None = None
     assigned_to: uuid.UUID | None = None
+    due_date: datetime | None = None
+
+
+class PersonalTaskCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = ""
+    priority: Literal["low", "medium", "high", "urgent"] = "medium"
+    due_date: datetime | None = None
+
+
+class CalendarTaskResponse(TaskResponse):
+    source: Literal["personal", "workspace"]
+    is_created_by_me: bool
+    is_assigned_to_me: bool
+
+
+class CalendarSummaryResponse(BaseModel):
+    tasks: list[CalendarTaskResponse]
+    todo_count: int
+    in_progress_count: int
+    completed_count: int

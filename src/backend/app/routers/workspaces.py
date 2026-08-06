@@ -141,6 +141,8 @@ def create_task(
         content=payload.content,
         priority=payload.priority,
         assigned_to=payload.assigned_to,
+        created_by=current_user.users_uuid,
+        due_date=payload.due_date,
     )
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
