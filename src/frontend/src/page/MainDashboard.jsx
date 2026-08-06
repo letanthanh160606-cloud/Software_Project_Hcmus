@@ -12,7 +12,6 @@ import pcicon from '../assets/pcicon.png';
 import pmicon from '../assets/pmicon.png';
 import DBmodule from '../component/DBmodule.jsx';
 import Contmodule from '../component/Contmodule.jsx';
-import Stamodule from '../component/Stamodule.jsx';
 import Calenmodule from '../component/Calenmodule.jsx';
 import WSmodule from '../component/WSmodule.jsx';
 
@@ -54,14 +53,14 @@ export default function MainDashboard() {
   };
 
   const menuItems = [
-    { label: 'Dashboard', roles: ['all'], icon: <img src={dbicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Content', roles: ['all'], icon: <img src={cticon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Statistics', roles: ['all'], icon: <img src={sicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Distribution', roles: ['individual', 'manager'], icon: <img src={disicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Calendar', roles: ['all'], icon: <img src={caicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Team Workspace', roles: ['member', 'manager'], icon: <img src={wsicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Prompt & Context', roles: ['all'], icon: <img src={pcicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> },
-    { label: 'Post Management', roles: ['all'], icon: <img src={pmicon} style={{ width: '18px', height: '18px', objectFit: 'contain'}}/> }
+    { label: 'Dashboard', roles: ['all'], icon: <img src={dbicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Content', roles: ['all'], icon: <img src={cticon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Statistics', roles: ['all'], icon: <img src={sicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Distribution', roles: ['individual', 'manager'], icon: <img src={disicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Calendar', roles: ['all'], icon: <img src={caicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Team Workspace', roles: ['member', 'manager'], icon: <img src={wsicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Prompt & Context', roles: ['all'], icon: <img src={pcicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
+    { label: 'Post Management', roles: ['all'], icon: <img src={pmicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> }
   ];
 
   const visibleMenuItems = menuItems.filter(
@@ -70,16 +69,16 @@ export default function MainDashboard() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
-      
+
       {/* Background Image Layer */}
-      <img 
-        src={bg} 
-        alt="Background" 
-        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, objectFit: 'cover' }} 
+      <img
+        src={bg}
+        alt="Background"
+        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, objectFit: 'cover' }}
       />
 
       {/* Fixed Top Utility Bar */}
-      <nav style={{ 
+      <nav style={{
         position: 'fixed', top: 0, left: 0, width: '100%', height: '70px', zIndex: 100,
         display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         padding: '0px 40px', boxSizing: 'border-box', fontFamily: 'Satoshi, system-ui, sans-serif', backdropFilter: 'blur(50px)'
@@ -95,7 +94,7 @@ export default function MainDashboard() {
 
           {/* Avatar Dropdown Container */}
           <div style={{ position: 'relative' }} ref={dropdownRef}>
-            <div 
+            <div
               onClick={() => setIsDropdownOpen((prev) => !prev)}
               style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}
             >
@@ -300,9 +299,9 @@ export default function MainDashboard() {
       )}
 
       {/* Fixed Left Navigation Sidebar */}
-      <aside style={{ 
-          position: 'fixed', top: '70px', left: 0, bottom: 0, width: '260px', zIndex: 90,
-          paddingLeft: '24px', paddingRight: '24px', boxSizing: 'border-box'
+      <aside style={{
+        position: 'fixed', top: '70px', left: 0, bottom: 0, width: '260px', zIndex: 90,
+        paddingLeft: '24px', paddingRight: '24px', boxSizing: 'border-box'
       }}>
         <hr style={{ border: 'none', borderTop: '1px solid rgba(0,0,0,0.08)', marginBottom: '24px', marginTop: 0 }} />
 
@@ -312,10 +311,10 @@ export default function MainDashboard() {
         }}>
           {visibleMenuItems.map((item) => {
             const isActive = activeTab === item.label;
-        
+
             return (
               <li key={item.label} style={{ width: '100%' }}>
-                <button 
+                <button
                   onClick={() => setActiveTab(item.label)}
                   style={{
                     display: 'flex',
@@ -330,7 +329,7 @@ export default function MainDashboard() {
                     padding: '12px 16px',
                     borderRadius: '12px',
                     border: 'none', // Prevents default button borders styling clashes
-                    
+
                     // Dynamic active styles
                     fontWeight: isActive ? '500' : '400',
                     color: isActive ? '#1e1e1e' : '#5c5c5c',
@@ -343,7 +342,7 @@ export default function MainDashboard() {
                 >
                   <span style={{ display: 'flex', alignItems: 'center' }}>
                     {item.icon}
-                  </span> 
+                  </span>
                   <span>{item.label}</span>
                 </button>
               </li>
@@ -353,12 +352,12 @@ export default function MainDashboard() {
       </aside>
 
       {/* Main Panel Window */}
-      <main style={{ 
+      <main style={{
         marginTop: '70px', marginLeft: '260px', marginRight: '24px', marginBottom: '24px',
-        minHeight: 'calc(100vh - 100px)',borderRadius: '20px',
+        minHeight: 'calc(100vh - 100px)', borderRadius: '20px',
         padding: '0px', boxSizing: 'border-box', height: '100%', overflow: 'hidden'
       }}>
-        <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}> 
+        <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}>
           {activeTab === 'Dashboard' ? (
             <DBmodule user={user} />
           ) : activeTab === 'Content' ? (
@@ -368,8 +367,8 @@ export default function MainDashboard() {
           ) : activeTab === 'Team Workspace' ? (
             <WSmodule user={user} userRole={user?.role} />
           ) : (
-            <div style={{backgroundColor: 'black', color: '#5c5c5c' }}>
-              <h2 style={{padding: '0px', margin: '0px'}}>{activeTab} Module</h2>
+            <div style={{ backgroundColor: 'black', color: '#5c5c5c' }}>
+              <h2 style={{ padding: '0px', margin: '0px' }}>{activeTab} Module</h2>
             </div>
           )}
         </div>
