@@ -12,6 +12,7 @@ import pcicon from '../assets/pcicon.png';
 import pmicon from '../assets/pmicon.png';
 import DBmodule from '../component/DBmodule.jsx';
 import Contmodule from '../component/Contmodule.jsx';
+import Stamodule from '../component/Stamodule.jsx';
 import Calenmodule from '../component/Calenmodule.jsx';
 import WSmodule from '../component/WSmodule.jsx';
 
