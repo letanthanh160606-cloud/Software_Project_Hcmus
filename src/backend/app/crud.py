@@ -146,6 +146,18 @@ def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> l
 def get_post_by_id(db: Session, post_id, workspace_id: str) -> Post | None:
     return db.scalar(select(Post).where(Post.id == post_id, Post.workspace_id == workspace_id))
 
+def get_task_by_id(
+    db: Session,
+    task_id,
+    workspace_id: str,
+) -> Task | None:
+    return db.scalar(
+        select(Task).where(
+            Task.id == task_id,
+            Task.workspace_id == workspace_id,
+        )
+    )
+
 def create_task(
     db: Session, *, workspace_id: str, title: str,
     content: str, priority: str, assigned_to,
