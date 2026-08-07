@@ -195,7 +195,7 @@ export default function DBmodule({ user }) {
                   zIndex: 2, 
                   position: 'absolute', 
                   bottom: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '400',
                   color: '#7E7A72',
                   fontFamily: 'Satoshi'
@@ -219,7 +219,7 @@ export default function DBmodule({ user }) {
                   zIndex: 2, 
                   position: 'absolute', 
                   top: '15px', left: '15px',
-                  fontSize: '16px',
+                  fontSize: '14px',
                   fontWeight: '700',
                   fontFamily: 'Satoshi',
                   color: '#7E7A72'
@@ -231,7 +231,7 @@ export default function DBmodule({ user }) {
                   zIndex: 2, 
                   position: 'absolute', 
                   bottom: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '400',
                   color: '#7E7A72',
                   fontFamily: 'Satoshi'
@@ -266,7 +266,7 @@ export default function DBmodule({ user }) {
                   marginTop: '0px', 
                   zIndex: 2, 
                   position: 'absolute', 
-                  bottom: '37px', left: '15px',
+                  bottom: '32px', left: '15px',
                   fontSize: '20px',
                   fontWeight: '1000',
                   fontFamily: 'Satoshi'
@@ -288,7 +288,7 @@ export default function DBmodule({ user }) {
                   zIndex: 2, 
                   position: 'absolute', 
                   top: '15px', left: '15px',
-                  fontSize: '16px',
+                  fontSize: '14px',
                   fontWeight: '700',
                   fontFamily: 'Satoshi',
                   color: '#7E7A72'
@@ -321,7 +321,7 @@ export default function DBmodule({ user }) {
                   zIndex: 2, 
                   position: 'absolute', 
                   bottom: '15px', left: '15px',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '400',
                   color: '#7E7A72',
                   fontFamily: 'Satoshi'
@@ -356,7 +356,7 @@ export default function DBmodule({ user }) {
                   marginTop: '0px', 
                   zIndex: 2, 
                   position: 'absolute', 
-                  bottom: '37px', left: '15px',
+                  bottom: '32px', left: '15px',
                   fontSize: '20px',
                   fontWeight: '1000',
                   fontFamily: 'Satoshi'

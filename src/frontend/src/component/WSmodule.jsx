@@ -208,43 +208,24 @@ export default function WSmodule({ user }) {
   };
 
   const getPriorityStyle = (priority) => {
-    switch (priority) {
-      case 'Low':
-        return {
-          color: '#16a34a',
-          border: '1px solid #4ade80',
-          backgroundColor: 'transparent',
-          borderRadius: '10px',
-          padding: '1px 10px',
-          fontSize: '11px',
-          fontWeight: '600',
-          display: 'inline-block'
-        };
-      case 'Medium':
-        return {
-          color: '#d97706',
-          border: '1px solid #fb923c',
-          backgroundColor: 'transparent',
-          borderRadius: '10px',
-          padding: '1px 10px',
-          fontSize: '11px',
-          fontWeight: '600',
-          display: 'inline-block'
-        };
-      case 'High':
-        return {
-          color: '#dc2626',
-          border: '1px solid #f87171',
-          backgroundColor: 'transparent',
-          borderRadius: '10px',
-          padding: '1px 10px',
-          fontSize: '11px',
-          fontWeight: '600',
-          display: 'inline-block'
-        };
-      default:
-        return null;
+    const p = String(priority || '').toLowerCase();
+    const baseStyle = {
+      padding: '3px 12px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      fontWeight: '600',
+      display: 'inline-block'
+    };
+    if (p === 'low') {
+      return { ...baseStyle, color: '#2ECC71', border: '1px solid #2ECC71', backgroundColor: '#EAFAF1' };
     }
+    if (p === 'medium') {
+      return { ...baseStyle, color: '#F39C12', border: '1px solid #F39C12', backgroundColor: '#FEF5E7' };
+    }
+    if (p === 'high') {
+      return { ...baseStyle, color: '#E74C3C', border: '1px solid #E74C3C', backgroundColor: '#FDEDEC' };
+    }
+    return { ...baseStyle, color: '#7F8C8D', border: '1px solid #7F8C8D', backgroundColor: '#F4F6F6' };
   };
 
   return (
@@ -259,7 +240,7 @@ export default function WSmodule({ user }) {
       <div style={{
         display: 'flex',
         flexDirection: 'row',
-        gap: '24px',
+        gap: '20px',
         alignItems: 'start',
         width: '100%',
       }}>
@@ -373,7 +354,7 @@ export default function WSmodule({ user }) {
               {isManager ? 'Approval Request' : 'Submitted Approval Request'}
             </h2>
 
-            {/* Table Header (fixed, not scrollable) */}
+            {/* Table Header */}
             <table style={{
               width: '100%',
               borderCollapse: 'collapse',

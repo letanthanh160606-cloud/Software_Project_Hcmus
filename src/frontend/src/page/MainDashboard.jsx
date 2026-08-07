@@ -363,6 +363,8 @@ export default function MainDashboard() {
             <DBmodule user={user} />
           ) : activeTab === 'Content' ? (
             <Contmodule />
+          ) : activeTab === 'Statistics' ? (
+            <Stamodule user={user} />
           ) : activeTab === 'Calendar' ? (
             <Calenmodule user={user} userRole={user?.role} />
           ) : activeTab === 'Team Workspace' ? (

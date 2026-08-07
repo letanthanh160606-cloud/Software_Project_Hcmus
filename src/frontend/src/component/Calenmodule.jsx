@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import calendar1stBg from '../assets/calendar_1stbg.png';
 import calendar2ndBg from '../assets/calendar_2ndbg.png';
 
-/* ── Color Palette for Task Priority & Type ── */
 const PRIORITY_COLORS = {
-  high: '#ef4444',     // Red - Urgent / High priority
-  medium: '#f59e0b',   // Yellow/Orange - Medium priority
-  low: '#22c55e',      // Green - Low priority
-  workspace: '#3b82f6' // Blue - Workspace task (Manager/Member only)
+  high: '#E74C3C',
+  medium: '#F39C12',
+  low: '#2ECC71',
+  workspace: '#3b82f6'
 };
 
 const MONTH_NAMES = [
@@ -689,7 +688,17 @@ export default function Calenmodule({ user, userRole }) {
                 <div><strong>Time:</strong> {activeModalTask.time}</div>
                 <div>
                   <strong>Priority / Type:</strong>{' '}
-                  <span style={{ color: PRIORITY_COLORS[activeModalTask.priority], fontWeight: '700' }}>
+                  <span style={{
+                    padding: '3px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'inline-block',
+                    ...(activeModalTask.priority === 'low' ? { color: '#2ECC71', border: '1px solid #2ECC71', backgroundColor: '#EAFAF1' } :
+                       activeModalTask.priority === 'medium' ? { color: '#F39C12', border: '1px solid #F39C12', backgroundColor: '#FEF5E7' } :
+                       activeModalTask.priority === 'high' ? { color: '#E74C3C', border: '1px solid #E74C3C', backgroundColor: '#FDEDEC' } :
+                       { color: '#3b82f6', border: '1px solid #3b82f6', backgroundColor: '#eff6ff' })
+                  }}>
                     {activeModalTask.type}
                   </span>
                 </div>
