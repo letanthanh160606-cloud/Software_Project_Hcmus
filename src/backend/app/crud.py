@@ -126,6 +126,22 @@ def count_workspace_members(db: Session, workspace_id: str) -> int:
         .where(WorkspaceMember.workspace_id == workspace_id, WorkspaceMember.status == "active")
     ) or 0
 
+def is_active_workspace_member(
+    db: Session,
+    *,
+    workspace_id: str,
+    user_id,
+) -> bool:
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.status == "active",
+        )
+    )
+
+    return membership is not None
+
 def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     return db.scalars(
         select(SocialAccount).where(SocialAccount.workspace_id == workspace_id)
