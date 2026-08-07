@@ -144,6 +144,38 @@ def create_task(
         assigned_to=payload.assigned_to,
     )
 
+@router.get(
+    "/{workspace_id}/tasks/{task_id}",
+    response_model=TaskResponse,
+)
+def get_task(
+    task_id: uuid.UUID,
+    context: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
+    task = crud.get_task_by_id(
+        db,
+        task_id=task_id,
+        workspace_id=context.workspace.workspace_uuid,
+    )
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+    if (
+        context.role == "member"
+        and task.assigned_to != current_user.users_uuid
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not assigned to this task",
+        )
+
+    return task
+
 @router.patch(
     "/{workspace_id}/tasks/{task_id}",
     response_model=TaskResponse,
@@ -151,13 +183,14 @@ def create_task(
 def update_task(
     task_id: uuid.UUID,
     payload: TaskUpdateRequest,
-    db: Session = Depends(get_db),
     context: WorkspaceContext = Depends(get_workspace_context),
-):
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
     task = crud.get_task_by_id(
         db,
         task_id=task_id,
-        workspace_id=context.workspace_id,
+        workspace_id=context.workspace.workspace_uuid,
     )
 
     if task is None:
@@ -166,12 +199,26 @@ def update_task(
             detail="Task not found",
         )
 
+    updates = payload.model_dump(exclude_unset=True)
+
+    if context.role == "member":
+        if task.assigned_to != current_user.users_uuid:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not assigned to this task",
+            )
+
+        if set(updates) - {"status"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Members are only allowed to update task status",
+            )
+
     return crud.update_task(
         db,
         task=task,
-        payload=payload,
+        updates=updates,
     )
-
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
 def remove_member(
