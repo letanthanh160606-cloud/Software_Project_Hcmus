@@ -15,6 +15,7 @@ import Contmodule from '../component/Contmodule.jsx';
 import Stamodule from '../component/Stamodule.jsx';
 import Calenmodule from '../component/Calenmodule.jsx';
 import WSmodule from '../component/WSmodule.jsx';
+import PMmodule from '../component/PMmodule.jsx';
 
 export default function MainDashboard() {
   const navigate = useNavigate();
@@ -329,7 +330,7 @@ export default function MainDashboard() {
                     cursor: 'pointer',
                     padding: '12px 16px',
                     borderRadius: '12px',
-                    border: 'none', // Prevents default button borders styling clashes
+                    border: 'none',
 
                     // Dynamic active styles
                     fontWeight: isActive ? '500' : '400',
@@ -369,6 +370,8 @@ export default function MainDashboard() {
             <Calenmodule user={user} userRole={user?.role} />
           ) : activeTab === 'Team Workspace' ? (
             <WSmodule user={user} userRole={user?.role} />
+          ) : activeTab === 'Post Management' ? (
+            <PMmodule user={user} />
           ) : (
             <div style={{ backgroundColor: 'black', color: '#5c5c5c' }}>
               <h2 style={{ padding: '0px', margin: '0px' }}>{activeTab} Module</h2>

@@ -203,8 +203,8 @@ export default function Calenmodule({ user, userRole }) {
       style={{
         display: 'flex',
         flexDirection: 'row',
-        width: '100%',
-        gap: '24px',
+        width: '97%',
+        gap: '20px',
         margin: 0,
         padding: 0,
         fontFamily: 'Satoshi, system-ui, sans-serif',
@@ -214,7 +214,7 @@ export default function Calenmodule({ user, userRole }) {
       {/* MAIN CANVAS (70%) */}
       <div
         style={{
-          width: '70%',
+          width: '75%',
           backgroundColor: 'rgba(255, 255, 255, 0.5)',
           borderRadius: '20px',
           padding: '20px',
