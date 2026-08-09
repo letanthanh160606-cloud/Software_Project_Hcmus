@@ -5,6 +5,8 @@ from app.models import Post, SocialAccount, Task
 from app.models import Post, User, Workspace, WorkspaceMember
 from app.security import hash_password, hash_pin
 
+import uuid
+
 
 
 
@@ -126,6 +128,22 @@ def count_workspace_members(db: Session, workspace_id: str) -> int:
         .where(WorkspaceMember.workspace_id == workspace_id, WorkspaceMember.status == "active")
     ) or 0
 
+def is_active_workspace_member(
+    db: Session,
+    *,
+    workspace_id: str,
+    user_id: uuid.UUID,
+) -> bool:
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.status == "active",
+        )
+    )
+
+    return membership is not None
+
 def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     return db.scalars(
         select(SocialAccount).where(SocialAccount.workspace_id == workspace_id)
@@ -145,6 +163,18 @@ def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> l
 
 def get_post_by_id(db: Session, post_id, workspace_id: str) -> Post | None:
     return db.scalar(select(Post).where(Post.id == post_id, Post.workspace_id == workspace_id))
+
+def get_task_by_id(
+    db: Session,
+    task_id,
+    workspace_id: str,
+) -> Task | None:
+    return db.scalar(
+        select(Task).where(
+            Task.id == task_id,
+            Task.workspace_id == workspace_id,
+        )
+    )
 
 def create_task(
     db: Session, *, workspace_id: str, title: str,

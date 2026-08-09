@@ -36,6 +36,7 @@ PostStatus = Enum(
     create_type=False,
 )
 
+
 class User(Base):
 
     __tablename__ = "users"

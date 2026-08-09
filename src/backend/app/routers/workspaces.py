@@ -16,6 +16,7 @@ from app.schemas import (
     PostUpdateRequest,
     TaskCreateRequest,
     TaskResponse,
+    TaskUpdateRequest,
     WorkspaceDetailResponse,
 )
 
@@ -134,6 +135,15 @@ def create_task(
 ) -> TaskResponse:
     if ctx.role != "manager":
         raise HTTPException(status_code=403, detail="Only Manager")
+    if not crud.is_active_workspace_member(
+        db,
+        workspace_id=ctx.workspace.workspace_uuid,
+        user_id=payload.assigned_to,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Assigned user is not an active member of this workspace",
+        )
     return crud.create_task(
         db,
         workspace_id=ctx.workspace.workspace_uuid,
@@ -143,6 +153,93 @@ def create_task(
         assigned_to=payload.assigned_to,
         created_by=current_user.users_uuid,
         due_date=payload.due_date,
+    )
+
+@router.get(
+    "/{workspace_id}/tasks/{task_id}",
+    response_model=TaskResponse,
+)
+def get_task(
+    task_id: uuid.UUID,
+    context: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
+    task = crud.get_task_by_id(
+        db,
+        task_id=task_id,
+        workspace_id=context.workspace.workspace_uuid,
+    )
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+    if (
+        context.role == "member"
+        and task.assigned_to != current_user.users_uuid
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not assigned to this task",
+        )
+
+    return task
+
+@router.patch(
+    "/{workspace_id}/tasks/{task_id}",
+    response_model=TaskResponse,
+)
+def update_task(
+    task_id: uuid.UUID,
+    payload: TaskUpdateRequest,
+    context: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
+    task = crud.get_task_by_id(
+        db,
+        task_id=task_id,
+        workspace_id=context.workspace.workspace_uuid,
+    )
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+
+    updates = payload.model_dump(exclude_unset=True)
+
+    if "assigned_to" in updates:
+        if not crud.is_active_workspace_member(
+            db,
+            workspace_id=context.workspace.workspace_uuid,
+            user_id=updates["assigned_to"],
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Assigned user is not an active member of this workspace",
+            )
+
+    if context.role == "member":
+        if task.assigned_to != current_user.users_uuid:
+            raise HTTPException(
+                status_code=403,
+                detail="You are not assigned to this task",
+            )
+
+        if set(updates) - {"status"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Members are only allowed to update task status",
+            )
+
+    return crud.update_task(
+        db,
+        task=task,
+        updates=updates,
     )
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
