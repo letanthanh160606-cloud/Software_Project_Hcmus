@@ -210,6 +210,14 @@ def update_task(db: Session, task: Task, updates: dict) -> Task:
     db.refresh(task)
     return task
 
+def delete_task(
+    db: Session,
+    *,
+    task: Task,
+) -> None:
+    db.delete(task)
+    db.commit()
+
 def soft_remove_member(db: Session, workspace_id: str, user_id) -> WorkspaceMember | None:
     membership = db.scalar(
         select(WorkspaceMember).where(

@@ -246,6 +246,38 @@ def update_task(
         updates=updates,
     )
 
+@router.delete(
+    "/{workspace_id}/tasks/{task_id}",
+    status_code=204,
+)
+def delete_task(
+    task_id: uuid.UUID,
+    context: WorkspaceContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+) -> None:
+    if context.role != "manager":
+        raise HTTPException(
+            status_code=403,
+            detail="Only managers are allowed to delete tasks",
+        )
+
+    task = crud.get_task_by_id(
+        db,
+        task_id=task_id,
+        workspace_id=context.workspace.workspace_uuid,
+    )
+
+    if task is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+
+    crud.delete_task(
+        db,
+        task=task,
+    )
+
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
 def remove_member(
     user_id: uuid.UUID,
