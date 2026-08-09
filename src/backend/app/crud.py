@@ -5,6 +5,8 @@ from app.models import Post, SocialAccount, Task
 from app.models import User, Workspace, WorkspaceMember
 from app.security import hash_password, hash_pin
 
+import uuid
+
 
 
 
@@ -130,7 +132,7 @@ def is_active_workspace_member(
     db: Session,
     *,
     workspace_id: str,
-    user_id,
+    user_id: uuid.UUID,
 ) -> bool:
     membership = db.scalar(
         select(WorkspaceMember).where(
