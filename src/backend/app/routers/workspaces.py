@@ -135,10 +135,13 @@ def create_task(
 ) -> TaskResponse:
     if ctx.role != "manager":
         raise HTTPException(status_code=403, detail="Only Manager")
-    if not crud.is_active_workspace_member(
-        db,
-        workspace_id=ctx.workspace.workspace_uuid,
-        user_id=payload.assigned_to,
+    if (
+        payload.assigned_to is not None
+        and not crud.is_active_workspace_member(
+            db,
+            workspace_id=ctx.workspace.workspace_uuid,
+            user_id=payload.assigned_to,
+        )
     ):
         raise HTTPException(
             status_code=400,
@@ -210,16 +213,19 @@ def update_task(
 
     updates = payload.model_dump(exclude_unset=True)
 
-    if "assigned_to" in updates:
-        if not crud.is_active_workspace_member(
+    if (
+        "assigned_to" in updates
+        and updates["assigned_to"] is not None
+        and not crud.is_active_workspace_member(
             db,
             workspace_id=context.workspace.workspace_uuid,
             user_id=updates["assigned_to"],
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="Assigned user is not an active member of this workspace",
-            )
+        )
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Assigned user is not an active member of this workspace",
+        )
 
     if context.role == "member":
         if task.assigned_to != current_user.users_uuid:
