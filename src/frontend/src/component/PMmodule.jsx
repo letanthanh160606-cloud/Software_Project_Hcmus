@@ -243,7 +243,7 @@ function getStatusColor(status) {
 
 function PostThumbnail({ title , post, user }) {
 
-  const isOwnerRole = post?.belongto === user?.role;
+  const isOwnerRole = user?.account_type === 'individual' ? true : post?.belongto === user?.role;
   const indicatorColor = isOwnerRole 
     ? getStatusColor(post?.status) 
     : 'rgba(52, 152, 219, 1)';
@@ -673,7 +673,7 @@ export default function PMmodule({ user }) {
                     >   
                         {/* Post Preview: Thumbnail + Title + Workspace Tag */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                        {user?.role !== 'individual' && <PostThumbnail post={post} user={user}/>}
+                        <PostThumbnail post={post} user={user}/>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
                             <span
                             style={{
