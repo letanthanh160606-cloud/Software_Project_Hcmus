@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, calendar, health, posts, workspaces
+from app.routers import auth, calendar, health, posts, workspaces, notifications
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.jobs.notification_jobs import check_due_soon_tasks
 
 settings = get_settings()
 
@@ -21,3 +24,17 @@ app.include_router(auth.router)
 app.include_router(workspaces.router)
 app.include_router(posts.router)
 app.include_router(calendar.router)
+app.include_router(notifications.router)
+
+scheduler = BackgroundScheduler()
+
+
+@app.on_event("startup")
+def start_scheduler():
+    scheduler.add_job(check_due_soon_tasks, "interval", hours=1, id="check_due_soon_tasks")
+    scheduler.start()
+
+
+@app.on_event("shutdown")
+def shutdown_scheduler():
+    scheduler.shutdown()
