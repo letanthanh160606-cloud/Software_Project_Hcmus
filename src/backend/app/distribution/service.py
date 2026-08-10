@@ -377,8 +377,7 @@ class DistributionService:
                 # Direct Page Token override from .env if configured
                 if self.settings.facebook_page_access_token:
                     access_token = self.settings.facebook_page_access_token.strip()
-                    if self.settings.facebook_page_id:
-                        target_id = self.settings.facebook_page_id.strip()
+                    url = "https://graph.facebook.com/v19.0/me/feed"
                 else:
                     # Dynamically resolve managed Fanpages and Page Access Tokens
                     pages_res = client.get("https://graph.facebook.com/v19.0/me/accounts", params={"access_token": access_token})
@@ -388,8 +387,8 @@ class DistributionService:
                             target_page = pages_list[0]
                             target_id = str(target_page.get("id", target_id))
                             access_token = target_page.get("access_token", access_token)
+                    url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
 
-                url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
                 res = client.post(
                     url,
                     data={
