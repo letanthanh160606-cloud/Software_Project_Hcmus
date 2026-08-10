@@ -283,13 +283,11 @@ export default function PromptContextmodule() {
           display: 'flex',
           alignItems: 'center',
         }}>
-          <span style={{
-            position: 'absolute',
-            left: '14px',
-            color: '#8c8c8c',
-            fontSize: '14px',
-            pointerEvents: 'none'
-          }}>🔍</span>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, position: 'absolute', left: '14px' }}>
+            <circle cx="6" cy="6" r="5" stroke="#9ca3af" strokeWidth="1.5" />
+            <path d="M10 10L13 13" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+
           <input
             type="text"
             placeholder="Search prompt templates..."
@@ -473,13 +471,11 @@ export default function PromptContextmodule() {
           display: 'flex',
           alignItems: 'center'
         }}>
-          <span style={{
-            position: 'absolute',
-            left: '14px',
-            color: '#8c8c8c',
-            fontSize: '14px',
-            pointerEvents: 'none'
-          }}>🔍</span>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, position: 'absolute', left: '14px' }}>
+            <circle cx="6" cy="6" r="5" stroke="#9ca3af" strokeWidth="1.5" />
+            <path d="M10 10L13 13" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          
           <input
             type="text"
             placeholder="Search contexts..."
