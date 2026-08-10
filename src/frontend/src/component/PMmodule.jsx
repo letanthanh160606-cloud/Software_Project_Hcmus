@@ -363,7 +363,11 @@ export default function PMmodule({ user }) {
         throw new Error(data.detail || 'Publish failed');
       }
       toast.success(data.message || 'Post published to Facebook successfully!');
-      setSelectedPost(null);
+      if (data.facebook_post_url) {
+        setSelectedPost((prev) => prev ? { ...prev, status: 'Published', facebook_post_url: data.facebook_post_url } : null);
+      } else {
+        setSelectedPost(null);
+      }
       // Reload posts list
       const savedUserStr = localStorage.getItem('user');
       const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
@@ -767,11 +771,13 @@ export default function PMmodule({ user }) {
                     <span style={{ fontSize: '18px' }}>🔗</span>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>Omni Laptop Shop</span>
-                      <span style={{ fontSize: '11px', color: '#15803d' }}>facebook.com/profile.php?id=61593303653577</span>
+                      <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
+                        {selectedPost.facebook_post_url ? selectedPost.facebook_post_url.replace('https://www.', '') : 'facebook.com/profile.php?id=61593303653577'}
+                      </span>
                     </div>
                   </div>
                   <a
-                    href="https://www.facebook.com/profile.php?id=61593303653577"
+                    href={selectedPost.facebook_post_url || 'https://www.facebook.com/profile.php?id=61593303653577'}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{

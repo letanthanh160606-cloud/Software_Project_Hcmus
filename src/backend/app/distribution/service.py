@@ -421,7 +421,12 @@ class DistributionService:
                 else:
                     fb_data = res.json()
 
-                fb_post_id = fb_data.get("id")
+                fb_post_id = str(fb_data.get("id", ""))
+                if fb_post_id and "_" in fb_post_id:
+                    page_id, story_fbid = fb_post_id.split("_", 1)
+                    fb_post_url = f"https://www.facebook.com/permalink.php?story_fbid={story_fbid}&id={page_id}"
+                else:
+                    fb_post_url = f"https://www.facebook.com/profile.php?id={channel.platform_account_id or '61593303653577'}"
 
                 # Update Post status
                 post.status = "ready_for_distribution"
@@ -432,6 +437,7 @@ class DistributionService:
                     "success": True,
                     "platform": "facebook",
                     "facebook_post_id": fb_post_id,
+                    "facebook_post_url": fb_post_url,
                     "channel_name": channel.display_name,
                     "message": "Post successfully published to Facebook!",
                 }
