@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # --- Distribution / OAuth ---
     facebook_app_id: str = ""
     facebook_app_secret: str = ""
+    facebook_page_id: str = ""
+    facebook_page_access_token: str = ""
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
     oauth_redirect_uri: str = "http://localhost:8000/api/v1/distribution/channels/connect/callback"
