@@ -137,6 +137,11 @@ def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> l
         query = query.where(Post.author_id == user_id)
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
+def list_posts_for_user(db: Session, user_id) -> list[Post]:
+    return db.scalars(
+        select(Post).where(Post.author_id == user_id).order_by(Post.created_at.desc())
+    ).all()
+
 def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Task]:
     query = select(Task).where(Task.workspace_id == workspace_id)
     if role == "member":
