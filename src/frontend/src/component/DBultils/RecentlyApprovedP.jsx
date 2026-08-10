@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import fbicon from '../../assets/fblg.png';
 
-export default function RecentlyApproveP() {
+export default function RecentlyApproveP({ user }) {
   const [approvedPosts, setApprovedPosts] = useState([]);
 
   useEffect(() => {
@@ -36,6 +36,72 @@ export default function RecentlyApproveP() {
         PublisedDate: 'May 18, 2026 - May 19, 2026',
         attachment: 'Architecture.png',
         Flatform: fbicon
+      },{
+        id: 6,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 7,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 8,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 9,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 10,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 11,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 12,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 13,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 14,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 15,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
+      },{
+        id: 16,
+        name: '[SE - PAOO] Instructions on how ...',
+        PublisedDate: 'May 18, 2026 - May 19, 2026',
+        attachment: 'Architecture.png',
+        Flatform: fbicon
       }
     ];
 
@@ -55,7 +121,7 @@ export default function RecentlyApproveP() {
     }}>
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>Recently Approved Posts</h2>
+        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>{user?.role === 'manager' ? 'Recently Approved' : 'Recent'} Posts</h2>
         <span style={{ fontSize: '13px', color: '#554E43', cursor: 'pointer', fontWeight: '500' }}>See all &gt;</span>
       </div>
 

@@ -261,3 +261,19 @@ class CalendarSummaryResponse(BaseModel):
     todo_count: int
     in_progress_count: int
     completed_count: int
+
+
+class NotificationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    task_id: uuid.UUID
+    type: Literal["due_soon", "task_assigned"]
+    message: str
+    is_read: bool
+    created_at: datetime
+
+class NotificationCountUnreadResponse(BaseModel):
+    unread_count: int
+
+

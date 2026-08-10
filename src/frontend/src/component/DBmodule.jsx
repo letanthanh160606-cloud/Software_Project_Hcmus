@@ -135,7 +135,7 @@ export default function DBmodule({ user }) {
         padding: '0px',
         display: 'flex',
         flexDirection: 'row',
-        width: '100%',
+        width: '97%',
         minHeight: 'calc(100vh - 70px)',
       }}>
       
@@ -150,7 +150,7 @@ export default function DBmodule({ user }) {
       }}>
         
         <div style={{
-            width: '70%',
+            width: '75%',
             minHeight: '100%',
             backgroundColor: 'rgba(255, 255, 255, 0.5)',
             borderRadius: '20px',
@@ -605,7 +605,7 @@ export default function DBmodule({ user }) {
               </div>
 
             {/* Assigned Tasks */}
-            <div style={{
+            {user?.account_type === 'business' && <div style={{
               display: 'flex',
               flexDirection: 'column',
               width: '100%',
@@ -617,16 +617,16 @@ export default function DBmodule({ user }) {
               overflow: 'hidden'
             }}>
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <AssignedTasksTable/>
+                <AssignedTasksTable user={user}/>
               </div>
-            </div>
+            </div>}
 
-            {/* Recently Approved Posts */}
+            {/* Recently Approved Posts / Recent Posts*/}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
               width: '100%',
-              height: '300px',
+              height: user?.account_type === 'business' ? '300px' : '477px',
               backgroundColor: 'rgba(255, 255, 255, 0.5)',
               borderRadius: '15px',
               padding: '0px',
@@ -634,7 +634,7 @@ export default function DBmodule({ user }) {
               overflow: 'hidden'
             }}>
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <RecentlyApproveP/>
+                <RecentlyApproveP user={user}/>
               </div>
             </div>
         </div>

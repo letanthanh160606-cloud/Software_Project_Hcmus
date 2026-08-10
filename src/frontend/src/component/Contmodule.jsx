@@ -347,21 +347,21 @@ export default function Contmodule() {
     <div style={{
       display: 'flex',
       flexDirection: 'row',
-      width: '100%',
-      gap: '24px',
+      width: '95%',
+      gap: '20px',
       margin: '0px',
       padding: '0px'
     }}>
       {/* Right Panel (70%) */}
       <div style={{
-        width: '70%',
+        width: '75%',
         backgroundColor: 'rgba(255, 255, 255, 0.5)',
         borderRadius: '20px',
         padding: '20px',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        gap: componentGap,
+        gap: '20px',
       }}>
 
         {/* Platform Selector Row */}
@@ -694,7 +694,7 @@ export default function Contmodule() {
       {/* Left Panel (25%): Knowledge Base & Prompt Template Widgets */}
       <div style={{
         width: '25%',
-        borderRadius: '15px',
+        borderRadius: '20px',
         padding: '0px',
         boxSizing: 'border-box',
         display: 'flex',

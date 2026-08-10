@@ -234,7 +234,7 @@ export default function Stamodule({ user }) {
   return (
     <div
       style={{
-        width: '100%',
+        width: '97%',
         fontFamily: 'Satoshi, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         margin: '0px',
         padding: '0px',
@@ -888,7 +888,7 @@ export default function Stamodule({ user }) {
       {/* RIGHT SIDEBAR: HIGHEST-ENGAGING POST */}
       <div
         style={{
-          width: '26%',
+          width: '25%',
           backgroundColor: 'rgba(255, 255, 255, 0.5)',
           borderRadius: '20px',
           padding: '20px',

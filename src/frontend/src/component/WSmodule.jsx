@@ -230,7 +230,7 @@ export default function WSmodule({ user }) {
 
   return (
     <div style={{
-      width: '100%',
+      width: '97%',
       fontFamily: 'Satoshi, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: '#1e1e1e',
       margin: '0px', 
@@ -254,7 +254,7 @@ export default function WSmodule({ user }) {
           display: 'flex',
           flexDirection: 'column',
           gap: '20px',
-          width: '70%',
+          width: '75%',
           boxSizing: 'border-box'
         }}>
 
@@ -265,10 +265,9 @@ export default function WSmodule({ user }) {
           }}>
             <h1 style={{
               margin: 0,
-              fontSize: '15px',
+              fontSize: '16px',
               fontWeight: '700',
-              color: '#443e36',
-              letterSpacing: '-0.2px'
+              color: '#443e36'
             }}>
               {isManager ? 'Manage Your Workspace' : 'Your Workspace'}
             </h1>
@@ -307,7 +306,7 @@ export default function WSmodule({ user }) {
                 <span
                   className="jr-label"
                   style={{
-                    fontSize: '12px',
+                    fontSize: '13px',
                     fontWeight: '600',
                     color: '#fff',
                     whiteSpace: 'nowrap',
@@ -324,8 +323,8 @@ export default function WSmodule({ user }) {
                   src={addMember}
                   alt="Join Request"
                   style={{
-                    width: '18px',
-                    height: '18px',
+                    width: '15px',
+                    height: '15px',
                     objectFit: 'contain',
                     flexShrink: 0,
                     filter: 'brightness(0) invert(1)'
@@ -491,7 +490,7 @@ export default function WSmodule({ user }) {
           <div style={{
             display: 'grid',
             width: '100%',
-            gap: '24px',
+            gap: '20px',
             display: 'flex',
             flexDirection: 'row'
           }}>
@@ -802,7 +801,7 @@ export default function WSmodule({ user }) {
           boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
           display: 'flex',
           flexDirection: 'column',
-          width: '24%',
+          width: '25%',
           height: '500px'
         }}>
           {/* Header */}

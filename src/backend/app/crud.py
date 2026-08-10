@@ -2,7 +2,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 from app.models import Post, SocialAccount, Task
 
-from app.models import Post, User, Workspace, WorkspaceMember
+from app.models import Post, User, Workspace, WorkspaceMember, Notifications
 from app.security import hash_password, hash_pin
 
 
@@ -156,6 +156,8 @@ def create_task(
         due_date=due_date,
     )
     db.add(task)
+    db.flush()
+    create_task_notification(db, task)
     db.commit()
     db.refresh(task)
     return task
@@ -266,6 +268,8 @@ def create_personal_task(
         due_date=due_date,
     )
     db.add(task)
+    db.flush()
+    create_task_notification(db, task)
     db.commit()
     db.refresh(task)
     return task
@@ -295,3 +299,82 @@ def count_tasks_assigned_to_others(db: Session, user_id) -> int:
             Task.status.notin_(["completed", "cancelled"]),
         )
     ) or 0
+
+def create_task_notification(db: Session, task: Task):
+    if task.assigned_to:
+        notification = Notifications(
+            user_id=task.assigned_to,
+            task_id=task.id,
+            type="task_assigned",
+            message=f"Bạn được giao task mới: {task.title}"
+        )
+        db.add(notification)
+        db.commit()
+
+def count_unread_notifications(db: Session, users_id) -> int:
+    return db.scalar(select(func.count()).select_from(Notifications).where(
+        Notifications.user_id == users_id,
+        Notifications.is_read.is_(False),
+        )
+    ) or 0
+
+def list_notifications_for_user(db: Session, users_id, limit: int = 20) -> list[Notifications]:
+    return db.scalar(select(Notifications).where(Notifications.user_id == users_id).order_by(Notifications.create_at.desc()).limit(limit)).all()
+
+def mark_notification_read(db:Session, notifications_id, users_id) -> Notifications| None:
+    notifications = db.scalar(select(Notifications).where(Notifications.id == notifications_id, Notifications.user_id == users_id))
+    if notifications is None:
+        return None
+    notifications.is_read = True
+    db.commit()
+    db.refresh(notifications)
+    return notifications
+
+def mark_all_notifications_read(db: Session, users_id) -> int:
+    notifications = db.scalars(
+        select(Notifications).where(
+            Notifications.user_id == users_id,
+            Notifications.is_read.is_(False),
+        )
+    ).all()
+    count = 0
+    for n in notifications:
+        n.is_read = True
+        count += 1
+    db.commit()
+    return count
+
+def create_due_soon_notification(db: Session, task: Task):
+    if not task.assigned_to:
+        return
+    # Tránh tạo trùng nếu đã có notification due_soon cho task này rồi
+    existing = db.scalar(
+        select(Notifications).where(
+            Notifications.task_id == task.id,
+            Notifications.type == "due_soon",
+        )
+    )
+    if existing:
+        return
+    notification = Notifications(
+        user_id=task.assigned_to,
+        task_id=task.id,
+        type="due_soon",
+        message=f"Task '{task.title}' sắp đến hạn",
+    )
+    db.add(notification)
+    db.commit()
+
+
+def get_tasks_due_soon(db: Session, hours: int = 24) -> list[Task]:
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    threshold = now + timedelta(hours=hours)
+    return db.scalars(
+        select(Task).where(
+            Task.due_date.isnot(None),
+            Task.due_date <= threshold,
+            Task.due_date >= now,
+            Task.status.notin_(["completed", "cancelled"]),
+        )
+    ).all()

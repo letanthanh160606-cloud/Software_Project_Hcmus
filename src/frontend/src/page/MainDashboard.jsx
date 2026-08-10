@@ -15,6 +15,7 @@ import Contmodule from '../component/Contmodule.jsx';
 import Stamodule from '../component/Stamodule.jsx';
 import Calenmodule from '../component/Calenmodule.jsx';
 import WSmodule from '../component/WSmodule.jsx';
+import PMmodule from '../component/PMmodule.jsx';
 
 export default function MainDashboard() {
   const navigate = useNavigate();
@@ -22,7 +23,11 @@ export default function MainDashboard() {
   const [user, setUser] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -41,6 +46,9 @@ export default function MainDashboard() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -52,6 +60,99 @@ export default function MainDashboard() {
     toast.success('Logged out successfully');
     navigate('/signin');
   };
+
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/notifications/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.unread_count);
+      }
+    } catch (err) {
+      console.error('Failed to fetch unread count', err);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/notifications?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications', err);
+    }
+  };
+
+  const markAsRead = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Failed to mark notification as read', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/notifications/mark-all-read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    }
+  };
+
+  const getRelativeTime = (dateStr) => {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diffMs = now - date;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Poll unread count every 60 seconds for business accounts
+  useEffect(() => {
+    if (user?.account_type !== 'business') return;
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Fetch full notification list when dropdown opens
+  useEffect(() => {
+    if (isNotifOpen) {
+      fetchNotifications();
+    }
+  }, [isNotifOpen]);
 
   const menuItems = [
     { label: 'Dashboard', roles: ['all'], icon: <img src={dbicon} style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> },
@@ -88,9 +189,129 @@ export default function MainDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
 
           {(user?.account_type === 'business') && (
-            <button style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', position: 'relative' }}>
-              🔔<span style={{ position: 'absolute', top: 2, right: 2, width: '6px', height: '6px', backgroundColor: '#ef4444', borderRadius: '50%' }}></span>
-            </button>
+            <div style={{ position: 'relative' }} ref={notifRef}>
+              <button
+                onClick={() => setIsNotifOpen((prev) => !prev)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', position: 'relative', padding: '4px' }}
+              >
+                🔔
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 0, right: -2,
+                    minWidth: '18px', height: '18px', padding: '0 5px',
+                    backgroundColor: '#ef4444', borderRadius: '9px',
+                    color: '#fff', fontSize: '11px', fontWeight: '700',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1, boxShadow: '0 2px 6px rgba(239,68,68,0.4)',
+                    fontFamily: 'Satoshi, system-ui, sans-serif',
+                  }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {isNotifOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '42px',
+                  right: 0,
+                  width: '340px',
+                  maxHeight: '440px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.97)',
+                  backdropFilter: 'blur(24px)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
+                  zIndex: 300,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  fontFamily: 'Satoshi, system-ui, sans-serif',
+                }}>
+                  {/* Header */}
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '16px 18px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)',
+                  }}>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#1e1e1e' }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        style={{
+                          background: 'none', border: 'none', fontSize: '12px',
+                          color: '#FE7216', fontWeight: '600', cursor: 'pointer',
+                          fontFamily: 'Satoshi, system-ui, sans-serif',
+                          padding: '4px 8px', borderRadius: '6px',
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(254,114,22,0.08)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notification List */}
+                  <div style={{ overflowY: 'auto', maxHeight: '370px', padding: '6px' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{
+                        padding: '40px 20px', textAlign: 'center',
+                        color: '#9c9c9c', fontSize: '13px',
+                      }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔔</div>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={() => { if (!notif.is_read) markAsRead(notif.id); }}
+                          style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '12px',
+                            padding: '12px 14px', borderRadius: '10px',
+                            cursor: notif.is_read ? 'default' : 'pointer',
+                            backgroundColor: notif.is_read ? 'transparent' : 'rgba(254, 114, 22, 0.04)',
+                            borderLeft: notif.is_read ? '3px solid transparent' : '3px solid #FE7216',
+                            transition: 'background-color 0.15s ease',
+                            marginBottom: '2px',
+                          }}
+                          onMouseEnter={(e) => { if (!notif.is_read) e.currentTarget.style.backgroundColor = 'rgba(254, 114, 22, 0.08)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = notif.is_read ? 'transparent' : 'rgba(254, 114, 22, 0.04)'; }}
+                        >
+                          <div style={{
+                            width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '14px',
+                            backgroundColor: notif.type === 'due_soon' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)',
+                          }}>
+                            {notif.type === 'due_soon' ? '⏰' : '📋'}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '13px', color: '#1e1e1e', lineHeight: '1.4',
+                              fontWeight: notif.is_read ? '400' : '600',
+                              overflow: 'hidden', textOverflow: 'ellipsis',
+                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                            }}>
+                              {notif.message}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#9c9c9c', marginTop: '4px' }}>
+                              {getRelativeTime(notif.created_at)}
+                            </div>
+                          </div>
+                          {!notif.is_read && (
+                            <div style={{
+                              width: '8px', height: '8px', borderRadius: '50%',
+                              backgroundColor: '#FE7216', flexShrink: 0, marginTop: '6px',
+                            }} />
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Avatar Dropdown Container */}
@@ -329,7 +550,7 @@ export default function MainDashboard() {
                     cursor: 'pointer',
                     padding: '12px 16px',
                     borderRadius: '12px',
-                    border: 'none', // Prevents default button borders styling clashes
+                    border: 'none',
 
                     // Dynamic active styles
                     fontWeight: isActive ? '500' : '400',
@@ -355,8 +576,7 @@ export default function MainDashboard() {
       {/* Main Panel Window */}
       <main style={{
         marginTop: '70px', marginLeft: '260px', marginRight: '24px', marginBottom: '24px',
-        minHeight: 'calc(100vh - 100px)', borderRadius: '20px',
-        padding: '0px', boxSizing: 'border-box', height: '100%', overflow: 'hidden'
+        minHeight: 'calc(100vh - 100px)', padding: '0px', boxSizing: 'border-box', height: '100%', overflow: 'hidden'
       }}>
         <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}>
           {activeTab === 'Dashboard' ? (
@@ -369,6 +589,8 @@ export default function MainDashboard() {
             <Calenmodule user={user} userRole={user?.role} />
           ) : activeTab === 'Team Workspace' ? (
             <WSmodule user={user} userRole={user?.role} />
+          ) : activeTab === 'Post Management' ? (
+            <PMmodule user={user} />
           ) : (
             <div style={{ backgroundColor: 'black', color: '#5c5c5c' }}>
               <h2 style={{ padding: '0px', margin: '0px' }}>{activeTab} Module</h2>

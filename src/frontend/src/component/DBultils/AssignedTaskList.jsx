@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function AssignedTasksTable() {
+export default function AssignedTasksTable( {user} ) {
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function AssignedTasksTable() {
     }}>
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>Assigned Tasks</h2>
+        <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>{user?.role === 'member' ? 'Assigned Tasks' : 'Tasks Assigned to Others'}</h2>
         <span style={{ fontSize: '13px', color: '#554E43', cursor: 'pointer', fontWeight: '500' }}>See all &gt;</span>
       </div>
 
