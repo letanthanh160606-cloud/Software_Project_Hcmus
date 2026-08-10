@@ -394,7 +394,7 @@ class DistributionService:
                     else:
                         # Dev Mode Fallback: Facebook Graph API restricts profile posting without Page access.
                         # Mark as published & distribution verified for Dev environment.
-                        fb_data = {"id": f"dev_fb_post_{post_id[:8]}"}
+                        fb_data = {"id": f"dev_fb_post_{str(post_id)[:8]}"}
                 else:
                     fb_data = res.json()
 
