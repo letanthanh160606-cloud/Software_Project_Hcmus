@@ -66,23 +66,24 @@ def initiate_channel_connection(
     )
 
 
+from fastapi.responses import RedirectResponse
+
 @router.get(
     "/connect/callback",
-    response_model=ChannelResponse,
-    status_code=status.HTTP_201_CREATED,
     summary="OAuth Step 2: Callback after provider authorization",
     description=(
-        "Exchanges authorization code for long-lived access tokens via server-to-server call. "
-        "Encrypts tokens with Fernet AES and saves channel record."
+        "Exchanges authorization code for access tokens via server-to-server call. "
+        "Encrypts tokens with Fernet AES, saves channel record, and redirects back to Frontend Web."
     ),
 )
 def handle_oauth_callback(
     code: str = Query(..., description="Authorization code from provider"),
     state: str = Query(..., description="CSRF state token issued in Step 1"),
     db: Session = Depends(get_db),
-) -> ChannelResponse:
+):
     service = DistributionService(db)
-    return service.handle_oauth_callback(code=code, state_token=state)
+    service.handle_oauth_callback(code=code, state_token=state)
+    return RedirectResponse(url="http://localhost:5173", status_code=status.HTTP_302_FOUND)
 
 
 @router.patch(
