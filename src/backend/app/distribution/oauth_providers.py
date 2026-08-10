@@ -122,7 +122,7 @@ class FacebookOAuthProvider:
                     )
                     me_data = me_res.json() if me_res.status_code == 200 else {}
                     page_id = str(me_data.get("id", f"fb_{state[:8]}"))
-                    page_name = channel_name or me_data.get("name", "Facebook Account")
+                    page_name = channel_name if channel_name else f"{me_data.get('name', 'Shop')} (Fanpage)"
                     page_access_token = user_access_token
 
                 return TokenExchangeResult(
