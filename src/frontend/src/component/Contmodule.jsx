@@ -219,16 +219,51 @@ function SearchBar({ placeholder = 'Search', disabled = false }) {
 export default function Contmodule() {
   const componentGap = '20px';
 
-  // Platforms data
-  const [platforms, setPlatforms] = useState([
-    { id: 1, name: 'Facebook', account: 'The Discreet Coven', icon: facebook, selected: true },
-    { id: 2, name: 'Facebook', account: 'The Deep Blue Abyssal', icon: facebook, selected: false },
-    { id: 3, name: 'LinkedIn', account: 'Statch', icon: linkedin, selected: false },
-    { id: 4, name: 'LinkedIn', account: 'Statch', icon: linkedin, selected: false },
-    { id: 5, name: 'LinkedIn', account: 'Statch', icon: linkedin, selected: false },
-    { id: 6, name: 'LinkedIn', account: 'Statch', icon: linkedin, selected: false },
-    { id: 7, name: 'LinkedIn', account: 'Statch', icon: linkedin, selected: false }
-  ]);
+  // Platforms data dynamically fetched from Backend
+  const [platforms, setPlatforms] = useState([]);
+
+  React.useEffect(() => {
+    const fetchChannels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const savedUserStr = localStorage.getItem('user');
+        let workspaceId = null;
+        if (savedUserStr) {
+          try {
+            const parsedUser = JSON.parse(savedUserStr);
+            workspaceId = parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid || null;
+          } catch (e) {}
+        }
+
+        let url = 'http://localhost:8000/api/v1/distribution/channels';
+        if (workspaceId) {
+          url += `?workspace_id=${workspaceId}`;
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (data.channels || []).map((ch, idx) => ({
+            id: ch.id,
+            name: ch.platform === 'facebook' ? 'Facebook' : 'LinkedIn',
+            account: ch.display_name,
+            icon: ch.platform === 'facebook' ? facebook : linkedin,
+            selected: idx === 0,
+          }));
+          setPlatforms(mapped);
+        }
+      } catch (err) {
+        console.error('Error loading channels in Content module:', err);
+      }
+    };
+
+    fetchChannels();
+  }, []);
 
   const [aiEnabled, setAiEnabled] = useState(false);
   const [title, setTitle] = useState('');
@@ -405,24 +440,30 @@ export default function Contmodule() {
               padding: '8px 0'
             }}
           >
-            {platforms.map((p) => (
-              <div 
-                key={p.id} 
-                style={{ 
-                  width: '240px',
-                  minWidth: '240px',
-                  flexShrink: 0 
-                }}
-              >
-                <PlatformCard
-                  icon={p.icon}
-                  platformName={p.name}
-                  accountName={p.account}
-                  selected={p.selected}
-                  onToggle={() => togglePlatform(p.id)}
-                />
+            {platforms.length === 0 ? (
+              <div style={{ fontSize: '13px', color: '#94a3b8', padding: '10px 4px', fontFamily: 'Satoshi, sans-serif' }}>
+                No connected channels found. Go to <strong>Distribution</strong> tab to connect your Facebook Page or LinkedIn channel.
               </div>
-            ))}
+            ) : (
+              platforms.map((p) => (
+                <div 
+                  key={p.id} 
+                  style={{ 
+                    width: '240px',
+                    minWidth: '240px',
+                    flexShrink: 0 
+                  }}
+                >
+                  <PlatformCard
+                    icon={p.icon}
+                    platformName={p.name}
+                    accountName={p.account}
+                    selected={p.selected}
+                    onToggle={() => togglePlatform(p.id)}
+                  />
+                </div>
+              ))
+            )}
           </div>
 
           <div style={{ height: '1px', backgroundColor: 'rgba(0,0,0,0.07)', marginTop: '16px' }} />
