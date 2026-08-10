@@ -359,7 +359,13 @@ class DistributionService:
         # 3. Decrypt Access Token
         access_token = decrypt_token(channel.access_token_encrypted)
         if not access_token:
-            raise HTTPException(status_code=400, detail="Invalid channel access token")
+            if channel.access_token_encrypted and (channel.access_token_encrypted.startswith("EAAG") or channel.access_token_encrypted.startswith("EAA")):
+                access_token = channel.access_token_encrypted
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Token Facebook cũ được mã hóa bằng chìa khóa cũ. Vui lòng vào tab Distribution bấm nút 'Connect and Save' để lưu kênh Facebook với chìa khóa mới!"
+                )
 
         # 4. Publish via Facebook Graph API
         if channel.platform == "facebook":
