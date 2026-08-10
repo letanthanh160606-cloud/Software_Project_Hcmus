@@ -349,7 +349,8 @@ class DistributionService:
         if channel_id:
             channel = self.repo.get_channel_by_id(channel_id)
         else:
-            channels = self.repo.list_channels_for_user(str(user.users_uuid))
+            owner_type, owner_id, _ = self._determine_owner_and_role(user)
+            channels = self.repo.list_channels_by_owner(owner_type, owner_id)
             channel = channels[0] if channels else None
 
         if not channel:
