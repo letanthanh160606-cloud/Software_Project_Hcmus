@@ -3,227 +3,10 @@ import toast from 'react-hot-toast';
 import facebook from '../assets/fblg.png';
 import linkedin from '../assets/linkedinlg.png';
 
-// Mock Data
-const businessPosts = [
-  {
-    id: 1,
-    title: 'Q3 Marketing Campaign Launch',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Published',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-    belongto: 'member',
-  },
-  {
-    id: 2,
-    title: 'Weekly Industry Insights Infographic',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Failed',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-    belongto: 'member',
-  },
-  {
-    id: 3,
-    title: 'Webinar Announcement: Future of AI',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-    belongto: 'manager',
-  },
-  {
-    id: 4,
-    title: 'Product Update: Version 3.0 Release',
-    thumbnail: null,
-    platforms: ['facebook'],
-    status: 'Published',
-    publishedDate: 'Oct 22, 2023 - 02:30 PM',
-    engagement: 8320,
-    belongto: 'manager',
-  },
-  {
-    id: 5,
-    title: 'Employee Spotlight: Engineering Team',
-    thumbnail: null,
-    platforms: ['linkedin'],
-    status: 'Drafts',
-    publishedDate: '—',
-    engagement: 0,
-    belongto: 'manager',
-  },
-  {
-    id: 6,
-    title: 'Holiday Greetings From Our Team',
-    thumbnail: null,
-    platforms: ['facebook', 'linkedin'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-    belongto: 'member',
-  },
-  {
-    id: 7,
-    title: 'Case Study: Client Success Story',
-    thumbnail: null,
-    platforms: ['linkedin'],
-    status: 'Published',
-    publishedDate: 'Oct 20, 2023 - 10:00 AM',
-    engagement: 19842,
-    belongto: 'member',
-  },
-  {
-    id: 8,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'member',
-  },{
-    id: 9,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },{
-    id: 10,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },{
-    id: 11,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'member',
-  },{
-    id: 12,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },{
-    id: 13,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },
-];
+// Dynamic Posts Data from Backend API
+const businessPosts = [];
 
-const individualPosts = [
-  {
-    id: 1,
-    title: 'Q3 Marketing Campaign Launch',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Published',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-  },
-  {
-    id: 2,
-    title: 'Weekly Industry Insights Infographic',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Failed',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-  },
-  {
-    id: 3,
-    title: 'Webinar Announcement: Future of AI',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-  },
-  {
-    id: 4,
-    title: 'My Personal Brand Update',
-    thumbnail: null,
-    platforms: ['linkedin'],
-    status: 'Published',
-    publishedDate: 'Oct 21, 2023 - 04:15 PM',
-    engagement: 3980,
-  },
-  {
-    id: 5,
-    title: 'Portfolio Showcase: Recent Work',
-    thumbnail: null,
-    platforms: ['facebook'],
-    status: 'Drafts',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 6,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 7,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 8,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 9,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 10,
-    title: 'Year sdsdsd Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-];
+const individualPosts = [];
 
 // ─────────────────────────────────────────────────────
 // Sub-components
@@ -496,11 +279,75 @@ export default function PMmodule({ user }) {
 
   const [activeFilter, setActiveFilter] = useState('All Posts');
   const [sortBy, setSortBy] = useState('date-desc');
+  const [realPosts, setRealPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+
+        let url = 'http://localhost:8000/posts';
+        if (workspaceId) {
+          url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (Array.isArray(data) ? data : []).map((p) => {
+            let statusLabel = 'Drafts';
+            if (p.status === 'draft') statusLabel = 'Drafts';
+            else if (p.status === 'pending_review') statusLabel = 'Pending';
+            else if (p.status === 'rejected') statusLabel = 'Rejected';
+            else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
+            else if (p.status === 'failed') statusLabel = 'Failed';
+
+            const createdDate = p.created_at
+              ? new Date(p.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                }) + ' - ' + new Date(p.created_at).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '—';
+
+            return {
+              id: p.id,
+              title: p.title || 'Untitled Post',
+              thumbnail: null,
+              platforms: ['facebook'],
+              status: statusLabel,
+              publishedDate: p.published_at || createdDate,
+              engagement: 0,
+              belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+            };
+          });
+          setRealPosts(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching posts in PMmodule:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, [user]);
 
   const filters = ['All Posts', 'Drafts', 'Pending', 'Rejected', 'Published', 'Failed'];
 
-  // Choose dataset based on account type
-  const rawPosts = isBusiness ? businessPosts : individualPosts;
+  // Dynamic dataset from Backend API
+  const rawPosts = realPosts;
 
   // Apply status filter
   const filteredPosts =
