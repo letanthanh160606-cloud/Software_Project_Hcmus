@@ -330,6 +330,20 @@ def mark_notification_read(db:Session, notifications_id, users_id) -> Notificati
     db.refresh(notifications)
     return notifications
 
+def mark_all_notifications_read(db: Session, users_id) -> int:
+    notifications = db.scalars(
+        select(Notifications).where(
+            Notifications.user_id == users_id,
+            Notifications.is_read.is_(False),
+        )
+    ).all()
+    count = 0
+    for n in notifications:
+        n.is_read = True
+        count += 1
+    db.commit()
+    return count
+
 def create_due_soon_notification(db: Session, task: Task):
     if not task.assigned_to:
         return
