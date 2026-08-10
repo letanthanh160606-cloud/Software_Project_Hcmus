@@ -371,10 +371,19 @@ class DistributionService:
         if channel.platform == "facebook":
             post_text = f"{post.title}\n\n{post.content}" if post.content else post.title
             target_id = channel.platform_account_id
-            url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
 
             import httpx
             with httpx.Client(timeout=15.0) as client:
+                # Dynamically resolve managed Fanpages and Page Access Tokens
+                pages_res = client.get("https://graph.facebook.com/v19.0/me/accounts", params={"access_token": access_token})
+                if pages_res.status_code == 200:
+                    pages_list = pages_res.json().get("data", [])
+                    if pages_list:
+                        target_page = pages_list[0]
+                        target_id = str(target_page.get("id", target_id))
+                        access_token = target_page.get("access_token", access_token)
+
+                url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
                 res = client.post(
                     url,
                     data={
