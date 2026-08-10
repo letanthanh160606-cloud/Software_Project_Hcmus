@@ -16,6 +16,7 @@ import Stamodule from '../component/Stamodule.jsx';
 import Calenmodule from '../component/Calenmodule.jsx';
 import WSmodule from '../component/WSmodule.jsx';
 import PMmodule from '../component/PMmodule.jsx';
+import Dismodule from '../component/Dismodule.jsx';
 
 export default function MainDashboard() {
   const navigate = useNavigate();
@@ -585,6 +586,8 @@ export default function MainDashboard() {
             <Contmodule />
           ) : activeTab === 'Statistics' ? (
             <Stamodule user={user} />
+          ) : activeTab === 'Distribution' ? (
+            <Dismodule user={user} />
           ) : activeTab === 'Calendar' ? (
             <Calenmodule user={user} userRole={user?.role} />
           ) : activeTab === 'Team Workspace' ? (
