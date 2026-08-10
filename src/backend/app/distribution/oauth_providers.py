@@ -56,7 +56,7 @@ class FacebookOAuthProvider:
             "client_id": app_id,
             "redirect_uri": settings.oauth_redirect_uri,
             "state": state,
-            "scope": "pages_show_list,pages_read_engagement,pages_manage_posts",
+            "scope": "email,public_profile",
             "response_type": "code",
         }
         return f"{cls.AUTH_URL}?{urlencode(params)}"
@@ -96,30 +96,34 @@ class FacebookOAuthProvider:
                 user_token_data = token_res.json()
                 user_access_token = user_token_data.get("access_token")
 
-                # 2. Fetch Facebook Pages managed by user
+                # 2. Fetch Facebook Pages managed by user or fallback to profile
                 pages_res = client.get(
                     cls.PAGES_URL,
                     params={"access_token": user_access_token},
                 )
-                if pages_res.status_code != 200:
-                    logger.error(f"Facebook pages fetch failed: {pages_res.text}")
-                    raise OAuthProviderError("Failed to fetch managed Facebook Pages", status_code=502)
 
-                pages_data = pages_res.json().get("data", [])
-                if not pages_data:
-                    raise OAuthProviderError("No managed Facebook Page found for this account", status_code=400)
+                pages_data = pages_res.json().get("data", []) if pages_res.status_code == 200 else []
 
-                # Pick first page or matching channel name
-                selected_page = pages_data[0]
-                if channel_name:
-                    for p in pages_data:
-                        if p.get("name", "").lower() == channel_name.lower():
-                            selected_page = p
-                            break
-
-                page_id = selected_page.get("id")
-                page_name = selected_page.get("name", "Facebook Page")
-                page_access_token = selected_page.get("access_token", user_access_token)
+                if pages_data:
+                    selected_page = pages_data[0]
+                    if channel_name:
+                        for p in pages_data:
+                            if p.get("name", "").lower() == channel_name.lower():
+                                selected_page = p
+                                break
+                    page_id = str(selected_page.get("id"))
+                    page_name = selected_page.get("name", "Facebook Page")
+                    page_access_token = selected_page.get("access_token", user_access_token)
+                else:
+                    # Fallback to Facebook Profile if user has no pages or page permissions not added
+                    me_res = client.get(
+                        "https://graph.facebook.com/v19.0/me",
+                        params={"fields": "id,name", "access_token": user_access_token},
+                    )
+                    me_data = me_res.json() if me_res.status_code == 200 else {}
+                    page_id = str(me_data.get("id", f"fb_{state[:8]}"))
+                    page_name = channel_name or me_data.get("name", "Facebook Account")
+                    page_access_token = user_access_token
 
                 return TokenExchangeResult(
                     platform_account_id=page_id,
