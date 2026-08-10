@@ -746,6 +746,54 @@ export default function PMmodule({ user }) {
               </div>
             </div>
 
+            {/* Published Facebook Link */}
+            {selectedPost.status === 'Published' && (
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#166534', letterSpacing: '0.5px' }}>
+                  Facebook Post Link
+                </label>
+                <div style={{
+                  marginTop: '6px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '18px' }}>🔗</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>Omni Laptop Shop</span>
+                      <span style={{ fontSize: '11px', color: '#15803d' }}>facebook.com/profile.php?id=61593303653577</span>
+                    </div>
+                  </div>
+                  <a
+                    href="https://www.facebook.com/profile.php?id=61593303653577"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      backgroundColor: '#1877F2',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 10px rgba(24,119,242,0.25)',
+                    }}
+                  >
+                    View on Facebook ↗
+                  </a>
+                </div>
+              </div>
+            )}
+
             {/* Modal Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
               <button
