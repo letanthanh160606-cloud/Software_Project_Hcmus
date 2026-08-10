@@ -401,9 +401,11 @@ class DistributionService:
                     if res_me.status_code in (200, 201):
                         fb_data = res_me.json()
                     else:
-                        # Dev Mode Fallback: Facebook Graph API restricts profile posting without Page access.
-                        # Mark as published & distribution verified for Dev environment.
-                        fb_data = {"id": f"dev_fb_post_{str(post_id)[:8]}"}
+                        error_detail = res.text or res_me.text
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Facebook API Chặn Đăng Bài: {error_detail}"
+                        )
                 else:
                     fb_data = res.json()
 
