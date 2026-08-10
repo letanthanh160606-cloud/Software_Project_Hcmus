@@ -560,7 +560,7 @@ export default function Dismodule({ user }) {
             <label style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Channel name</label>
             <input
               type="text"
-              placeholder="e.g. The United Congregation Of Optimus"
+              placeholder="Ví dụ: Laptop Tấn Thành - Fanpage Thu Cũ Đổi Mới"
               value={channelName}
               onChange={(e) => setChannelName(e.target.value)}
               style={{
