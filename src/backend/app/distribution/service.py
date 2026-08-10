@@ -1,8 +1,11 @@
 import uuid
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.models import User, SocialAccount, Workspace, WorkspaceMember, Post
