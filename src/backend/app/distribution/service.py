@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import User, SocialAccount, Workspace, WorkspaceMember
+from app.models import User, SocialAccount, Workspace, WorkspaceMember, Post
 from app import crud
 from app.distribution.schemas import (
     ChannelInitiateResponse,
@@ -14,13 +14,14 @@ from app.distribution.schemas import (
     ChannelUpdateRequest,
     ChannelToggleWorkspaceResponse,
 )
-from app.distribution.token_encryption import encrypt_token
+from app.distribution.token_encryption import encrypt_token, decrypt_token
 from app.distribution.oauth_providers import (
     FacebookOAuthProvider,
     LinkedInOAuthProvider,
     OAuthProviderError,
 )
 from app.distribution.repository import DistributionRepository
+from sqlalchemy import select
 
 
 class DistributionService:
@@ -332,3 +333,77 @@ class DistributionService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Only the Workspace Manager can edit or delete workspace channels."
                 )
+
+    # --- 7. Publish Post to Channel ---
+
+    def publish_post_to_channel(self, user: User, post_id: uuid.UUID, channel_id: uuid.UUID | None = None) -> dict:
+        """
+        Publishes a post content to a connected Facebook/LinkedIn channel via Graph API.
+        """
+        # 1. Fetch Post
+        post = self.db.scalar(select(Post).where(Post.id == post_id))
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # 2. Get Channel
+        if channel_id:
+            channel = self.repo.get_channel_by_id(channel_id)
+        else:
+            channels = self.repo.list_channels_for_user(str(user.users_uuid))
+            channel = channels[0] if channels else None
+
+        if not channel:
+            raise HTTPException(status_code=400, detail="No connected active social channel found")
+
+        # 3. Decrypt Access Token
+        access_token = decrypt_token(channel.access_token_encrypted)
+        if not access_token:
+            raise HTTPException(status_code=400, detail="Invalid channel access token")
+
+        # 4. Publish via Facebook Graph API
+        if channel.platform == "facebook":
+            post_text = f"{post.title}\n\n{post.content}" if post.content else post.title
+            target_id = channel.platform_account_id
+            url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
+
+            import httpx
+            with httpx.Client(timeout=15.0) as client:
+                res = client.post(
+                    url,
+                    data={
+                        "message": post_text,
+                        "access_token": access_token,
+                    },
+                )
+
+                if res.status_code not in (200, 201):
+                    # Try fallback to /me/feed
+                    res_me = client.post(
+                        "https://graph.facebook.com/v19.0/me/feed",
+                        data={"message": post_text, "access_token": access_token},
+                    )
+                    if res_me.status_code not in (200, 201):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Facebook Publish error: {res_me.text or res.text}",
+                        )
+                    fb_data = res_me.json()
+                else:
+                    fb_data = res.json()
+
+                fb_post_id = fb_data.get("id")
+
+                # Update Post status
+                post.status = "ready_for_distribution"
+                post.published_at = datetime.now(timezone.utc)
+                self.db.commit()
+
+                return {
+                    "success": True,
+                    "platform": "facebook",
+                    "facebook_post_id": fb_post_id,
+                    "channel_name": channel.display_name,
+                    "message": "Post successfully published to Facebook!",
+                }
+        else:
+            raise HTTPException(status_code=400, detail=f"Publishing to {channel.platform} is not supported yet.")

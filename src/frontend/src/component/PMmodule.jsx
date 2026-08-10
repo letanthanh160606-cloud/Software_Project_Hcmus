@@ -345,6 +345,53 @@ export default function PMmodule({ user }) {
     fetchPosts();
   }, [user]);
 
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublishToFacebook = async (postId) => {
+    setIsPublishing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:8000/api/v1/distribution/channels/publish/${postId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Publish failed');
+      }
+      toast.success(data.message || 'Post published to Facebook successfully!');
+      setSelectedPost(null);
+      // Reload posts list
+      const savedUserStr = localStorage.getItem('user');
+      const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+      const workspaceId = user?.workspace_id || parsedUser?.workspace_id || null;
+      let url = 'http://localhost:8000/posts';
+      if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
+      const reloadRes = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (reloadRes.ok) {
+        const reloadData = await reloadRes.json();
+        setRealPosts((Array.isArray(reloadData) ? reloadData : []).map(p => ({
+          id: p.id,
+          title: p.title || 'Untitled Post',
+          content: p.content || '',
+          thumbnail: null,
+          platforms: ['facebook'],
+          status: p.status === 'ready_for_distribution' ? 'Published' : 'Drafts',
+          publishedDate: p.published_at ? new Date(p.published_at).toLocaleString() : '—',
+          engagement: 0,
+          belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+        })));
+      }
+    } catch (err) {
+      toast.error(err.message || 'Error publishing post');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const filters = ['All Posts', 'Drafts', 'Pending', 'Rejected', 'Published', 'Failed'];
 
   // Dynamic dataset from Backend API
@@ -704,7 +751,7 @@ export default function PMmodule({ user }) {
               <button
                 onClick={() => setSelectedPost(null)}
                 style={{
-                  padding: '8px 20px',
+                  padding: '8px 18px',
                   borderRadius: '10px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
@@ -715,6 +762,31 @@ export default function PMmodule({ user }) {
                 }}
               >
                 Close
+              </button>
+
+              <button
+                onClick={() => handlePublishToFacebook(selectedPost.id)}
+                disabled={isPublishing}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #1877F2 0%, #0056b3 100%)',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: isPublishing ? 'not-allowed' : 'pointer',
+                  opacity: isPublishing ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(24,119,242,0.3)',
+                }}
+              >
+                {isPublishing ? 'Publishing...' : 'Publish to Facebook'}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
               </button>
             </div>
           </div>

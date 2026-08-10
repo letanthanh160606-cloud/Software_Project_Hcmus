@@ -133,3 +133,18 @@ def delete_channel(
 ) -> None:
     service = DistributionService(db)
     service.delete_channel(user=current_user, channel_id=channel_id)
+
+
+@router.post(
+    "/publish/{post_id}",
+    summary="Publish a post directly to connected Facebook/LinkedIn channel",
+    description="Uses stored encrypted access token to post message directly to social platform Graph API.",
+)
+def publish_post(
+    post_id: uuid.UUID,
+    channel_id: uuid.UUID | None = Query(default=None, description="Optional channel ID to publish to"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = DistributionService(db)
+    return service.publish_post_to_channel(user=current_user, post_id=post_id, channel_id=channel_id)
