@@ -56,7 +56,7 @@ class FacebookOAuthProvider:
             "client_id": app_id,
             "redirect_uri": settings.oauth_redirect_uri,
             "state": state,
-            "scope": "public_profile,email",
+            "scope": "public_profile",
             "response_type": "code",
         }
         return f"{cls.AUTH_URL}?{urlencode(params)}"
