@@ -324,6 +324,7 @@ export default function PMmodule({ user }) {
             return {
               id: p.id,
               title: p.title || 'Untitled Post',
+              content: p.content || '',
               thumbnail: null,
               platforms: ['facebook'],
               status: statusLabel,
@@ -381,8 +382,10 @@ export default function PMmodule({ user }) {
     }
   });
 
+  const [selectedPost, setSelectedPost] = useState(null);
+
   const handleRowClick = (post) => {
-    toast(`Viewing post: ${post.title}`, { icon: '📋' });
+    setSelectedPost(post);
   };
 
   return (
@@ -588,6 +591,135 @@ export default function PMmodule({ user }) {
             </div>
         </div>
       </div>
+
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        <div
+          onClick={() => setSelectedPost(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '90%',
+              maxWidth: '560px',
+              padding: '24px 28px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              position: 'relative',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', pb: '12px', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <StatusBadge status={selectedPost.status} />
+                <span style={{ fontSize: '12px', color: '#64748b' }}>Created: {selectedPost.publishedDate}</span>
+              </div>
+              <button
+                onClick={() => setSelectedPost(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  color: '#64748b',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Post Title */}
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                Post Title
+              </label>
+              <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
+                {selectedPost.title}
+              </h3>
+            </div>
+
+            {/* Platforms */}
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                Target Platforms
+              </label>
+              <div style={{ marginTop: '6px' }}>
+                <PlatformIcons platforms={selectedPost.platforms} />
+              </div>
+            </div>
+
+            {/* Post Body Content */}
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                Content
+              </label>
+              <div
+                style={{
+                  marginTop: '6px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  fontSize: '14px',
+                  color: '#334155',
+                  lineHeight: '1.6',
+                  whiteSpace: 'pre-wrap',
+                  minHeight: '100px',
+                  maxHeight: '240px',
+                  overflowY: 'auto',
+                }}
+              >
+                {selectedPost.content || selectedPost.title || 'No content provided.'}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={() => setSelectedPost(null)}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
