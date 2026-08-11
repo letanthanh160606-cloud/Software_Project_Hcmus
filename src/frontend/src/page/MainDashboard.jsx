@@ -17,6 +17,7 @@ import Calenmodule from '../component/Calenmodule.jsx';
 import WSmodule from '../component/WSmodule.jsx';
 import PMmodule from '../component/PMmodule.jsx';
 import Dismodule from '../component/Dismodule.jsx';
+import PromptContextmodule from '../component/P&Cmodule.jsx';
 
 export default function MainDashboard() {
   const navigate = useNavigate();
@@ -594,6 +595,8 @@ export default function MainDashboard() {
             <WSmodule user={user} userRole={user?.role} />
           ) : activeTab === 'Post Management' ? (
             <PMmodule user={user} />
+          ) : activeTab === 'Prompt & Context' ? (
+            <PromptContextmodule user={user} />
           ) : (
             <div style={{ backgroundColor: 'black', color: '#5c5c5c' }}>
               <h2 style={{ padding: '0px', margin: '0px' }}>{activeTab} Module</h2>
