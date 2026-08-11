@@ -143,8 +143,9 @@ def delete_channel(
 def publish_post(
     post_id: uuid.UUID,
     channel_id: uuid.UUID | None = Query(default=None, description="Optional channel ID to publish to"),
+    platform: str | None = Query(default=None, description="Optional platform ('facebook' | 'linkedin') to publish to"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     service = DistributionService(db)
-    return service.publish_post_to_channel(user=current_user, post_id=post_id, channel_id=channel_id)
+    return service.publish_post_to_channel(user=current_user, post_id=post_id, channel_id=channel_id, platform=platform)

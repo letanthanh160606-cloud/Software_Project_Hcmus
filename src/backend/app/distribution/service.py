@@ -339,7 +339,13 @@ class DistributionService:
 
     # --- 7. Publish Post to Channel ---
 
-    def publish_post_to_channel(self, user: User, post_id: uuid.UUID, channel_id: uuid.UUID | None = None) -> dict:
+    def publish_post_to_channel(
+        self,
+        user: User,
+        post_id: uuid.UUID,
+        channel_id: uuid.UUID | None = None,
+        platform: str | None = None,
+    ) -> dict:
         """
         Publishes a post content to a connected Facebook/LinkedIn channel via Graph API.
         """
@@ -348,13 +354,28 @@ class DistributionService:
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
 
+        # Idempotency Check: prevent duplicate publishing
+        if post.status in ("ready_for_distribution", "published") and post.published_at:
+            raise HTTPException(
+                status_code=409,
+                detail="Bài viết này đã được xuất bản trước đó. Không thể đăng trùng lặp!"
+            )
+
         # 2. Get Channel
         if channel_id:
             channel = self.repo.get_channel_by_id(channel_id)
         else:
             owner_type, owner_id, _ = self._determine_owner_and_role(user)
             channels = self.repo.list_channels_by_owner(owner_type, owner_id)
-            channel = channels[0] if channels else None
+            channel = None
+            if platform:
+                target_platform = platform.lower().strip()
+                for c in channels:
+                    if c.platform == target_platform:
+                        channel = c
+                        break
+            if not channel:
+                channel = channels[0] if channels else None
 
         if not channel:
             raise HTTPException(status_code=400, detail="No connected active social channel found")
@@ -362,13 +383,22 @@ class DistributionService:
         # 3. Decrypt Access Token
         access_token = decrypt_token(channel.access_token_encrypted)
         if not access_token:
-            if channel.access_token_encrypted and (channel.access_token_encrypted.startswith("EAAG") or channel.access_token_encrypted.startswith("EAA")):
+            if channel.access_token_encrypted and (
+                channel.access_token_encrypted.startswith("EAAG") 
+                or channel.access_token_encrypted.startswith("EAA")
+                or channel.access_token_encrypted.startswith("WPL_")
+            ):
                 access_token = channel.access_token_encrypted
+            elif self.settings.linkedin_client_secret and self.settings.linkedin_client_secret.startswith("WPL_"):
+                access_token = self.settings.linkedin_client_secret
             else:
                 raise HTTPException(
                     status_code=400,
-                    detail="Token Facebook cũ được mã hóa bằng chìa khóa cũ. Vui lòng vào tab Distribution bấm nút 'Connect and Save' để lưu kênh Facebook với chìa khóa mới!"
+                    detail="Token cũ được mã hóa bằng chìa khóa cũ. Vui lòng vào tab Distribution bấm nút 'Connect and Save' để lưu kênh với chìa khóa mới!"
                 )
+        if channel.platform == "linkedin" and (not access_token or access_token.startswith("mock_")):
+            if self.settings.linkedin_client_secret and self.settings.linkedin_client_secret.startswith("WPL_"):
+                access_token = self.settings.linkedin_client_secret
 
         # 4. Publish via Facebook Graph API
         if channel.platform == "facebook":
@@ -441,5 +471,158 @@ class DistributionService:
                     "channel_name": channel.display_name,
                     "message": "Post successfully published to Facebook!",
                 }
+        elif channel.platform == "linkedin":
+            post_text = f"{post.title}\n\n{post.content}" if post.content else post.title
+            import httpx
+
+            account_id = channel.platform_account_id or ""
+            author_urn = None
+
+            try:
+                with httpx.Client(timeout=15.0) as client:
+                    # 1. Fetch userinfo to get exact valid person URN if not organization
+                    if account_id.isdigit():
+                        author_urn = f"urn:li:organization:{account_id}"
+                    elif account_id.startswith("urn:li:"):
+                        author_urn = account_id
+
+                    if not author_urn or "li_user_" in author_urn:
+                        # 1. Try OpenID Connect /v2/userinfo
+                        me_res = client.get(
+                            "https://api.linkedin.com/v2/userinfo",
+                            headers={"Authorization": f"Bearer {access_token}"}
+                        )
+                        if me_res.status_code == 200:
+                            sub_id = me_res.json().get("sub")
+                            if sub_id:
+                                author_urn = f"urn:li:person:{sub_id}"
+
+                    if not author_urn or author_urn in ("urn:li:person:me", "urn:li:person:"):
+                        # 2. Try v2/me for legacy token
+                        v2_me = client.get(
+                            "https://api.linkedin.com/v2/me",
+                            headers={"Authorization": f"Bearer {access_token}"}
+                        )
+                        if v2_me.status_code == 200:
+                            person_id = v2_me.json().get("id")
+                            if person_id:
+                                author_urn = f"urn:li:person:{person_id}"
+
+                    if not author_urn or author_urn in ("urn:li:person:me", "urn:li:person:"):
+                        # 3. Fallback to Company Page Organization URN
+                        org_id = account_id if account_id.isdigit() else "143138993"
+                        author_urn = f"urn:li:organization:{org_id}"
+
+                    # Cache resolved author URN to DB so future calls don't need profile lookup API requests
+                    if author_urn and channel.platform_account_id != author_urn:
+                        channel.platform_account_id = author_urn
+                        self.db.commit()
+
+                    # Try v2/posts API first, fallback to v2/ugcPosts
+                    res = client.post(
+                        "https://api.linkedin.com/v2/posts",
+                        json={
+                            "author": author_urn,
+                            "commentary": post_text,
+                            "visibility": "PUBLIC",
+                            "distribution": {
+                                "feedDistribution": "MAIN_FEED",
+                                "targetEntities": [],
+                                "thirdPartyDistributionChannels": []
+                            },
+                            "lifecycleState": "PUBLISHED",
+                        },
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "LinkedIn-Version": "202401",
+                            "Content-Type": "application/json",
+                        },
+                    )
+
+                    if res.status_code not in (200, 201):
+                        # Fallback to ugcPosts API with correct MemberNetworkVisibility enum
+                        res = client.post(
+                            "https://api.linkedin.com/v2/ugcPosts",
+                            json={
+                                "author": author_urn,
+                                "lifecycleState": "PUBLISHED",
+                                "specificContent": {
+                                    "com.linkedin.ugc.ShareContent": {
+                                        "shareCommentary": {"text": post_text},
+                                        "shareMediaCategory": "NONE",
+                                    }
+                                },
+                                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+                            },
+                            headers={
+                                "Authorization": f"Bearer {access_token}",
+                                "X-Restli-Protocol-Version": "2.0.0",
+                                "Content-Type": "application/json",
+                            },
+                        )
+
+                    if res.status_code not in (200, 201):
+                        error_text = res.text
+                        logger.error(f"LinkedIn API Error: {error_text}")
+                        if "mock" in access_token or not self.settings.linkedin_client_id:
+                            logger.warning("Mock mode enabled for LinkedIn publish.")
+                            li_post_id = f"li_dev_post_{str(post_id)[:8]}"
+                            li_post_url = "https://www.linkedin.com/feed/"
+                        else:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"LinkedIn API trả về lỗi: {error_text}. Vui lòng kiểm tra lại Token hoặc cấp lại quyền cho App LinkedIn."
+                            )
+                    else:
+                        li_data = {}
+                        if res.content and res.content.strip():
+                            try:
+                                li_data = res.json()
+                            except Exception:
+                                li_data = {}
+                        
+                        li_post_id = str(li_data.get("id", "")) if isinstance(li_data, dict) else ""
+                        if not li_post_id:
+                            li_post_id = res.headers.get("x-restli-id", "") or res.headers.get("x-linkedin-id", "")
+                        if not li_post_id and res.headers.get("location"):
+                            from urllib.parse import unquote
+                            loc = unquote(res.headers.get("location", ""))
+                            li_post_id = loc.split("/")[-1]
+
+                        if li_post_id and li_post_id.startswith("urn:li:"):
+                            li_post_url = f"https://www.linkedin.com/feed/update/{li_post_id}/"
+                        elif li_post_id and li_post_id.isdigit():
+                            li_post_url = f"https://www.linkedin.com/feed/update/urn:li:share:{li_post_id}/"
+                        elif li_post_id:
+                            li_post_url = f"https://www.linkedin.com/feed/update/{li_post_id}/"
+                        else:
+                            li_post_url = "https://www.linkedin.com/in/me/recent-activity/all/"
+
+                        logger.info(f"LinkedIn post published: id={li_post_id}, url={li_post_url}")
+
+                    post.status = "ready_for_distribution"
+                    post.published_at = datetime.now(timezone.utc)
+                    self.db.commit()
+
+                    return {
+                        "success": True,
+                        "platform": "linkedin",
+                        "linkedin_post_id": li_post_id,
+                        "linkedin_post_url": li_post_url,
+                        "channel_name": channel.display_name,
+                        "message": "Post successfully published to LinkedIn!",
+                    }
+            except httpx.TimeoutException:
+                logger.error("Timeout connecting to LinkedIn API")
+                raise HTTPException(
+                    status_code=504,
+                    detail="Kết nối đến máy chủ LinkedIn quá thời gian chờ (Timeout 15s). Vui lòng thử lại!"
+                )
+            except httpx.HTTPError as exc:
+                logger.error(f"HTTPX error connecting to LinkedIn API: {exc}")
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Lỗi kết nối mạng đến LinkedIn API: {str(exc)}"
+                )
         else:
             raise HTTPException(status_code=400, detail=f"Publishing to {channel.platform} is not supported yet.")

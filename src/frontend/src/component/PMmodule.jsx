@@ -281,6 +281,41 @@ export default function PMmodule({ user }) {
   const [sortBy, setSortBy] = useState('date-desc');
   const [realPosts, setRealPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectedPlatforms, setConnectedPlatforms] = useState(['facebook']);
+  const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
+
+  useEffect(() => {
+    const fetchConnectedChannels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const savedUserStr = localStorage.getItem('user');
+        let workspaceId = null;
+        if (savedUserStr) {
+          try {
+            const parsedUser = JSON.parse(savedUserStr);
+            workspaceId = parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid || null;
+          } catch (e) {}
+        }
+        let url = 'http://localhost:8000/api/v1/distribution/channels';
+        if (workspaceId) url += `?workspace_id=${workspaceId}`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const pList = (data.channels || []).map(c => c.platform);
+          if (pList.length > 0) {
+            setConnectedPlatforms(pList);
+            setPrimaryPlatform(pList[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching connected channels in PMmodule:', err);
+      }
+    };
+    fetchConnectedChannels();
+  }, [user]);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -326,7 +361,7 @@ export default function PMmodule({ user }) {
               title: p.title || 'Untitled Post',
               content: p.content || '',
               thumbnail: null,
-              platforms: ['facebook'],
+              platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook'],
               status: statusLabel,
               publishedDate: p.published_at || createdDate,
               engagement: 0,
@@ -343,28 +378,40 @@ export default function PMmodule({ user }) {
     };
 
     fetchPosts();
-  }, [user]);
+  }, [user, connectedPlatforms]);
 
   const [isPublishing, setIsPublishing] = useState(false);
 
   const handlePublishToFacebook = async (postId) => {
     setIsPublishing(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8000/api/v1/distribution/channels/publish/${postId}`, {
+      const targetPlat = primaryPlatform || 'facebook';
+      const res = await fetch(`http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${targetPlat}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.detail || 'Publish failed');
       }
-      toast.success(data.message || 'Post published to Facebook successfully!');
-      if (data.facebook_post_url) {
-        setSelectedPost((prev) => prev ? { ...prev, status: 'Published', facebook_post_url: data.facebook_post_url } : null);
+      const platformName = data.platform === 'linkedin' ? 'LinkedIn' : 'Facebook';
+      toast.success(data.message || `Post published to ${platformName} successfully!`);
+      const publishedUrl = data.linkedin_post_url || data.facebook_post_url;
+      if (publishedUrl) {
+        setSelectedPost((prev) => prev ? { 
+          ...prev, 
+          status: 'Published', 
+          facebook_post_url: publishedUrl,
+          linkedin_post_url: publishedUrl
+        } : null);
       } else {
         setSelectedPost(null);
       }
@@ -390,7 +437,13 @@ export default function PMmodule({ user }) {
         })));
       }
     } catch (err) {
-      toast.error(err.message || 'Error publishing post');
+      if (err.name === 'AbortError') {
+        toast.error('Quá thời gian chờ phản hồi từ máy chủ (Timeout 30s). Vui lòng thử lại!');
+      } else if (err.message === 'Failed to fetch') {
+        toast.error('Không thể kết nối đến Máy chủ (Backend). Vui lòng kiểm tra lại dịch vụ Backend!');
+      } else {
+        toast.error(err.message || 'Lỗi khi xuất bản bài viết');
+      }
     } finally {
       setIsPublishing(false);
     }
@@ -750,11 +803,11 @@ export default function PMmodule({ user }) {
               </div>
             </div>
 
-            {/* Published Facebook Link */}
+            {/* Published Social Link */}
             {selectedPost.status === 'Published' && (
               <div>
                 <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#166534', letterSpacing: '0.5px' }}>
-                  Facebook Post Link
+                  {primaryPlatform === 'linkedin' ? 'LinkedIn Post Link' : 'Facebook Post Link'}
                 </label>
                 <div style={{
                   marginTop: '6px',
@@ -770,20 +823,22 @@ export default function PMmodule({ user }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '18px' }}>🔗</span>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>Omni Laptop Shop</span>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                        {primaryPlatform === 'linkedin' ? 'LinkedIn Channel' : 'Omni Laptop Shop'}
+                      </span>
                       <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
-                        {selectedPost.facebook_post_url ? selectedPost.facebook_post_url.replace('https://www.', '') : 'facebook.com/profile.php?id=61593303653577'}
+                        {selectedPost.linkedin_post_url || selectedPost.facebook_post_url || (primaryPlatform === 'linkedin' ? 'linkedin.com/feed/' : 'facebook.com/profile.php?id=61593303653577')}
                       </span>
                     </div>
                   </div>
                   <a
-                    href={selectedPost.facebook_post_url || 'https://www.facebook.com/profile.php?id=61593303653577'}
+                    href={selectedPost.linkedin_post_url || selectedPost.facebook_post_url || (primaryPlatform === 'linkedin' ? 'https://www.linkedin.com/feed/' : 'https://www.facebook.com/profile.php?id=61593303653577')}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
                       padding: '8px 16px',
                       borderRadius: '10px',
-                      backgroundColor: '#1877F2',
+                      backgroundColor: primaryPlatform === 'linkedin' ? '#0A66C2' : '#1877F2',
                       color: '#ffffff',
                       fontSize: '12px',
                       fontWeight: '700',
@@ -791,10 +846,10 @@ export default function PMmodule({ user }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 10px rgba(24,119,242,0.25)',
+                      boxShadow: primaryPlatform === 'linkedin' ? '0 4px 10px rgba(10,102,194,0.25)' : '0 4px 10px rgba(24,119,242,0.25)',
                     }}
                   >
-                    View on Facebook ↗
+                    View on {primaryPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} ↗
                   </a>
                 </div>
               </div>
@@ -825,7 +880,9 @@ export default function PMmodule({ user }) {
                   padding: '8px 20px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #1877F2 0%, #0056b3 100%)',
+                  background: primaryPlatform === 'linkedin'
+                    ? 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)'
+                    : 'linear-gradient(135deg, #1877F2 0%, #0056b3 100%)',
                   color: '#ffffff',
                   fontSize: '13px',
                   fontWeight: '700',
@@ -834,13 +891,19 @@ export default function PMmodule({ user }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 4px 12px rgba(24,119,242,0.3)',
+                  boxShadow: primaryPlatform === 'linkedin'
+                    ? '0 4px 12px rgba(10,102,194,0.3)'
+                    : '0 4px 12px rgba(24,119,242,0.3)',
                 }}
               >
-                {isPublishing ? 'Publishing...' : 'Publish to Facebook'}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
+                {isPublishing ? 'Publishing...' : `Publish to ${primaryPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'}`}
+                {primaryPlatform === 'linkedin' ? (
+                  <img src={linkedin} alt="LinkedIn" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                )}
               </button>
             </div>
           </div>

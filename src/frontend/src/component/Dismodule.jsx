@@ -130,15 +130,26 @@ export default function Dismodule({ user }) {
         initiateUrl += `&workspace_id=${workspaceId}`;
       }
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const currentToken = localStorage.getItem('token');
+      if (!currentToken) {
+        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+        setIsSubmitting(false);
+        return;
       }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentToken}`
+      };
 
       const response = await fetch(initiateUrl, { headers });
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+          return;
+        }
         throw new Error(data.detail || 'Failed to initiate channel connection');
       }
 

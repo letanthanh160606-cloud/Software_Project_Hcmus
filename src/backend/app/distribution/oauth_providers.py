@@ -162,7 +162,7 @@ class LinkedInOAuthProvider:
             }
             return f"http://localhost:8000/api/v1/distribution/channels/connect/callback?code=mock_li_code_{state[:8]}&{urlencode(params)}"
 
-        scope = "w_organization_social r_organization_social" if is_workspace else "w_member_social"
+        scope = "openid profile w_member_social" if not is_workspace else "openid profile w_organization_social r_organization_social"
         params = {
             "response_type": "code",
             "client_id": client_id,
@@ -213,17 +213,37 @@ class LinkedInOAuthProvider:
 
                 expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
-                # Fetch user profile info
+                # Fetch user profile info (try /v2/userinfo first, fallback to /v2/me)
+                profile_name = "LinkedIn Account"
+                account_id = None
+
                 profile_res = client.get(
                     cls.USERINFO_URL,
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
-                profile_name = "LinkedIn Account"
-                account_id = f"li_user_{state[:8]}"
                 if profile_res.status_code == 200:
                     pdata = profile_res.json()
                     profile_name = pdata.get("name") or pdata.get("given_name", "LinkedIn Account")
-                    account_id = pdata.get("sub", account_id)
+                    account_id = pdata.get("sub")
+
+                if not account_id:
+                    # Fallback: try /v2/me to get numeric person ID
+                    me_res = client.get(
+                        "https://api.linkedin.com/v2/me",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+                    if me_res.status_code == 200:
+                        me_data = me_res.json()
+                        account_id = me_data.get("id")
+                        if not profile_name or profile_name == "LinkedIn Account":
+                            fn = me_data.get("localizedFirstName", "")
+                            ln = me_data.get("localizedLastName", "")
+                            if fn or ln:
+                                profile_name = f"{fn} {ln}".strip()
+
+                if not account_id:
+                    account_id = f"li_user_{state[:8]}"
+                    logger.warning(f"Could not resolve LinkedIn person ID. Using fallback: {account_id}")
 
                 return TokenExchangeResult(
                     platform_account_id=account_id,
