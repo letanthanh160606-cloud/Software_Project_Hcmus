@@ -26,6 +26,19 @@ class Settings(BaseSettings):
     otp_resend_interval: int = 60
     verification_token_expire_minutes: int = 15
 
+    # --- Distribution / OAuth ---
+    facebook_app_id: str = ""
+    facebook_app_secret: str = ""
+    facebook_page_id: str = ""
+    facebook_page_access_token: str = ""
+    linkedin_client_id: str = ""
+    linkedin_client_secret: str = ""
+    oauth_redirect_uri: str = "http://localhost:8000/api/v1/distribution/channels/connect/callback"
+    oauth_state_expire_seconds: int = 300  # 5 minutes
+
+    # --- Token Encryption ---
+    fernet_secret_key: str = ""  # Auto-generated at startup if empty
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

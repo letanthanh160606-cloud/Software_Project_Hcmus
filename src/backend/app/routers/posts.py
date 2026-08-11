@@ -67,3 +67,14 @@ def create_post(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Post could not be created because related data is invalid",
         ) from exc
+
+
+@router.get(
+    "",
+    response_model=list[PostResponse],
+)
+def list_posts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Post]:
+    return crud.list_posts_for_user(db, current_user.users_uuid)

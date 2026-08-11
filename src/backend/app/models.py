@@ -118,20 +118,110 @@ class WorkspaceMember(Base):
     workspace: Mapped["Workspace"] = relationship(back_populates="members")
 
 class SocialAccount(Base):
+    """
+    Connected social media channel (Facebook Page, LinkedIn Profile/Company).
+
+    Polymorphic owner pattern:
+    - owner_type='workspace'   → owner_id = workspace_uuid (16-char)
+    - owner_type='individual'  → owner_id = str(user UUID)
+
+    Tokens are Fernet-encrypted at rest and NEVER exposed in API responses.
+    enabled_for_workspace only has meaning when owner_type='workspace'; it controls
+    whether Members of that workspace can see this channel.
+    """
     __tablename__ = "social_accounts"
     __table_args__ = {"schema": "workspaces"}
 
-    social_acc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
-    workspace_id: Mapped[str | None] = mapped_column(
-        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE"),
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()")
     )
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
-    platform: Mapped[str] = mapped_column(String, nullable=False)  # facebook / linkedin
+    platform: Mapped[str] = mapped_column(String(20), nullable=False)  # 'facebook' | 'linkedin'
     platform_account_id: Mapped[str] = mapped_column(String, nullable=False)
-    platform_account_name: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False, server_default="connected")
-    connected_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
-    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    owner_type: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # 'workspace' | 'individual'
+    owner_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    connected_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=False
+    )
+
+    access_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refresh_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="active"
+    )  # 'active' | 'inactive' | 'expired'
+    enabled_for_workspace: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class OAuthState(Base):
+    """
+    Temporary state tokens for OAuth 2.0 CSRF protection.
+
+    Created when user initiates a channel connection, consumed on callback.
+    Expired states are cleaned up lazily (checked on validate).
+    metadata_json stores the 'note' and 'channel_name' from the initiate request
+    so they can be attached to the SocialAccount after the callback succeeds.
+    """
+    __tablename__ = "oauth_states"
+    __table_args__ = {"schema": "public"}
+
+    state: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=False
+    )
+    platform: Mapped[str] = mapped_column(String(20), nullable=False)
+    metadata_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PostDistribution(Base):
+    """
+    Junction table linking a Post to the SocialAccount(s) it is targeted for.
+
+    Used for:
+    1. Tracking which channels a post has been distributed to.
+    2. The 409 delete guard: prevent deleting a channel that has posts in
+       'pending' or 'queued' distribution status.
+    """
+    __tablename__ = "post_distributions"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()")
+    )
+    post_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.posts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.social_accounts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="pending"
+    )  # 'pending' | 'published' | 'failed'
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class Post(Base):
