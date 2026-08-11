@@ -3,227 +3,10 @@ import toast from 'react-hot-toast';
 import facebook from '../assets/fblg.png';
 import linkedin from '../assets/linkedinlg.png';
 
-// Mock Data
-const businessPosts = [
-  {
-    id: 1,
-    title: 'Q3 Marketing Campaign Launch',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Published',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-    belongto: 'member',
-  },
-  {
-    id: 2,
-    title: 'Weekly Industry Insights Infographic',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Failed',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-    belongto: 'member',
-  },
-  {
-    id: 3,
-    title: 'Webinar Announcement: Future of AI',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-    belongto: 'manager',
-  },
-  {
-    id: 4,
-    title: 'Product Update: Version 3.0 Release',
-    thumbnail: null,
-    platforms: ['facebook'],
-    status: 'Published',
-    publishedDate: 'Oct 22, 2023 - 02:30 PM',
-    engagement: 8320,
-    belongto: 'manager',
-  },
-  {
-    id: 5,
-    title: 'Employee Spotlight: Engineering Team',
-    thumbnail: null,
-    platforms: ['linkedin'],
-    status: 'Drafts',
-    publishedDate: '—',
-    engagement: 0,
-    belongto: 'manager',
-  },
-  {
-    id: 6,
-    title: 'Holiday Greetings From Our Team',
-    thumbnail: null,
-    platforms: ['facebook', 'linkedin'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-    belongto: 'member',
-  },
-  {
-    id: 7,
-    title: 'Case Study: Client Success Story',
-    thumbnail: null,
-    platforms: ['linkedin'],
-    status: 'Published',
-    publishedDate: 'Oct 20, 2023 - 10:00 AM',
-    engagement: 19842,
-    belongto: 'member',
-  },
-  {
-    id: 8,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'member',
-  },{
-    id: 9,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },{
-    id: 10,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },{
-    id: 11,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'member',
-  },{
-    id: 12,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },{
-    id: 13,
-    title: 'Recruitment Drive: Open Positions',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 19, 2023 - 11:00 AM',
-    engagement: 5210,
-    belongto: 'manager',
-  },
-];
+// Dynamic Posts Data from Backend API
+const businessPosts = [];
 
-const individualPosts = [
-  {
-    id: 1,
-    title: 'Q3 Marketing Campaign Launch',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Published',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-  },
-  {
-    id: 2,
-    title: 'Weekly Industry Insights Infographic',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Failed',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-  },
-  {
-    id: 3,
-    title: 'Webinar Announcement: Future of AI',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Pending',
-    publishedDate: 'Oct 24, 2023 - 09:00 AM',
-    engagement: 12456,
-  },
-  {
-    id: 4,
-    title: 'My Personal Brand Update',
-    thumbnail: null,
-    platforms: ['linkedin'],
-    status: 'Published',
-    publishedDate: 'Oct 21, 2023 - 04:15 PM',
-    engagement: 3980,
-  },
-  {
-    id: 5,
-    title: 'Portfolio Showcase: Recent Work',
-    thumbnail: null,
-    platforms: ['facebook'],
-    status: 'Drafts',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 6,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 7,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 8,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 9,
-    title: 'Year In Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-  {
-    id: 10,
-    title: 'Year sdsdsd Review: Growth Summary',
-    thumbnail: null,
-    platforms: ['linkedin', 'facebook'],
-    status: 'Rejected',
-    publishedDate: '—',
-    engagement: 0,
-  },
-];
+const individualPosts = [];
 
 // ─────────────────────────────────────────────────────
 // Sub-components
@@ -496,11 +279,180 @@ export default function PMmodule({ user }) {
 
   const [activeFilter, setActiveFilter] = useState('All Posts');
   const [sortBy, setSortBy] = useState('date-desc');
+  const [realPosts, setRealPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [connectedPlatforms, setConnectedPlatforms] = useState(['facebook']);
+  const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
+
+  useEffect(() => {
+    const fetchConnectedChannels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const savedUserStr = localStorage.getItem('user');
+        let workspaceId = null;
+        if (savedUserStr) {
+          try {
+            const parsedUser = JSON.parse(savedUserStr);
+            workspaceId = parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid || null;
+          } catch (e) {}
+        }
+        let url = 'http://localhost:8000/api/v1/distribution/channels';
+        if (workspaceId) url += `?workspace_id=${workspaceId}`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const pList = (data.channels || []).map(c => c.platform);
+          if (pList.length > 0) {
+            setConnectedPlatforms(pList);
+            setPrimaryPlatform(pList[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching connected channels in PMmodule:', err);
+      }
+    };
+    fetchConnectedChannels();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+
+        let url = 'http://localhost:8000/posts';
+        if (workspaceId) {
+          url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (Array.isArray(data) ? data : []).map((p) => {
+            let statusLabel = 'Drafts';
+            if (p.status === 'draft') statusLabel = 'Drafts';
+            else if (p.status === 'pending_review') statusLabel = 'Pending';
+            else if (p.status === 'rejected') statusLabel = 'Rejected';
+            else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
+            else if (p.status === 'failed') statusLabel = 'Failed';
+
+            const createdDate = p.created_at
+              ? new Date(p.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                }) + ' - ' + new Date(p.created_at).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '—';
+
+            return {
+              id: p.id,
+              title: p.title || 'Untitled Post',
+              content: p.content || '',
+              thumbnail: null,
+              platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook'],
+              status: statusLabel,
+              publishedDate: p.published_at || createdDate,
+              engagement: 0,
+              belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+            };
+          });
+          setRealPosts(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching posts in PMmodule:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, [user, connectedPlatforms]);
+
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublishToFacebook = async (postId) => {
+    setIsPublishing(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const token = localStorage.getItem('token');
+      const targetPlat = primaryPlatform || 'facebook';
+      const res = await fetch(`http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${targetPlat}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Publish failed');
+      }
+      const platformName = data.platform === 'linkedin' ? 'LinkedIn' : 'Facebook';
+      toast.success(data.message || `Post published to ${platformName} successfully!`);
+      const publishedUrl = data.linkedin_post_url || data.facebook_post_url;
+      if (publishedUrl) {
+        setSelectedPost((prev) => prev ? { 
+          ...prev, 
+          status: 'Published', 
+          facebook_post_url: publishedUrl,
+          linkedin_post_url: publishedUrl
+        } : null);
+      } else {
+        setSelectedPost(null);
+      }
+      // Reload posts list
+      const savedUserStr = localStorage.getItem('user');
+      const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+      const workspaceId = user?.workspace_id || parsedUser?.workspace_id || null;
+      let url = 'http://localhost:8000/posts';
+      if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
+      const reloadRes = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (reloadRes.ok) {
+        const reloadData = await reloadRes.json();
+        setRealPosts((Array.isArray(reloadData) ? reloadData : []).map(p => ({
+          id: p.id,
+          title: p.title || 'Untitled Post',
+          content: p.content || '',
+          thumbnail: null,
+          platforms: ['facebook'],
+          status: p.status === 'ready_for_distribution' ? 'Published' : 'Drafts',
+          publishedDate: p.published_at ? new Date(p.published_at).toLocaleString() : '—',
+          engagement: 0,
+          belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+        })));
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        toast.error('Quá thời gian chờ phản hồi từ máy chủ (Timeout 30s). Vui lòng thử lại!');
+      } else if (err.message === 'Failed to fetch') {
+        toast.error('Không thể kết nối đến Máy chủ (Backend). Vui lòng kiểm tra lại dịch vụ Backend!');
+      } else {
+        toast.error(err.message || 'Lỗi khi xuất bản bài viết');
+      }
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   const filters = ['All Posts', 'Drafts', 'Pending', 'Rejected', 'Published', 'Failed'];
 
-  // Choose dataset based on account type
-  const rawPosts = isBusiness ? businessPosts : individualPosts;
+  // Dynamic dataset from Backend API
+  const rawPosts = realPosts;
 
   // Apply status filter
   const filteredPosts =
@@ -534,8 +486,10 @@ export default function PMmodule({ user }) {
     }
   });
 
+  const [selectedPost, setSelectedPost] = useState(null);
+
   const handleRowClick = (post) => {
-    toast(`Viewing post: ${post.title}`, { icon: '📋' });
+    setSelectedPost(post);
   };
 
   return (
@@ -741,6 +695,220 @@ export default function PMmodule({ user }) {
             </div>
         </div>
       </div>
+
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        <div
+          onClick={() => setSelectedPost(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '90%',
+              maxWidth: '560px',
+              padding: '24px 28px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              position: 'relative',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', pb: '12px', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <StatusBadge status={selectedPost.status} />
+                <span style={{ fontSize: '12px', color: '#64748b' }}>Created: {selectedPost.publishedDate}</span>
+              </div>
+              <button
+                onClick={() => setSelectedPost(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  color: '#64748b',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Post Title */}
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                Post Title
+              </label>
+              <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
+                {selectedPost.title}
+              </h3>
+            </div>
+
+            {/* Platforms */}
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                Target Platforms
+              </label>
+              <div style={{ marginTop: '6px' }}>
+                <PlatformIcons platforms={selectedPost.platforms} />
+              </div>
+            </div>
+
+            {/* Post Body Content */}
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                Content
+              </label>
+              <div
+                style={{
+                  marginTop: '6px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  fontSize: '14px',
+                  color: '#334155',
+                  lineHeight: '1.6',
+                  whiteSpace: 'pre-wrap',
+                  minHeight: '100px',
+                  maxHeight: '240px',
+                  overflowY: 'auto',
+                }}
+              >
+                {selectedPost.content || selectedPost.title || 'No content provided.'}
+              </div>
+            </div>
+
+            {/* Published Social Link */}
+            {selectedPost.status === 'Published' && (
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#166534', letterSpacing: '0.5px' }}>
+                  {primaryPlatform === 'linkedin' ? 'LinkedIn Post Link' : 'Facebook Post Link'}
+                </label>
+                <div style={{
+                  marginTop: '6px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '18px' }}>🔗</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                        {primaryPlatform === 'linkedin' ? 'LinkedIn Channel' : 'Omni Laptop Shop'}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
+                        {selectedPost.linkedin_post_url || selectedPost.facebook_post_url || (primaryPlatform === 'linkedin' ? 'linkedin.com/feed/' : 'facebook.com/profile.php?id=61593303653577')}
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={selectedPost.linkedin_post_url || selectedPost.facebook_post_url || (primaryPlatform === 'linkedin' ? 'https://www.linkedin.com/feed/' : 'https://www.facebook.com/profile.php?id=61593303653577')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      backgroundColor: primaryPlatform === 'linkedin' ? '#0A66C2' : '#1877F2',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: primaryPlatform === 'linkedin' ? '0 4px 10px rgba(10,102,194,0.25)' : '0 4px 10px rgba(24,119,242,0.25)',
+                    }}
+                  >
+                    View on {primaryPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} ↗
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={() => setSelectedPost(null)}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+
+              <button
+                onClick={() => handlePublishToFacebook(selectedPost.id)}
+                disabled={isPublishing}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: primaryPlatform === 'linkedin'
+                    ? 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)'
+                    : 'linear-gradient(135deg, #1877F2 0%, #0056b3 100%)',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: isPublishing ? 'not-allowed' : 'pointer',
+                  opacity: isPublishing ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: primaryPlatform === 'linkedin'
+                    ? '0 4px 12px rgba(10,102,194,0.3)'
+                    : '0 4px 12px rgba(24,119,242,0.3)',
+                }}
+              >
+                {isPublishing ? 'Publishing...' : `Publish to ${primaryPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'}`}
+                {primaryPlatform === 'linkedin' ? (
+                  <img src={linkedin} alt="LinkedIn" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

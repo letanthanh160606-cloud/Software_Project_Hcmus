@@ -36,7 +36,7 @@ ChartJS.register(
 
 export default function DBmodule({ user }) {
   const componentGap = '20px';
-  const userName = user?.username || 'Harry Potter';
+  const userName = user?.username || user?.email?.split('@')[0] || 'Tấn Thành';
   const [NIGincrease, setNIGincrease] = useState(true);
   const monthlyIncrease = 822006;
   const HPindex = 550744;
@@ -657,7 +657,7 @@ export default function DBmodule({ user }) {
             padding: '15px',
             boxSizing: 'border-box'
           }}>
-            <ApprovalRequests />
+            <ApprovalRequests user={user} />
           </div>
 
           <div style={{
@@ -679,7 +679,7 @@ export default function DBmodule({ user }) {
             padding: '15px',
             boxSizing: 'border-box'
           }}>
-            <ChannelList />
+            <ChannelList user={user} />
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import fbicon from '../../assets/fblg.png';
+import linkedinicon from '../../assets/linkedinlg.png';
 import AddIcon from '../../assets/AddButton.png'
 
 const AddButton = ({ onClick }) => (
@@ -39,19 +40,38 @@ const AddButton = ({ onClick }) => (
 );
 
 // 1. Approval Requests Widget
-export function ApprovalRequests() {
-  const requests = [
-    { id: 1, title: '[TA - P1] Archeology' },
-    { id: 2, title: 'Ecology' },
-    { id: 3, title: 'HR - IT dep.' },
-    { id: 4, title: 'HR - FI dep.' },
-    { id: 5, title: 'HR - FI dep.' },
-    { id: 6, title: 'HR - FI dep.' },
-    { id: 7, title: 'HR - FI dep.' },
-    { id: 8, title: 'HR - FI dep.' },
-    { id: 9, title: 'HR - FI dep.' },
-    { id: 10, title: 'HR - FI dep.' }
-  ];
+export function ApprovalRequests({ user }) {
+  const [requests, setRequests] = useState([]);
+
+  useEffect(() => {
+    const fetchPendingPosts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+        let url = 'http://localhost:8000/posts';
+        if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const pending = (Array.isArray(data) ? data : [])
+            .filter(p => p.status === 'pending_review' || p.status === 'draft')
+            .slice(0, 5)
+            .map(p => ({
+              id: p.id,
+              title: p.title || 'Untitled Post',
+            }));
+          setRequests(pending);
+        }
+      } catch (err) {
+        console.error('Error fetching pending posts:', err);
+      }
+    };
+    fetchPendingPosts();
+  }, [user]);
 
   return (
     <div style={{
@@ -226,14 +246,37 @@ export function MyCalendar() {
 }
 
 // 3. Channel Widget
-export function ChannelList() {
-  const channels = [
-    { id: 1, platform: 'Facebook', name: 'The Discreet Coven', status: 'Active' },
-    { id: 2, platform: 'Facebook', name: 'The Alumni Congregation', status: 'Active' },
-    { id: 3, platform: 'Facebook', name: 'The Discreet Coven', status: 'Active' },
-    { id: 4, platform: 'Facebook', name: 'The Alumni Congregation', status: 'Inactive' },
-    { id: 5, platform: 'Facebook', name: 'The Alumni Congregation', status: 'Inactive' }
-  ];
+export function ChannelList({ user }) {
+  const [channels, setChannels] = useState([]);
+
+  useEffect(() => {
+    const fetchRealChannels = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+        let url = 'http://localhost:8000/api/v1/distribution/channels';
+        if (workspaceId) url += `?workspace_id=${workspaceId}`;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const channelList = (data.channels || []).map(c => ({
+            id: c.id,
+            platform: c.platform.charAt(0).toUpperCase() + c.platform.slice(1),
+            name: c.display_name || 'Social Channel',
+            status: c.status === 'active' ? 'Active' : 'Inactive',
+          }));
+          setChannels(channelList);
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard channels:', err);
+      }
+    };
+    fetchRealChannels();
+  }, [user]);
 
   return (
     <div style={{

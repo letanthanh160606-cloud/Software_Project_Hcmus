@@ -3,110 +3,43 @@ import fbicon from '../../assets/fblg.png';
 
 export default function RecentlyApproveP({ user }) {
   const [approvedPosts, setApprovedPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const mockBackendData = [
-      {
-        id: 1,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 2,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 3,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 4,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 5,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 6,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 7,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 8,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 9,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 10,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 11,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 12,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 13,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 14,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 15,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      },{
-        id: 16,
-        name: '[SE - PAOO] Instructions on how ...',
-        PublisedDate: 'May 18, 2026 - May 19, 2026',
-        attachment: 'Architecture.png',
-        Flatform: fbicon
-      }
-    ];
+    const fetchRealPosts = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+        let url = 'http://localhost:8000/posts';
+        if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
 
-    setApprovedPosts(mockBackendData);
-  }, []);
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const postsList = Array.isArray(data) ? data : [];
+          setApprovedPosts(postsList.map(p => ({
+            id: p.id,
+            name: p.title || 'Untitled Post',
+            PublisedDate: p.published_at
+              ? new Date(p.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : (p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'),
+            attachment: 'Content Document',
+            Flatform: fbicon,
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching recent posts:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRealPosts();
+  }, [user]);
 
   return (
     <div style={{
