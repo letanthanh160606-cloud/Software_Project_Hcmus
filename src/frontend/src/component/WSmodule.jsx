@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import fbicon from '../assets/fblg.png';
 import linkedinicon from '../assets/linkedinlg.png';
@@ -6,158 +6,200 @@ import addIconImg from '../assets/AddButton.png';
 import addMember from '../assets/addmember.png';
 import infobg from '../assets/WSinfobg.png';
 
+const formatTaskDate = (dateStr) => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  });
+};
+
+const PLATFORM_LABELS = {
+  facebook: 'Facebook',
+  linkedin: 'LinkedIn',
+};
+
+const PLATFORM_ICONS = {
+  facebook: fbicon,
+  linkedin: linkedinicon,
+};
+
+function platformLabel(platform) {
+  return PLATFORM_LABELS[platform] || platform;
+}
+
+function platformIcon(platform) {
+  return PLATFORM_ICONS[platform] || fbicon;
+}
+
+
 export default function WSmodule({ user }) {
   const isManager = user?.role === 'manager';
 
-  const [approvalRequests, setApprovalRequests] = useState([
-    {
-      id: 1,
-      title: '[SE - PA00] Project Proposal',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['linkedin', 'facebook']
-    },
-    {
-      id: 2,
-      title: '[BA - TA11] Introduction to Microeco...',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['facebook']
-    },
-    {
-      id: 3,
-      title: '[SE - PA00] Project Proposal',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['facebook']
-    },
-    {
-      id: 4,
-      title: '[BA - TA11] Introduction to Microeco...',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['linkedin', 'facebook']
-    },
-    {
-      id: 5,
-      title: '[SE - PA00] Project Proposal',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['linkedin']
-    },
-    {
-      id: 6,
-      title: '[SE - PA00] Project Proposal',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['linkedin']
-    },
-    {
-      id: 7,
-      title: '[SE - PA00] Project Proposal',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['linkedin']
-    },
-    {
-      id: 8,
-      title: '[SE - PA00] Project Proposal',
-      submittedByAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      content: 'Introduction to Archi...',
-      attachment: 'Architecture.png',
-      platforms: ['linkedin']
+  const [approvalRequests, setApprovalRequests] = useState([]);
+  const [approvalLoading, setApprovalLoading] = useState(true);
+
+  const [distributorList, setDistributorList] = useState([]);
+  const [distributorLoading, setDistributorLoading] = useState(true);
+
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(true)
+
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+
+  const [workspaceDetail, setWorkspaceDetail] = useState(null);
+  const [workspaceDetailLoading, setWorkspaceDetailLoading] = useState(true);
+
+  const workspaceId = user?.workspace_id || user?.workspace?.workspace_id || null;
+
+
+const fetchMembers = async () => {
+  setMembersLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    if (!workspaceId) {
+      setMembers([]);
+      return;
     }
-  ]);
 
-  const [distributorList, setDistributorList] = useState([
-    { id: 1, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: true },
-    { id: 2, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: true },
-    { id: 3, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: true },
-    { id: 4, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: false },
-    { id: 5, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: false },
-    { id: 6, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: false },
-    { id: 7, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: false },
-    { id: 8, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: false },
-    { id: 9, platform: 'Facebook', name: 'The Discreet Coven', icon: fbicon, active: false }
-  ]);
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const [tasks] = useState([
-    {
-      id: 1,
-      name: isManager
-        ? '[SE - PA00] Instructions on how to...'
-        : '[SE - PA00] Instructions on how to crea...',
-      date: 'May 18, 2026 - May 19, 2026',
-      priority: 'Low',
-      attachment: 'Architecture.png',
-      assigneeAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      platform: null
-    },
-    {
-      id: 2,
-      name: isManager
-        ? '[SE - PA00] Instructions on how to...'
-        : '[SE - PA00] Instructions on how to crea...',
-      date: 'May 18, 2026 - May 19, 2026',
-      priority: 'Medium',
-      attachment: 'Architecture.png',
-      assigneeAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      platform: null
-    },
-    {
-      id: 3,
-      name: isManager
-        ? '[SE - PA00] Instructions on how to...'
-        : '[SE - PA00] Instructions on how to crea...',
-      date: 'May 18, 2026 - May 19, 2026',
-      priority: 'Medium',
-      attachment: 'Architecture.png',
-      assigneeAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      platform: null
-    },
-    {
-      id: 4,
-      name: isManager
-        ? '[SE - PA00] Instructions on how to...'
-        : '[SE - PA00] Instructions on how to crea...',
-      date: 'May 18, 2026 - May 19, 2026',
-      priority: 'High',
-      attachment: 'Architecture.png',
-      assigneeAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      platform: null
-    },
-    {
-      id: 5,
-      name: isManager
-        ? '[SE - PA00] Instructions on how to...'
-        : 'Here is the step-by-step framework that actu...',
-      date: isManager ? 'May 18, 2026 - May 19, 2026' : 'Monday, May 18, 2025',
-      priority: isManager ? 'High' : null,
-      attachment: 'Architecture.png',
-      assigneeAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-      platform: isManager ? null : 'linkedin'
+    const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/members`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const mapped = (Array.isArray(data) ? data : []).map((m) => ({
+        id: m.user_id,
+        name: m.username,
+        joined: 'Joined ' + new Date(m.joined_at).toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        })
+      }));
+      setMembers(mapped);
     }
-  ]);
+  } catch (err) {
+    console.error('Failed to fetch members:', err);
+  } finally {
+    setMembersLoading(false);
+  }
+};
 
-  const members = [
-    { id: 1, name: 'Draco Malfoy', joined: 'Joined 14 June 2025' },
-    { id: 2, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 3, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 4, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 5, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 6, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 7, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 8, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 9, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' },
-    { id: 10, name: 'Fenrir Greyback', joined: 'Joined 14 June 2025' }
-  ];
+useEffect(() => {
+  fetchMembers();
+}, [user, workspaceId]);
+
+
+useEffect(() => {
+  const fetchWorkspaceDetail = async () => {
+    setWorkspaceDetailLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!workspaceId) {
+        console.warn('WSmodule: missing workspaceId on user object, skip fetching workspace detail', user);
+        setWorkspaceDetail(null);
+        return;
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaceDetail({
+          name: data.workspace_name,
+          managerName: data.manager_name,
+          workspaceId: data.workspace_id,
+          createdAt: data.created_at
+            ? new Date(data.created_at).toLocaleDateString('en-GB', {
+                day: 'numeric', month: 'long', year: 'numeric'
+              })
+            : null,
+          memberCount: data.member_count,
+        });
+      } else {
+        console.error('Failed to fetch workspace detail, status:', res.status);
+      }
+    } catch (err) {
+      console.error('Failed to fetch workspace detail:', err);
+    } finally {
+      setWorkspaceDetailLoading(false);
+    }
+  };
+
+  fetchWorkspaceDetail();
+}, [user, workspaceId]);
+
+useEffect(() => {
+  const fetchDistributorChannels = async () => {
+    setDistributorLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!workspaceId) {
+        setDistributorList([]);
+        return;
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `http://localhost:8000/api/v1/distribution/channels?workspace_id=${workspaceId}`,
+        { headers }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = (data.channels || []).map((c) => ({
+          id: c.id,
+          platform: platformLabel(c.platform),
+          name: c.display_name,
+          icon: platformIcon(c.platform),
+          active: c.enabled_for_workspace
+        }));
+        setDistributorList(mapped);
+      } else {
+        console.error('Failed to fetch distributor channels, status:', res.status);
+      }
+    } catch (err) {
+      console.error('Failed to fetch distributor channels:', err);
+    } finally {
+      setDistributorLoading(false);
+    }
+  };
+
+  fetchDistributorChannels();
+}, [user, workspaceId]);
+
+
+  const fetchTasks = async () => {
+    setTasksLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!workspaceId) {
+        setTasks([]);
+        return;
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setTasks(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Failed to fetch tasks, status:', res.status);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err);
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [user, workspaceId]);
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -165,41 +207,230 @@ export default function WSmodule({ user }) {
   const [showRejectReason, setShowRejectReason] = useState(false);
   const [rejectComment, setRejectComment] = useState('');
 
-  const handleToggleDistributor = (id) => {
+
+  const [joinRequests, setJoinRequests] = useState([]);
+  const [joinRequestsLoading, setJoinRequestsLoading] = useState(false);
+
+  const fetchJoinRequests = async () => {
+    if (!workspaceId) {
+      setJoinRequests([]);
+      return;
+    }
+    setJoinRequestsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/join-requests`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setJoinRequests(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Failed to fetch join requests, status:', res.status);
+      }
+    } catch (err) {
+      console.error('Failed to fetch join requests:', err);
+    } finally {
+      setJoinRequestsLoading(false);
+    }
+  };
+
+  // Fetch pending join requests each time the modal is opened
+  useEffect(() => {
+    if (showJoinModal) {
+      fetchJoinRequests();
+    }
+  }, [showJoinModal, workspaceId]);
+
+
+  const handleAcceptJoinRequest = async (userId, username) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `http://localhost:8000/workspaces/${workspaceId}/join-requests/${userId}/accept`,
+        { method: 'PATCH', headers }
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Failed to accept join request');
+        return;
+      }
+
+      setJoinRequests(prev => prev.filter(r => r.user_id !== userId));
+      toast.success(`Accepted ${username}`);
+      // Refresh member list since a new active member was added
+      fetchMembers();
+    } catch (err) {
+      console.error('Failed to accept join request:', err);
+      toast.error('Network error while accepting join request');
+    }
+  };
+
+
+  const handleDenyJoinRequest = async (userId, username) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `http://localhost:8000/workspaces/${workspaceId}/join-requests/${userId}`,
+        { method: 'DELETE', headers }
+      );
+
+      if (!res.ok && res.status !== 204) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Failed to decline join request');
+        return;
+      }
+
+      setJoinRequests(prev => prev.filter(r => r.user_id !== userId));
+      toast.error(`Declined ${username}`);
+    } catch (err) {
+      console.error('Failed to decline join request:', err);
+      toast.error('Network error while declining join request');
+    }
+  };
+
+  const handleToggleDistributor = async (id) => {
     const target = distributorList.find(item => item.id === id);
     if (!target) return;
     const nextActive = !target.active;
 
+    // Optimistic update
     setDistributorList(prev =>
       prev.map(item =>
         item.id === id ? { ...item, active: nextActive } : item
       )
     );
 
-    toast(nextActive ? 'Distributor activated' : 'Distributor deactivated', {
-      icon: nextActive ? '✅' : '⏸️'
-    });
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `http://localhost:8000/api/v1/distribution/channels/${id}/toggle-workspace`,
+        { method: 'PATCH', headers }
+      );
+
+      if (!res.ok) {
+        // Rollback if the request failed
+        setDistributorList(prev =>
+          prev.map(item =>
+            item.id === id ? { ...item, active: target.active } : item
+          )
+        );
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || 'Failed to update distributor status');
+        return;
+      }
+
+      const data = await res.json();
+      setDistributorList(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, active: data.enabled_for_workspace } : item
+        )
+      );
+
+      toast(data.enabled_for_workspace ? 'Distributor activated' : 'Distributor deactivated', {
+        icon: data.enabled_for_workspace ? '✅' : '⏸️'
+      });
+    } catch (err) {
+      // Rollback on network error
+      setDistributorList(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, active: target.active } : item
+        )
+      );
+      console.error('Failed to toggle distributor:', err);
+      toast.error('Network error while updating distributor status');
+    }
   };
 
-  const handleApprove = (id) => {
+
+  const mapPostToRequest = (post) => ({
+  id: post.id,
+  title: post.title || (post.content ? post.content.slice(0, 40) : 'Untitled post'),
+  content: post.content || '',
+  status: post.status,
+  authorId: post.author_id,
+  attachment: post.attachment || null,
+});
+
+const fetchApprovalRequests = async () => {
+  setApprovalLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    if (!workspaceId) {
+      setApprovalRequests([]);
+      return;
+    }
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const posts = Array.isArray(data) ? data : [];
+      setApprovalRequests(posts.map(mapPostToRequest));
+    } else {
+      console.error('Failed to fetch workspace posts, status:', res.status);
+    }
+  } catch (err) {
+    console.error('Failed to fetch workspace posts:', err);
+  } finally {
+    setApprovalLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchApprovalRequests();
+}, [user, workspaceId]);
+
+const patchPost = async (id, payload) => {
+  const token = localStorage.getItem('token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts/${id}`, {
+    method: 'PATCH', headers, body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to update the request');
+  }
+  return res.json();
+};
+
+const handleApprove = async (id) => {
+  try {
+    await patchPost(id, { status: 'ready_for_distribution' });
     setApprovalRequests(prev => prev.filter(r => r.id !== id));
     toast.success('Request Approved successfully');
-  };
+  } catch (err) { toast.error(err.message); }
+};
 
-  const handleDeny = (id) => {
-    setApprovalRequests(prev => prev.filter(r => r.id !== id));
-    toast.error('Request Denied');
-  };
-
-  const handleDenyWithComment = (id, comment) => {
+const handleDenyWithComment = async (id, comment) => {
+  try {
+    await patchPost(id, { status: 'rejected' });
     setApprovalRequests(prev => prev.filter(r => r.id !== id));
     toast.error(`Request Rejected: "${comment}"`);
-  };
+  } catch (err) { toast.error(err.message); }
+};
 
-  const handleCancelRequest = (id) => {
+const handleCancelRequest = async (id) => {
+  try {
+    await patchPost(id, { status: 'rejected' });
     setApprovalRequests(prev => prev.filter(r => r.id !== id));
     toast('Request Cancelled', { icon: 'ℹ️' });
-  };
+  } catch (err) { toast.error(err.message); }
+};
 
   const handleViewRequest = (req) => {
     setSelectedRequest(req);
@@ -362,15 +593,14 @@ export default function WSmodule({ user }) {
             }}>
               <thead>
                 <tr style={{ color: '#7c7c7c', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '28%' }}>Task title</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '30%' }}>Task title</th>
                   {isManager ? (
-                    <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '25%' }}>Submitted by</th>
+                    <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '27%' }}>Submitted by</th>
                   ) : (
-                    <th style={{ padding: '10px 5px', fontWeight: '600', width: '25%' }}>Content</th>
+                    <th style={{ padding: '10px 5px', fontWeight: '600', width: '27%' }}>Content</th>
                   )}
-                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '18%' }}>Attachment</th>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '12%' }}>Platform</th>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '20%' }}></th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '22%' }}>Attachment</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '21%' }}></th>
                 </tr>
               </thead>
             </table>
@@ -382,55 +612,58 @@ export default function WSmodule({ user }) {
             }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <tbody>
-                  {approvalRequests.map((req) => (
+                  {approvalLoading ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '20px 0', textAlign: 'center', color: '#7c7c7c' }}>
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : approvalRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '20px 0', textAlign: 'center', color: '#7c7c7c' }}>
+                        No pending requests.
+                      </td>
+                    </tr>
+                  ) : (
+                  approvalRequests.map((req) => (
                     <tr
                       key={req.id}
                       style={{
                         borderBottom: '1px solid rgba(0, 0, 0, 0.04)'
                       }}
                     >
-                      <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: '28%' }}>
+                      <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: '30%' }}>
                         {req.title}
                       </td>
 
                       {isManager ? (
-                        <td style={{ padding: '10px 5px', textAlign: 'center', width: '25%' }}>
-                          <img
-                            src={req.submittedByAvatar}
-                            alt="Submitter"
-                            style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              display: 'inline-block',
-                              verticalAlign: 'middle'
-                            }}
-                          />
+                        <td style={{ padding: '10px 5px', color: '#666666', width: '27%' }}>
+                          {members.find(m => m.id === req.authorId)?.name || 'Member'}
                         </td>
                       ) : (
-                        <td style={{ padding: '10px', color: '#7c7c7c', width: '25%' }}>
+                        <td style={{ padding: '10px', color: '#7c7c7c', width: '27%' }}>
                           {req.content}
                         </td>
                       )}
 
-                      <td style={{ padding: '10px', color: '#666666', width: '18%' }}>
-                        {req.attachment}
-                      </td>
-
-                      <td style={{ padding: '10px', textAlign: 'center', width: '12%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          {req.platforms.includes('linkedin') && (
-                            <img src={linkedinicon} alt="LinkedIn" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
-                          )}
-                          {req.platforms.includes('facebook') && (
-                            <img src={fbicon} alt="Facebook" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
-                          )}
-                        </div>
+                      <td style={{ padding: '10px', color: '#666666', width: '22%' }}>
+                        {req.attachment ? (
+                          <a
+                            href={req.attachment.image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            style={{ color: '#FE7216', fontWeight: '600', textDecoration: 'none' }}
+                          >
+                            Download
+                          </a>
+                        ) : (
+                          <span style={{ color: '#b5b5b5' }}>—</span>
+                        )}
                       </td>
 
                       {/* Actions */}
-                      <td style={{ padding: '10px 0 10px 12px', textAlign: 'right', whiteSpace: 'nowrap', width: '20%' }}>
+                      <td style={{ padding: '10px 0 10px 12px', textAlign: 'right', whiteSpace: 'nowrap', width: '21%' }}>
                         {isManager ? (
                           <button
                             onClick={() => handleViewRequest(req)}
@@ -480,7 +713,8 @@ export default function WSmodule({ user }) {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -495,7 +729,7 @@ export default function WSmodule({ user }) {
             flexDirection: 'row'
           }}>
             {/* Workspace Distributor Card */}
-            <div style={{
+                        <div style={{
               backgroundColor: 'rgba(255, 255, 255, 0.5)',
               borderRadius: '16px',
               padding: '15px',
@@ -521,7 +755,16 @@ export default function WSmodule({ user }) {
 
               {/* Channel Items */}
               <div className="custom-scroll" style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', overflowY: 'auto' }}>
-                {distributorList.map((item) => (
+                {distributorLoading ? (
+                  <div style={{ fontSize: '12px', color: '#7c7c7c', textAlign: 'center', padding: '20px 0' }}>
+                    Loading...
+                  </div>
+                ) : distributorList.length === 0 ? (
+                  <div style={{ fontSize: '12px', color: '#7c7c7c', textAlign: 'center', padding: '20px 0' }}>
+                    No distributor channels connected yet.
+                  </div>
+                ) : (
+                distributorList.map((item) => (
                   <div
                     key={item.id}
                     style={{
@@ -586,7 +829,8 @@ export default function WSmodule({ user }) {
                       </span>
                     )}
                   </div>
-                ))}
+                ))
+                )}
               </div>
             </div>
 
@@ -638,18 +882,30 @@ export default function WSmodule({ user }) {
                 flexDirection: 'column',
                 gap: '2px'
               }}>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43', marginBottom: '2px' }}>
-                  Marketing Dept.
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
-                  Managed by: Harry Potter
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
-                  Workspace id: 46345346
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
-                  Created: 8 February 2024
-                </div>
+                {workspaceDetailLoading ? (
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
+                    Loading...
+                  </div>
+                ) : workspaceDetail ? (
+                  <>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43', marginBottom: '2px' }}>
+                      {workspaceDetail.name}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
+                      Managed by: {workspaceDetail.managerName}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
+                      Workspace id: {workspaceDetail.workspaceId}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
+                      Created: {workspaceDetail.createdAt}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
+                    No workspace data
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -731,61 +987,71 @@ export default function WSmodule({ user }) {
             }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <tbody>
-                  {tasks.map((task) => (
-                    <tr
-                      key={task.id}
-                      style={{
-                        borderBottom: '1px solid rgba(0, 0, 0, 0.04)'
-                      }}
-                    >
-                      {/* Name */}
-                      <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: isManager ? '35%' : '40%' }}>
-                        {task.name}
+                  {tasksLoading ? (
+                    <tr>
+                      <td colSpan={isManager ? 5 : 4} style={{ padding: '14px 5px', color: '#7c7c7c', textAlign: 'center' }}>
+                        Loading...
                       </td>
-
-                      {/* Date */}
-                      <td style={{ padding: '10px 5px', color: '#666666', whiteSpace: 'nowrap', width: '25%' }}>
-                        {task.date}
-                      </td>
-
-                      {/* Priority */}
-                      <td style={{ padding: '10px 5px', textAlign: 'center', width: '15%' }}>
-                        {task.priority ? (
-                          <span style={getPriorityStyle(task.priority)}>
-                            {task.priority}
-                          </span>
-                        ) : null}
-                      </td>
-
-                      {/* Attachment */}
-                      <td style={{ padding: '10px 5px', color: '#666666', width: isManager ? '15%' : '20%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>{task.attachment}</span>
-                          {!isManager && task.platform === 'linkedin' && (
-                            <img src={linkedinicon} alt="LinkedIn" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Assignee Avatar (Manager View) */}
-                      {isManager && (
-                        <td style={{ padding: '10px 5px', textAlign: 'center', width: '10%' }}>
-                          <img
-                            src={task.assigneeAvatar}
-                            alt="Assignee"
-                            style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              display: 'inline-block',
-                              verticalAlign: 'middle'
-                            }}
-                          />
-                        </td>
-                      )}
                     </tr>
-                  ))}
+                  ) : tasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={isManager ? 5 : 4} style={{ padding: '14px 5px', color: '#7c7c7c', textAlign: 'center' }}>
+                        {isManager ? 'No tasks assigned yet' : 'No tasks assigned to you'}
+                      </td>
+                    </tr>
+                  ) : (
+                    tasks.map((task) => (
+                      <tr
+                        key={task.id}
+                        style={{
+                          borderBottom: '1px solid rgba(0, 0, 0, 0.04)'
+                        }}
+                      >
+                        {/* Name */}
+                        <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: isManager ? '35%' : '40%' }}>
+                          {task.title}
+                        </td>
+
+                        {/* Date */}
+                        <td style={{ padding: '10px 5px', color: '#666666', whiteSpace: 'nowrap', width: '25%' }}>
+                          {formatTaskDate(task.due_date)}
+                        </td>
+
+                        {/* Priority */}
+                        <td style={{ padding: '10px 5px', textAlign: 'center', width: '15%' }}>
+                          {task.priority ? (
+                            <span style={getPriorityStyle(task.priority)}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                          ) : null}
+                        </td>
+
+                        {/* Attachment: download link instead of filename/logo */}
+                        <td style={{ padding: '10px 5px', color: '#666666', width: isManager ? '15%' : '20%' }}>
+                          {task.attachment ? (
+                            <a
+                              href={task.attachment.image_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              style={{ color: '#FE7216', fontWeight: '600', textDecoration: 'none' }}
+                            >
+                              Download
+                            </a>
+                          ) : (
+                            <span style={{ color: '#b5b5b5' }}>—</span>
+                          )}
+                        </td>
+
+                        {/* Assignee: name text instead of avatar (Manager View) */}
+                        {isManager && (
+                          <td style={{ padding: '10px 5px', textAlign: 'center', width: '10%', color: '#666666' }}>
+                            {task.assigned_to || 'Unassigned'}
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -821,7 +1087,7 @@ export default function WSmodule({ user }) {
 
           {/* Subtitle */}
           <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '14px' }}>
-            45 Members
+            {membersLoading ? 'Loading...' : `${members.length} Members`}
           </div>
 
           {/* Members List */}
@@ -876,15 +1142,25 @@ export default function WSmodule({ user }) {
               <button onClick={() => setShowJoinModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {['Nymphadora Tonks', 'Remus Lupin', 'Sirius Black'].map((name, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '600' }}>{name}</span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => { setShowJoinModal(false); toast.success(`Accepted ${name}`); }} style={{ backgroundColor: '#22c55e', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Accept</button>
-                    <button onClick={() => { setShowJoinModal(false); toast.error(`Declined ${name}`); }} style={{ backgroundColor: '#e5e7eb', color: '#374151', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Decline</button>
-                  </div>
+              {joinRequestsLoading ? (
+                <div style={{ fontSize: '13px', color: '#7c7c7c', textAlign: 'center', padding: '20px 0' }}>
+                  Loading...
                 </div>
-              ))}
+              ) : joinRequests.length === 0 ? (
+                <div style={{ fontSize: '13px', color: '#7c7c7c', textAlign: 'center', padding: '20px 0' }}>
+                  No pending join requests.
+                </div>
+              ) : (
+                joinRequests.map((req) => (
+                  <div key={req.user_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600' }}>{req.username}</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => handleAcceptJoinRequest(req.user_id, req.username)} style={{ backgroundColor: '#22c55e', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Accept</button>
+                      <button onClick={() => handleDenyJoinRequest(req.user_id, req.username)} style={{ backgroundColor: '#e5e7eb', color: '#374151', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Decline</button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -996,7 +1272,19 @@ export default function WSmodule({ user }) {
                     Attachment
                   </label>
                   <div style={{ fontSize: '13px', color: '#1e1e1e', backgroundColor: '#f9f9f9', padding: '8px 12px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📎 {selectedRequest.attachment}
+                    {selectedRequest.attachment ? (
+                      <a
+                        href={selectedRequest.attachment.image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        style={{ color: '#FE7216', fontWeight: '600', textDecoration: 'none' }}
+                      >
+                        📎 {selectedRequest.attachment.filename || 'Download attachment'}
+                      </a>
+                    ) : (
+                      <span style={{ color: '#b5b5b5' }}>No attachment</span>
+                    )}
                   </div>
                 </div>
 

@@ -17,9 +17,31 @@ from app.schemas import (
     TaskCreateRequest,
     TaskResponse,
     WorkspaceDetailResponse,
+    TaskAttachmentResponse
 )
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+
+def _task_to_response(db: Session, task) -> TaskResponse:
+    assignee = crud.get_user_by_id(db, task.assigned_to) if task.assigned_to else None
+    attachment_response = (
+        TaskAttachmentResponse.model_validate(task.attachment)
+        if task.attachment
+        else None
+    )
+    return TaskResponse(
+        id=task.id,
+        workspace_id=task.workspace_id,
+        title=task.title,
+        status=task.status,
+        priority=task.priority,
+        assigned_to=assignee.username if assignee else None,
+        attachment=attachment_response,
+        due_date=task.due_date,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+        created_by=task.created_by,
+    )
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceDetailResponse)
@@ -29,6 +51,7 @@ def get_workspace_detail(
 ) -> WorkspaceDetailResponse:
     resp = WorkspaceDetailResponse.model_validate(ctx.workspace)
     resp.member_count = crud.count_workspace_members(db, ctx.workspace.workspace_uuid)
+    resp.manager_name = ctx.workspace.manager.username
     return resp
 
 
@@ -73,7 +96,8 @@ def get_tasks(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[TaskResponse]:
-    return crud.list_tasks_for_role(db, ctx.workspace.workspace_uuid, current_user.users_uuid, ctx.role)
+    tasks = crud.list_tasks_for_role(db, ctx.workspace.workspace_uuid, current_user.users_uuid, ctx.role)
+    return [_task_to_response(db, task) for task in tasks]
 
 @router.patch("/{workspace_id}/distributors/{social_acc_id}", response_model=DistributorResponse)
 def update_distributor(
@@ -134,7 +158,7 @@ def create_task(
 ) -> TaskResponse:
     if ctx.role != "manager":
         raise HTTPException(status_code=403, detail="Only Manager")
-    return crud.create_task(
+    task =  crud.create_task(
         db,
         workspace_id=ctx.workspace.workspace_uuid,
         title=payload.title,
@@ -143,7 +167,9 @@ def create_task(
         assigned_to=payload.assigned_to,
         created_by=current_user.users_uuid,
         due_date=payload.due_date,
+        image_url=payload.image_url,
     )
+    return _task_to_response(db, task) 
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
 def remove_member(
@@ -156,6 +182,65 @@ def remove_member(
     membership = crud.soft_remove_member(db, ctx.workspace.workspace_uuid, user_id)
     if membership is None:
         raise HTTPException(status_code=404, detail="Member not found hoặc đã bị remove trước đó")
+    return MemberResponse(
+        user_id=membership.user.users_uuid,
+        username=membership.user.username,
+        email=membership.user.email,
+        status=membership.status,
+        joined_at=membership.joined_at,
+    )
+
+@router.get("/{workspace_id}/join-requests", response_model=list[MemberResponse])
+def get_join_requests(
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+) -> list[MemberResponse]:
+    if ctx.role != "manager":
+        raise HTTPException(status_code=403, detail="Only managers can view join requests.")
+    memberships = crud.list_pending_members(db, ctx.workspace.workspace_uuid)
+    return [
+        MemberResponse(
+            user_id=m.user.users_uuid,
+            username=m.user.username,
+            email=m.user.email,
+            status=m.status,
+            joined_at=m.joined_at,
+        )
+        for m in memberships
+    ]
+
+
+@router.patch("/{workspace_id}/join-requests/{user_id}/accept", response_model=MemberResponse)
+def accept_join_request(
+    user_id: uuid.UUID,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+) -> MemberResponse:
+    if ctx.role != "manager":
+        raise HTTPException(status_code=403, detail="Only managers can accept join requests.")
+    membership = crud.accept_pending_member(db, ctx.workspace.workspace_uuid, user_id)
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Pending join request not found.")
+    return MemberResponse(
+        user_id=membership.user.users_uuid,
+        username=membership.user.username,
+        email=membership.user.email,
+        status=membership.status,
+        joined_at=membership.joined_at,
+    )
+
+
+@router.delete("/{workspace_id}/join-requests/{user_id}", response_model=MemberResponse)
+def deny_join_request(
+    user_id: uuid.UUID,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+) -> MemberResponse:
+    if ctx.role != "manager":
+        raise HTTPException(status_code=403, detail="Only managers can deny join requests.")
+    membership = crud.deny_pending_member(db, ctx.workspace.workspace_uuid, user_id)
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Pending join request not found.")
     return MemberResponse(
         user_id=membership.user.users_uuid,
         username=membership.user.username,

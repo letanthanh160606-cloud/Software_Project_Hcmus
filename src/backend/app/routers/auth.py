@@ -167,6 +167,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     role = crud.derive_role(db, user)
+    workspace = crud.get_workspace_for_user(db, user)
     access_token, expires_in = create_access_token(
         subject=str(user.users_uuid),
         extra_claims={"role": role, "account_type": user.account_type},
@@ -174,7 +175,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
     user_response = UserResponse.model_validate(user)
     user_response.role = role
 
-    return TokenResponse(access_token=access_token, expires_in=expires_in, user=user_response)
+    workspace_info = WorkspaceInfo.model_validate(workspace) if workspace else None
+    return TokenResponse(access_token=access_token, expires_in=expires_in, user=user_response, workspace=workspace_info)
 
 
 @router.get("/me", response_model=UserResponse)

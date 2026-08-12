@@ -224,6 +224,21 @@ class PostDistribution(Base):
     )
 
 
+class PostMedia(Base):
+    __tablename__ = "post_media"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    post_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.posts.id", ondelete="CASCADE"), nullable=False
+    )
+    image_url: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    post: Mapped["Post"] = relationship(back_populates="attachment")
+
+
 class Post(Base):
     __tablename__ = "posts"
     __table_args__ = {"schema": "workspaces"}
@@ -332,6 +347,12 @@ class Post(Base):
         nullable=False,
         server_default=func.now(),
     )
+    attachment: Mapped["PostMedia | None"] = relationship(
+        back_populates="post",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
 
 
 class Task(Base):
@@ -355,10 +376,23 @@ class Task(Base):
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    attachment: Mapped["TaskAttachment | None"] = relationship(
+        back_populates="task", cascade="all, delete-orphan", uselist=False)
+
+
+class TaskAttachment(Base):
+    __tablename__ = "task_attachments"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    task_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("workspaces.tasks.id", ondelete="CASCADE"), nullable= False)
+    image_url: Mapped[str] = mapped_column(String, nullable= False, server_default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    task: Mapped["Task"] = relationship(back_populates="attachment")
 
 
 
-class Notifications: 
+class Notifications(Base): 
     __tablename__ = "notifications"
     __table_args__ = {"schema": "workspaces"}
 

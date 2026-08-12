@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import calendar1stBg from '../assets/calendar_1stbg.png';
 import calendar2ndBg from '../assets/calendar_2ndbg.png';
 
@@ -29,6 +29,59 @@ export default function Calenmodule({ user, userRole }) {
   const [timeframe, setTimeframe] = useState('Next 7 days');
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [activeModalTask, setActiveModalTask] = useState(null);
+
+  const [apiTasks, setApiTasks] = useState([]);
+  const [todoCount, setTodoCount] = useState(0);
+  const [assignedToOthersCount, setAssignedToOthersCount] = useState(0);
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+   const PRIORITY_TYPE_LABEL = {
+    low: 'Low Priority',
+    medium: 'Medium Priority',
+    high: 'High Priority (Urgent)',
+    urgent: 'High Priority (Urgent)',
+  };
+
+
+    const fetchCalendarTasks = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/calendar/tasks`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch calendar tasks');
+      const data = await res.json(); // CalendarSummaryResponse
+
+      const mapped = data.tasks
+        .filter((t) => t.due_date) 
+        .map((t) => {
+          const d = new Date(t.due_date);
+          return {
+            id: t.id,
+            day: d.getDate(),
+            month: d.getMonth(),
+            year: d.getFullYear(),
+            time: d.toTimeString().slice(0, 5),
+            title: t.title,
+            priority: t.source === 'workspace' && !t.is_created_by_me ? 'workspace' : t.priority,
+            type: t.source === 'workspace' && !t.is_created_by_me
+              ? 'Workspace Task'
+              : PRIORITY_TYPE_LABEL[t.priority] || 'Medium Priority',
+            workspaceOnly: t.source === 'workspace',
+          };
+        });
+
+      setApiTasks(mapped);
+      setTodoCount(data.todo_count);
+      setAssignedToOthersCount(data.assigned_to_others_count);
+    } catch (err) {
+      console.error('Error fetching calendar tasks', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCalendarTasks();
+  }, []);
 
   // Viewed month/year parameters
   const currentYear = viewDate.getFullYear();
@@ -68,80 +121,7 @@ export default function Calenmodule({ user, userRole }) {
 
   const isCurrentRealMonth = today.getFullYear() === currentYear && today.getMonth() === currentMonth;
 
-  /* ───────────────────────────── Fixed Mock Tasks Data ───────────────────────────── */
-  // Tasks have fixed calendar dates (e.g. Day 10, Day 14, Day 15, Day 19, Day 23) in the current month
-  const realYear = today.getFullYear();
-  const realMonth = today.getMonth();
-
-  const mockTaskDefinitions = [
-    {
-      id: 1,
-      day: 10,
-      month: realMonth,
-      year: realYear,
-      time: '18:00',
-      title: '[SE - Sprint Review]',
-      priority: 'low',
-      type: 'Low Priority'
-    },
-    {
-      id: 2,
-      day: 14,
-      month: realMonth,
-      year: realYear,
-      time: '14:30',
-      title: '[Design Sync]',
-      priority: 'medium',
-      type: 'Medium Priority'
-    },
-    {
-      id: 3,
-      day: 15,
-      month: realMonth,
-      year: realYear,
-      time: '23:59',
-      title: '[SE - PA00]',
-      priority: 'high',
-      type: 'High Priority (Urgent)'
-    },
-    {
-      id: 4,
-      day: 15,
-      month: realMonth,
-      year: realYear,
-      time: '23:59',
-      title: '[SE - PA00]',
-      priority: 'workspace',
-      type: 'Workspace Task',
-      workspaceOnly: true
-    },
-    {
-      id: 5,
-      day: 19,
-      month: realMonth,
-      year: realYear,
-      time: '23:59',
-      title: '[SE - PA00]',
-      priority: 'medium',
-      type: 'Medium Priority'
-    },
-    {
-      id: 6,
-      day: 23,
-      month: realMonth,
-      year: realYear,
-      time: '20:00',
-      title: '[Deploy Backend]',
-      priority: 'workspace',
-      type: 'Workspace Task',
-      workspaceOnly: true
-    }
-  ];
-
-  /* 
-    FIXED TIMELINE TASKS: Deadlines are fixed calendar dates and will NOT increment when today advances.
-  */
-  const fixedTimelineTasks = mockTaskDefinitions.map((t) => {
+  const fixedTimelineTasks = apiTasks.map((t) => {
     const deadlineDate = new Date(t.year, t.month, t.day);
     const dayName = deadlineDate.toLocaleDateString('en-US', { weekday: 'long' });
     const monthName = deadlineDate.toLocaleDateString('en-US', { month: 'long' });
@@ -245,7 +225,7 @@ export default function Calenmodule({ user, userRole }) {
               </div> 
             </div> 
             <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}> 
-              4 
+              {todoCount ?? '-'}
             </div> 
           </div>
 
@@ -272,7 +252,7 @@ export default function Calenmodule({ user, userRole }) {
                 </div> 
               </div> 
               <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}> 
-                12
+                {assignedToOthersCount ?? '-'}
               </div> 
             </div>
           ) : (

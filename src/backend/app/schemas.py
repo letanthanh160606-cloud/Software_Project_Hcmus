@@ -117,6 +117,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+    workspace: WorkspaceInfo | None = None
 
 
 class WorkspaceDetailResponse(BaseModel):
@@ -127,6 +128,7 @@ class WorkspaceDetailResponse(BaseModel):
     manager_id: uuid.UUID
     created_at: datetime
     member_count: int = 0
+    manager_name: str = ""
 
 
 class MemberResponse(BaseModel):
@@ -169,6 +171,13 @@ class PostCreate(BaseModel):
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
 
+class PostMediaResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    image_url: str
+    position: int
+    uploaded_at: datetime
+
 
 class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -188,6 +197,8 @@ class PostResponse(BaseModel):
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
 
+    attachment: PostMediaResponse | None = None
+
     submitted_at: datetime | None = None
     reviewed_by: uuid.UUID | None = None
     reviewed_at: datetime | None = None
@@ -197,6 +208,11 @@ class PostResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+class TaskAttachmentResponse(BaseModel):    
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    image_url: str
+    uploaded_at: datetime
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -206,7 +222,8 @@ class TaskResponse(BaseModel):
     title: str
     status: str
     priority: str
-    assigned_to: uuid.UUID | None = None
+    assigned_to: str | None = None  
+    attachment: TaskAttachmentResponse | None = None 
     due_date: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -226,12 +243,15 @@ class PostUpdateRequest(BaseModel):
     ] | None = None
 
 
+
+
 class TaskCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     content: str = ""
     priority: Literal["low", "medium", "high", "urgent"] = "medium"
     assigned_to: uuid.UUID | None = None
     due_date: datetime | None = None
+    image_url: str | None = None  
 
 
 class TaskUpdateRequest(BaseModel):
@@ -259,8 +279,7 @@ class CalendarTaskResponse(TaskResponse):
 class CalendarSummaryResponse(BaseModel):
     tasks: list[CalendarTaskResponse]
     todo_count: int
-    in_progress_count: int
-    completed_count: int
+    assigned_to_others_count: int
 
 
 class NotificationResponse(BaseModel):

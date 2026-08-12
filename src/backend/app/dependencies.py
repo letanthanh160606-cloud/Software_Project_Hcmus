@@ -3,6 +3,7 @@ import uuid
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.database import get_db
 from app.models import User
@@ -78,3 +79,4 @@ def get_workspace_context(
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, 
                         detail="You do not have permission to access this workspace."
                         )
+

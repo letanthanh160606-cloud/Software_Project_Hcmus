@@ -1,9 +1,11 @@
 from sqlalchemy import select, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.models import Post, SocialAccount, Task
 
-from app.models import Post, User, Workspace, WorkspaceMember, Notifications
+from app.models import Post, User, Workspace, WorkspaceMember, Notifications, TaskAttachment
 from app.security import hash_password, hash_pin
+
+import uuid
 
 
 
@@ -89,7 +91,7 @@ def create_member_for_workspace(
     membership = WorkspaceMember(
         user_id=user.users_uuid,
         workspace_id=workspace.workspace_uuid,
-        status="active",
+        status="pending",
     )
     db.add(membership)
 
@@ -97,6 +99,21 @@ def create_member_for_workspace(
     db.refresh(user)
     return user
 
+def get_workspace_for_user(db: Session, user: User) -> Workspace | None:
+    managed = db.scalar(select(Workspace).where(Workspace.manager_id == user.users_uuid))
+    if managed is not None:
+        return managed
+
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.user_id == user.users_uuid,
+            WorkspaceMember.status == "active",
+        )
+    )
+    if membership is not None:
+        return db.get(Workspace, membership.workspace_id)
+
+    return None
 
 def derive_role(db: Session, user: User) -> str:
     manages = db.scalar(select(Workspace.workspace_uuid).where(Workspace.manager_id == user.users_uuid))
@@ -132,14 +149,17 @@ def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     ).all()
 
 def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
-    query = select(Post).where(Post.workspace_id == workspace_id)
+    query = select(Post).where(Post.workspace_id == workspace_id).options(selectinload(Post.attachment))
     if role == "member":
         query = query.where(Post.author_id == user_id)
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
     return db.scalars(
-        select(Post).where(Post.author_id == user_id).order_by(Post.created_at.desc())
+        select(Post)
+        .where(Post.author_id == user_id)
+        .options(selectinload(Post.attachment))
+        .order_by(Post.created_at.desc())
     ).all()
 
 def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Task]:
@@ -154,6 +174,7 @@ def get_post_by_id(db: Session, post_id, workspace_id: str) -> Post | None:
 def create_task(
     db: Session, *, workspace_id: str, title: str,
     content: str, priority: str, assigned_to, created_by, due_date=None,
+    image_url: str | None = None, 
 ) -> Task:
     task = Task(
         workspace_id=workspace_id, title=title, content=content,
@@ -163,6 +184,8 @@ def create_task(
     db.add(task)
     db.flush()
     create_task_notification(db, task)
+    if image_url:                          # THÊM
+        db.add(TaskAttachment(task_id=task.id, image_url=image_url))
     db.commit()
     db.refresh(task)
     return task
@@ -311,7 +334,7 @@ def create_task_notification(db: Session, task: Task):
             user_id=task.assigned_to,
             task_id=task.id,
             type="task_assigned",
-            message=f"Bạn được giao task mới: {task.title}"
+            message=f"You have been assigned a new task: {task.title}"
         )
         db.add(notification)
         db.commit()
@@ -324,7 +347,11 @@ def count_unread_notifications(db: Session, users_id) -> int:
     ) or 0
 
 def list_notifications_for_user(db: Session, users_id, limit: int = 20) -> list[Notifications]:
-    return db.scalar(select(Notifications).where(Notifications.user_id == users_id).order_by(Notifications.create_at.desc()).limit(limit)).all()
+    return db.scalars(select(Notifications)
+                     .where(Notifications.user_id == users_id)
+                     .order_by(Notifications.created_at.desc())
+                     .limit(limit)
+    ).all()
 
 def mark_notification_read(db:Session, notifications_id, users_id) -> Notifications| None:
     notifications = db.scalar(select(Notifications).where(Notifications.id == notifications_id, Notifications.user_id == users_id))
@@ -365,7 +392,7 @@ def create_due_soon_notification(db: Session, task: Task):
         user_id=task.assigned_to,
         task_id=task.id,
         type="due_soon",
-        message=f"Task '{task.title}' sắp đến hạn",
+        message=f"Task '{task.title}' are approaching their deadlines.",
     )
     db.add(notification)
     db.commit()
@@ -383,3 +410,48 @@ def get_tasks_due_soon(db: Session, hours: int = 24) -> list[Task]:
             Task.status.notin_(["completed", "cancelled"]),
         )
     ).all()
+
+def get_user_by_id(db: Session, user_id: uuid.UUID) -> User | None:
+    return db.get(User, user_id)
+
+
+def list_pending_members(db: Session, workspace_id: str) -> list[WorkspaceMember]:
+    return db.scalars(
+        select(WorkspaceMember)
+        .where(WorkspaceMember.workspace_id == workspace_id, WorkspaceMember.status == "pending")
+    ).all()
+
+
+def accept_pending_member(db: Session, workspace_id: str, user_id) -> WorkspaceMember | None:
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.status == "pending",
+        )
+    )
+    if membership is None:
+        return None
+    membership.status = "active"
+    membership.joined_at = func.now()
+    db.commit()
+    db.refresh(membership)
+    return membership
+
+def deny_pending_member(db: Session, workspace_id: str, user_id) -> WorkspaceMember | None:
+    membership = db.scalar(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id,
+            WorkspaceMember.status == "pending",
+        )
+    )
+    if membership is None:
+        return None
+    membership.status = "removed"
+    membership.removed_at = func.now()
+    db.commit()
+    db.refresh(membership)
+    return membership
+
+
