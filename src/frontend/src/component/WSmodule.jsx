@@ -73,7 +73,8 @@ const fetchMembers = async () => {
         name: m.username,
         joined: 'Joined ' + new Date(m.joined_at).toLocaleDateString('en-GB', {
           day: 'numeric', month: 'long', year: 'numeric'
-        })
+        }),
+        avatar: m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.username)}&background=FE7216&color=fff&size=40`
       }));
       setMembers(mapped);
     }
@@ -203,9 +204,11 @@ useEffect(() => {
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [showManageMemberModal, setShowManageMemberModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRejectReason, setShowRejectReason] = useState(false);
   const [rejectComment, setRejectComment] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState(null);
 
 
   const [joinRequests, setJoinRequests] = useState([]);
@@ -1080,7 +1083,10 @@ const handleCancelRequest = async (id) => {
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
               Member
             </h3>
-            <span style={{ fontSize: '12px', color: '#554e43', fontWeight: '500', cursor: 'pointer' }}>
+            <span
+              onClick={() => setShowManageMemberModal(true)}
+              style={{ fontSize: '12px', color: '#554e43', fontWeight: '500', cursor: 'pointer' }}
+            >
               {isManager ? 'Manage >' : 'View >'}
             </span>
           </div>
@@ -1162,6 +1168,47 @@ const handleCancelRequest = async (id) => {
                 ))
               )}
             </div>
+
+            {/* --- Invite Members Info Section --- */}
+            <div style={{ marginTop: '20px', padding: '14px', backgroundColor: '#FFF7ED', borderRadius: '12px', border: '1px solid #FDBA74' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#9A3412' }}>Share to Invite Members</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Workspace ID */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#78716C', minWidth: '85px' }}>Workspace ID</span>
+                  <div
+                    onClick={() => {
+                      const val = workspaceId || 'N/A';
+                      navigator.clipboard.writeText(val);
+                      toast.success('Workspace ID copied!');
+                    }}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E5E7EB', cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                  >
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#1e1e1e', fontFamily: 'monospace' }}>{workspaceId || 'N/A'}</span>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF' }}>📋</span>
+                  </div>
+                </div>
+                {/* PIN Password */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#78716C', minWidth: '85px' }}>PIN Password</span>
+                  <div
+                    onClick={() => {
+                      const val = workspaceDetail?.pin || '••••••';
+                      navigator.clipboard.writeText(val);
+                      toast.success('PIN copied!');
+                    }}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E5E7EB', cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                  >
+                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#1e1e1e', fontFamily: 'monospace' }}>{workspaceDetail?.pin || '••••••'}</span>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF' }}>📋</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1196,13 +1243,52 @@ const handleCancelRequest = async (id) => {
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Task Name</label>
                 <input required placeholder="Enter task name..." style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
               </div>
-              <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Description</label>
+                <textarea placeholder="Enter task description..." rows={3} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', fontSize: '13px' }} />
+              </div>
+              <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Priority</label>
                 <select style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc' }}>
                   <option>Low</option>
                   <option>Medium</option>
                   <option>High</option>
                 </select>
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px' }}>Assignee</label>
+                <div className="custom-scroll" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', borderRadius: '8px', padding: '8px' }}>
+                  {(members).map((m) => {
+                    const isSelected = selectedAssignee?.id === m.id || selectedAssignee?.name === m.name;
+                    const avatarUrl = m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=FE7216&color=fff&size=40`;
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => setSelectedAssignee(m)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          backgroundColor: isSelected ? '#FFF7ED' : '#f9fafb',
+                          border: isSelected ? '1.5px solid #FE7216' : '1.5px solid transparent',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <img
+                          src={avatarUrl}
+                          alt={m.name}
+                          style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e5e7eb', flexShrink: 0 }}
+                        />
+                        <span style={{ fontSize: '13px', fontWeight: isSelected ? '700' : '500', color: isSelected ? '#FE7216' : '#1e1e1e' }}>
+                          {m.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" onClick={() => setShowAddTaskModal(false)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>Cancel</button>
@@ -1473,6 +1559,95 @@ const handleCancelRequest = async (id) => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* --- Manage Members Modal --- */}
+      {showManageMemberModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1100
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            padding: '24px',
+            width: '440px',
+            maxHeight: '520px',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700' }}>{isManager ? 'Manage Members' : 'Workspace Members'}</h3>
+              <button onClick={() => setShowManageMemberModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+            </div>
+
+            {/* Member count */}
+            <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: '12px' }}>
+              {(members.length > 0 ? members.length : 0)} members
+            </div>
+
+            {/* Scrollable list */}
+            <div className="custom-scroll" style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {(members).map((m) => (
+                <div
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    backgroundColor: '#f9f9f9',
+                    borderRadius: '12px',
+                    gap: '12px'
+                  }}
+                >
+                  {/* Avatar */}
+                  <img
+                    src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=FE7216&color=fff&size=40`}
+                    alt={m.name}
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #FE7216', flexShrink: 0 }}
+                  />
+
+                  {/* Name + Joined */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#1e1e1e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{m.joined}</div>
+                  </div>
+
+                  {/* Kick button */}
+                  {isManager && (
+                    <button
+                      onClick={() => {
+                        toast.success(`${m.name} has been removed`);
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #FCA5A5',
+                        backgroundColor: '#FEF2F2',
+                        color: '#DC2626',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FEE2E2'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FEF2F2'}
+                    >
+                      Kick out
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
