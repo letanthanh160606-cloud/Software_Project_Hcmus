@@ -449,12 +449,15 @@ export default function PMmodule({ user }) {
     }
   };
 
-  const filters = ['All Posts', 'Drafts', 'Pending', 'Rejected', 'Published', 'Failed'];
+  const isIndividual = role === 'individual' || accountType === 'individual';
+  const filters = isIndividual
+    ? ['All Posts', 'Drafts', 'Published', 'Failed']
+    : ['All Posts', 'Drafts', 'Pending', 'Rejected', 'Published', 'Failed'];
 
-  // Dynamic dataset from Backend API
-  const rawPosts = realPosts;
+  const rawPosts = isIndividual
+    ? realPosts.filter((p) => p.status !== 'Pending' && p.status !== 'Rejected')
+    : realPosts;
 
-  // Apply status filter
   const filteredPosts =
     activeFilter === 'All Posts'
       ? rawPosts
@@ -487,6 +490,16 @@ export default function PMmodule({ user }) {
   });
 
   const [selectedPost, setSelectedPost] = useState(null);
+  const [editingPost, setEditingPost] = useState(null);
+
+  const handleOpenEditModal = (post) => {
+    setEditingPost({
+      id: post.id,
+      title: post.title || '',
+      content: post.content || '',
+      platforms: post.platforms ? [...post.platforms] : ['facebook']
+    });
+  };
 
   const handleRowClick = (post) => {
     setSelectedPost(post);
@@ -855,55 +868,391 @@ export default function PMmodule({ user }) {
               </div>
             )}
 
-            {/* Modal Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+            {selectedPost.status === 'Drafts' && (isIndividual || role === 'manager') && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
+                    setSelectedPost(null);
+                    toast.success('Draft deleted');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #ef4444',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePublishToFacebook(selectedPost.id)}
+                  disabled={isPublishing}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#FE7216',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Publish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedPost)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+
+            {selectedPost.status === 'Drafts' && role === 'member' && !isIndividual && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
+                    setSelectedPost(null);
+                    toast.success('Draft deleted');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #ef4444',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Pending' } : p));
+                    setSelectedPost(null);
+                    toast.success('Submitted for approval');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#FE7216',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedPost)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+
+            {selectedPost.status === 'Pending' && role === 'manager' && !isIndividual && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  type="button"
+                  onClick={() => handlePublishToFacebook(selectedPost.id)}
+                  disabled={isPublishing}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#22c55e',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Approve & Publish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedPost)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected' } : p));
+                    setSelectedPost(null);
+                    toast.error('Post rejected');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #ef4444',
+                    backgroundColor: 'transparent',
+                    color: '#ef4444',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+
+            {selectedPost.status === 'Pending' && role === 'member' && !isIndividual && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Drafts' } : p));
+                    setSelectedPost(null);
+                    toast('Submission cancelled', { icon: 'ℹ️' });
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#6b7280',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel Submission
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {editingPost && (
+        <div
+          onClick={() => setEditingPost(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '90%',
+              maxWidth: '520px',
+              padding: '24px 28px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1e1e1e' }}>Edit Post</h3>
               <button
-                onClick={() => setSelectedPost(null)}
+                onClick={() => setEditingPost(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: '#7c7c7c' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                Targeted Platforms
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {['facebook', 'linkedin'].map((plat) => {
+                  const isSelected = editingPost.platforms.includes(plat);
+                  const iconSrc = plat === 'linkedin' ? linkedin : facebook;
+                  const labelName = plat === 'linkedin' ? 'LinkedIn' : 'Facebook';
+                  return (
+                    <div
+                      key={plat}
+                      onClick={() => {
+                        setEditingPost((prev) => {
+                          const exists = prev.platforms.includes(plat);
+                          let nextPlats = exists
+                            ? prev.platforms.filter((p) => p !== plat)
+                            : [...prev.platforms, plat];
+                          if (nextPlats.length === 0) nextPlats = [plat];
+                          return { ...prev, platforms: nextPlats };
+                        });
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: isSelected ? '1.5px solid #FE7216' : '1.5px solid #e5e7eb',
+                        backgroundColor: isSelected ? '#FFF7ED' : '#f9fafb',
+                        cursor: 'pointer',
+                        flex: 1,
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <img src={iconSrc} alt={labelName} style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+                      <span style={{ fontSize: '13px', fontWeight: isSelected ? '700' : '500', color: isSelected ? '#FE7216' : '#374151' }}>
+                        {labelName}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                Post Title
+              </label>
+              <input
+                type="text"
+                value={editingPost.title}
+                onChange={(e) => setEditingPost((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter post title..."
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '13px',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                Content
+              </label>
+              <textarea
+                value={editingPost.content}
+                onChange={(e) => setEditingPost((prev) => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter post content..."
+                rows={5}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '13px',
+                  boxSizing: 'border-box',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setEditingPost(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#f3f4f6',
+                  color: '#4b5563',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRealPosts((prev) =>
+                    prev.map((p) =>
+                      p.id === editingPost.id
+                        ? { ...p, title: editingPost.title, content: editingPost.content, platforms: editingPost.platforms }
+                        : p
+                    )
+                  );
+                  if (selectedPost && selectedPost.id === editingPost.id) {
+                    setSelectedPost((prev) => ({
+                      ...prev,
+                      title: editingPost.title,
+                      content: editingPost.content,
+                      platforms: editingPost.platforms
+                    }));
+                  }
+                  setEditingPost(null);
+                  toast.success('Post updated successfully');
+                }}
                 style={{
                   padding: '8px 18px',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
-
-              <button
-                onClick={() => handlePublishToFacebook(selectedPost.id)}
-                disabled={isPublishing}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: '10px',
                   border: 'none',
-                  background: primaryPlatform === 'linkedin'
-                    ? 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)'
-                    : 'linear-gradient(135deg, #1877F2 0%, #0056b3 100%)',
+                  backgroundColor: '#FE7216',
                   color: '#ffffff',
                   fontSize: '13px',
-                  fontWeight: '700',
-                  cursor: isPublishing ? 'not-allowed' : 'pointer',
-                  opacity: isPublishing ? 0.7 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: primaryPlatform === 'linkedin'
-                    ? '0 4px 12px rgba(10,102,194,0.3)'
-                    : '0 4px 12px rgba(24,119,242,0.3)',
+                  fontWeight: '600',
+                  cursor: 'pointer'
                 }}
               >
-                {isPublishing ? 'Publishing...' : `Publish to ${primaryPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'}`}
-                {primaryPlatform === 'linkedin' ? (
-                  <img src={linkedin} alt="LinkedIn" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                )}
+                Save Changes
               </button>
             </div>
           </div>
