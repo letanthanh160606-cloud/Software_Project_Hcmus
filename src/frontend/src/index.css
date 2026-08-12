@@ -1,0 +1,148 @@
+/* ==========================================================================
+   Satoshi Font Family Integration System
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Approach A: Fontshare CDN Import (Active High-Performance Online CDN)
+   -------------------------------------------------------------------------- */
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,400,300,901,701,501,401,301&display=swap');
+
+/* --------------------------------------------------------------------------
+   Approach B: Local WOFF2 Self-Hosted Declarations (Offline & High Reliability)
+   Place corresponding .woff2 files in `public/fonts/` folder:
+   - public/fonts/Satoshi-Light.woff2
+   - public/fonts/Satoshi-LightItalic.woff2
+   - public/fonts/Satoshi-Regular.woff2
+   - public/fonts/Satoshi-Italic.woff2
+   - public/fonts/Satoshi-Medium.woff2
+   - public/fonts/Satoshi-MediumItalic.woff2
+   - public/fonts/Satoshi-Bold.woff2
+   - public/fonts/Satoshi-BoldItalic.woff2
+   - public/fonts/Satoshi-Black.woff2
+   - public/fonts/Satoshi-BlackItalic.woff2
+   - public/fonts/Satoshi-Variable.woff2
+   - public/fonts/Satoshi-VariableItalic.woff2
+   -------------------------------------------------------------------------- */
+
+/* --- 1. Static Fonts Setup --- */
+
+/* Satoshi Light 300 */
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-LightItalic.woff2') format('woff2');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Satoshi Regular 400 */
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Satoshi Medium 500 */
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-MediumItalic.woff2') format('woff2');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Satoshi Bold 700 */
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-BoldItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Satoshi Black 900 */
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi-Local';
+  src: url('/fonts/Satoshi-BlackItalic.woff2') format('woff2');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* --- 2. Variable Fonts Setup --- */
+@font-face {
+  font-family: 'Satoshi-Variable';
+  src: url('/fonts/Satoshi-Variable.woff2') format('woff2-variations'),
+       url('/fonts/Satoshi-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi-VariableItalic';
+  src: url('/fonts/Satoshi-VariableItalic.woff2') format('woff2-variations'),
+       url('/fonts/Satoshi-VariableItalic.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* --------------------------------------------------------------------------
+   Global Design Tokens & Base Element Typography Defaults
+   -------------------------------------------------------------------------- */
+:root {
+  --font-satoshi: 'Satoshi', 'Satoshi-Local', 'Satoshi-Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  font-family: var(--font-satoshi);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
