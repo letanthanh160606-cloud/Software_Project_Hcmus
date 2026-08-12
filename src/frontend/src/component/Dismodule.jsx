@@ -296,8 +296,8 @@ export default function Dismodule({ user }) {
       style={{
         display: 'flex',
         flexDirection: 'row',
-        width: '100%',
-        gap: '24px',
+        width: '97%',
+        gap: '20px',
         fontFamily: 'Satoshi, system-ui, sans-serif',
         boxSizing: 'border-box',
       }}
@@ -305,19 +305,17 @@ export default function Dismodule({ user }) {
       {/* LEFT PANEL: Connected Channels (70%) */}
       <div
         style={{
-          width: '70%',
-          backgroundColor: 'rgba(255, 255, 255, 0.55)',
-          backdropFilter: 'blur(16px)',
+          width: '75%',
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
           borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
-          padding: '24px 28px',
+          padding: '20px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.04)',
           boxSizing: 'border-box',
         }}
       >
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e1e1e' }}>Connected Channels</h2>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1e1e1e' }}>Connected Channels</h2>
           <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '500' }}>
             {channels.length} {channels.length === 1 ? 'Channel' : 'Channels'}
           </span>
@@ -550,18 +548,17 @@ export default function Dismodule({ user }) {
       {/* RIGHT PANEL: Add New Channel Form (30%) */}
       <div
         style={{
-          width: '30%',
-          backgroundColor: 'rgba(255, 255, 255, 0.55)',
-          backdropFilter: 'blur(16px)',
+          width: '25%',
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
           borderRadius: '20px',
           border: '1px solid rgba(255, 255, 255, 0.5)',
-          padding: '24px 24px',
+          padding: '15px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.04)',
           boxSizing: 'border-box',
           height: 'fit-content',
         }}
       >
-        <h2 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '700', color: '#1e1e1e' }}>
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: '700', color: '#1e1e1e' }}>
           Add New Channel
         </h2>
 
