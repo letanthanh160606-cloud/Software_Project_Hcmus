@@ -169,6 +169,7 @@ class LinkedInOAuthProvider:
             "redirect_uri": settings.oauth_redirect_uri,
             "state": state,
             "scope": scope,
+            "prompt": "login",
         }
         return f"{cls.AUTH_URL}?{urlencode(params)}"
 
