@@ -57,5 +57,6 @@ def create_personal_task(
         priority=payload.priority,
         created_by=current_user.users_uuid,
         due_date=payload.due_date,
+        assigned_to=current_user.users_uuid,
     )
     return _to_calendar_response(db, task, current_user.users_uuid)

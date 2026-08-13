@@ -36,12 +36,19 @@ ChartJS.register(
 
 export default function DBmodule({ user }) {
   const componentGap = '20px';
-  const userName = user?.username || user?.email?.split('@')[0] || 'Tấn Thành';
+  const userName = user?.username;
   const [NIGincrease, setNIGincrease] = useState(true);
   const monthlyIncrease = 822006;
   const HPindex = 550744;
-  const KPIcard = 50;
+  const [KPIcard, setKPIcard] = useState(50);
   const graphSta = 1500;
+
+  // KPI popup state
+  const [showKPIPopup, setShowKPIPopup] = useState(false);
+  const [tempGoal, setTempGoal] = useState(KPIcard);
+  const [tempPeriodStart, setTempPeriodStart] = useState('');
+  const [tempPeriodEnd, setTempPeriodEnd] = useState('');
+  const [kpiPeriodLabel, setKpiPeriodLabel] = useState('For this month');
 
   const AddButton = ({ onClick }) => (
     <button
@@ -503,8 +510,148 @@ export default function DBmodule({ user }) {
                   right: '10px',
                   top: '10px', padding: '0px'
                 }}>
-                  <AddButton/>
+                  <AddButton onClick={() => {
+                    setTempGoal(KPIcard);
+                    setTempPeriodStart('');
+                    setTempPeriodEnd('');
+                    setShowKPIPopup(true);
+                  }}/>
                 </div>
+
+                {/* KPI Adjustment Popup */}
+                {showKPIPopup && (
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      width: '100vw',
+                      height: '100vh',
+                      backgroundColor: 'rgba(0, 0, 0, 0.35)',
+                      zIndex: 1000,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onClick={() => setShowKPIPopup(false)}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '28px 32px',
+                        width: '380px',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+                        fontFamily: 'Satoshi',
+                      }}
+                    >
+                      <h2 style={{
+                        margin: '0 0 6px 0',
+                        fontSize: '18px',
+                        fontWeight: '700',
+                        color: '#1a1a1a',
+                        fontFamily: 'Satoshi',
+                      }}>Set KPI Goal</h2>
+
+                      {/* Goal Index */}
+                      <div style={{ marginBottom: '24px' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          color: '#444',
+                          marginBottom: '8px',
+                          fontFamily: 'Satoshi',
+                        }}>Goal Index</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={tempGoal}
+                          onChange={(e) => {
+                            const v = Math.max(0, Number(e.target.value) || 0);
+                            setTempGoal(v);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1.5px solid #e0e0e0',
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            fontFamily: 'Satoshi',
+                            color: '#333',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            transition: 'border-color 0.2s',
+                          }}
+                          onFocus={(e) => e.currentTarget.style.borderColor = '#FE7216'}
+                          onBlur={(e) => e.currentTarget.style.borderColor = '#e0e0e0'}
+                        />
+                      </div>
+
+                      {/* Buttons */}
+                      <div style={{
+                        display: 'flex',
+                        gap: '10px',
+                      }}>
+                        <button
+                          onClick={() => setShowKPIPopup(false)}
+                          style={{
+                            flex: 1,
+                            padding: '10px 0',
+                            borderRadius: '10px',
+                            border: '1.5px solid #e0e0e0',
+                            backgroundColor: 'white',
+                            color: '#555',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            fontFamily: 'Satoshi',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                        >Cancel</button>
+                        <button
+                          onClick={() => {
+                            setKPIcard(tempGoal);
+                            // Build period label
+                            if (tempPeriodStart && tempPeriodEnd) {
+                              const fmt = (d) => {
+                                const dt = new Date(d);
+                                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                              };
+                              setKpiPeriodLabel(`${fmt(tempPeriodStart)} – ${fmt(tempPeriodEnd)}`);
+                            } else if (tempPeriodStart) {
+                              const dt = new Date(tempPeriodStart);
+                              setKpiPeriodLabel(`From ${dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
+                            } else {
+                              setKpiPeriodLabel('For this month');
+                            }
+                            setShowKPIPopup(false);
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '10px 0',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #FE7216, #F94000)',
+                            color: 'white',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            fontFamily: 'Satoshi',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            boxShadow: '0 4px 12px rgba(254, 114, 22, 0.3)',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >Apply</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Top white cover layer */}
                 <div style={{
@@ -585,7 +732,7 @@ export default function DBmodule({ user }) {
                     fontSize: '14px',
                     fontWeight: '400'
                   }}>
-                    For this month
+                    {kpiPeriodLabel}
                   </h1>
                 </div>
 
