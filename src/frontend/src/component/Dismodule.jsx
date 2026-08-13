@@ -155,23 +155,8 @@ export default function Dismodule({ user }) {
 
       toast.success(`Initiating ${platform.toUpperCase()} connection...`);
 
-      // If mock redirect URL is returned (Dev mode), trigger callback directly for seamless UX
-      if (data.authorization_url.includes('callback?code=')) {
-        const callbackRes = await fetch(data.authorization_url, { headers });
-        const callbackData = await callbackRes.json();
-
-        if (!callbackRes.ok) {
-          throw new Error(callbackData.detail || 'Callback token exchange failed');
-        }
-
-        toast.success(`Channel '${callbackData.display_name}' connected successfully!`);
-        setChannelName('');
-        setNote('');
-        fetchChannels();
-      } else {
-        // Real OAuth redirect to Facebook/LinkedIn authorization dialog
-        window.location.href = data.authorization_url;
-      }
+      // Redirect browser to OAuth authorization dialog (or mock callback endpoint)
+      window.location.href = data.authorization_url;
     } catch (err) {
       toast.error(err.message || 'Connection failed');
     } finally {
