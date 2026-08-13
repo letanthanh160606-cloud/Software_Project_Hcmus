@@ -219,6 +219,7 @@ class PostDistribution(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="pending"
     )  # 'pending' | 'published' | 'failed'
+    published_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

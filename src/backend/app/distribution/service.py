@@ -461,6 +461,7 @@ class DistributionService:
                 # Update Post status
                 post.status = "ready_for_distribution"
                 post.published_at = datetime.now(timezone.utc)
+                self._record_post_distribution(post.id, channel.id, fb_post_url)
                 self.db.commit()
 
                 return {
@@ -602,6 +603,7 @@ class DistributionService:
 
                     post.status = "ready_for_distribution"
                     post.published_at = datetime.now(timezone.utc)
+                    self._record_post_distribution(post.id, channel.id, li_post_url)
                     self.db.commit()
 
                     return {
@@ -626,3 +628,47 @@ class DistributionService:
                 )
         else:
             raise HTTPException(status_code=400, detail=f"Publishing to {channel.platform} is not supported yet.")
+
+    def _record_post_distribution(self, post_id: uuid.UUID, channel_id: uuid.UUID, published_url: str) -> None:
+        """Creates or updates a PostDistribution record to persist the published URL per channel."""
+        from app.models import PostDistribution
+        dist = self.db.scalar(
+            select(PostDistribution).where(
+                PostDistribution.post_id == post_id,
+                PostDistribution.channel_id == channel_id,
+            )
+        )
+        if not dist:
+            dist = PostDistribution(
+                post_id=post_id,
+                channel_id=channel_id,
+                status="published",
+                published_url=published_url,
+            )
+            self.db.add(dist)
+        else:
+            dist.status = "published"
+            dist.published_url = published_url
+
+    def get_published_urls_for_post(self, post_id: uuid.UUID) -> list[dict]:
+        """Returns a list of published URLs for all channels linked to this post."""
+        from app.models import PostDistribution, SocialAccount
+        rows = self.db.execute(
+            select(PostDistribution, SocialAccount)
+            .join(SocialAccount, PostDistribution.channel_id == SocialAccount.id)
+            .where(
+                PostDistribution.post_id == post_id,
+                PostDistribution.status == "published",
+            )
+        ).all()
+
+        results = []
+        for dist, channel in rows:
+            if dist.published_url:
+                results.append({
+                    "channel_id": str(channel.id),
+                    "channel_name": channel.display_name,
+                    "platform": channel.platform,
+                    "published_url": dist.published_url,
+                })
+        return results

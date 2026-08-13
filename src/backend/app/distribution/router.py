@@ -149,3 +149,16 @@ def publish_post(
 ):
     service = DistributionService(db)
     return service.publish_post_to_channel(user=current_user, post_id=post_id, channel_id=channel_id, platform=platform)
+
+
+@router.get(
+    "/published-urls/{post_id}",
+    summary="Get all published URLs and target channels for a post",
+)
+def get_published_urls(
+    post_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = DistributionService(db)
+    return service.get_published_urls_for_post(post_id)

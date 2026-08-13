@@ -285,6 +285,42 @@ export default function PMmodule({ user }) {
   const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
   const [connectedChannelsList, setConnectedChannelsList] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState('');
+  const [publishedUrlsList, setPublishedUrlsList] = useState([]);
+
+  useEffect(() => {
+    const fetchPublishedUrls = async () => {
+      if (!selectedPost || selectedPost.status !== 'Published') {
+        setPublishedUrlsList([]);
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        const cacheKey = `published_urls_${selectedPost.id}`;
+        const cachedStr = localStorage.getItem(cacheKey);
+        if (cachedStr) {
+          try {
+            const parsedCache = JSON.parse(cachedStr);
+            if (Array.isArray(parsedCache) && parsedCache.length > 0) {
+              setPublishedUrlsList(parsedCache);
+            }
+          } catch (e) {}
+        }
+        const res = await fetch(`http://localhost:8000/api/v1/distribution/channels/published-urls/${selectedPost.id}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setPublishedUrlsList(data);
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching published URLs for post:', err);
+      }
+    };
+    fetchPublishedUrls();
+  }, [selectedPost]);
 
   useEffect(() => {
     const fetchConnectedChannels = async () => {
@@ -426,6 +462,16 @@ export default function PMmodule({ user }) {
 
       const successNames = results.map(r => r.channel_name || (r.platform === 'linkedin' ? 'LinkedIn' : 'Facebook')).join(', ');
       toast.success(`Published successfully to ${results.length} account(s): ${successNames}!`);
+
+      const formattedUrls = results.map(r => ({
+        channel_name: r.channel_name || (r.platform === 'linkedin' ? 'LinkedIn' : 'Facebook'),
+        platform: r.platform,
+        published_url: r.linkedin_post_url || r.facebook_post_url || 'https://www.linkedin.com/feed/'
+      }));
+      setPublishedUrlsList(formattedUrls);
+      try {
+        localStorage.setItem(`published_urls_${postId}`, JSON.stringify(formattedUrls));
+      } catch (e) {}
 
       const publishedUrl = results.find(r => r.linkedin_post_url || r.facebook_post_url)?.linkedin_post_url 
                         || results.find(r => r.linkedin_post_url || r.facebook_post_url)?.facebook_post_url;
@@ -841,54 +887,101 @@ export default function PMmodule({ user }) {
               </div>
             </div>
 
-            {/* Published Social Link */}
+            {/* Published Social Links List */}
             {selectedPost.status === 'Published' && (
               <div>
                 <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#166534', letterSpacing: '0.5px' }}>
-                  {primaryPlatform === 'linkedin' ? 'LinkedIn Post Link' : 'Facebook Post Link'}
+                  PUBLISHED ACCOUNTS & POST LINKS ({publishedUrlsList.length > 0 ? publishedUrlsList.length : 1})
                 </label>
-                <div style={{
-                  marginTop: '6px',
-                  backgroundColor: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '18px' }}>🔗</span>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
-                        {primaryPlatform === 'linkedin' ? 'LinkedIn Channel' : 'Omni Laptop Shop'}
-                      </span>
-                      <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
-                        {selectedPost.linkedin_post_url || selectedPost.facebook_post_url || (primaryPlatform === 'linkedin' ? 'linkedin.com/feed/' : 'facebook.com/profile.php?id=61593303653577')}
-                      </span>
-                    </div>
-                  </div>
-                  <a
-                    href={selectedPost.linkedin_post_url || selectedPost.facebook_post_url || (primaryPlatform === 'linkedin' ? 'https://www.linkedin.com/feed/' : 'https://www.facebook.com/profile.php?id=61593303653577')}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      backgroundColor: primaryPlatform === 'linkedin' ? '#0A66C2' : '#1877F2',
-                      color: '#ffffff',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      textDecoration: 'none',
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {publishedUrlsList.length > 0 ? (
+                    publishedUrlsList.map((item, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          backgroundColor: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <img src={item.platform === 'linkedin' ? linkedin : facebook} alt={item.platform} style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                              {item.channel_name || (item.platform === 'linkedin' ? 'LinkedIn Channel' : 'Facebook Page')}
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {item.published_url}
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          href={item.published_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            backgroundColor: item.platform === 'linkedin' ? '#0A66C2' : '#1877F2',
+                            color: '#ffffff',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          View on {item.platform === 'linkedin' ? 'LinkedIn' : 'Facebook'} ↗
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '12px 16px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: primaryPlatform === 'linkedin' ? '0 4px 10px rgba(10,102,194,0.25)' : '0 4px 10px rgba(24,119,242,0.25)',
-                    }}
-                  >
-                    View on {primaryPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} ↗
-                  </a>
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '18px' }}>🔗</span>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                            {primaryPlatform === 'linkedin' ? 'LinkedIn Channel' : 'Facebook Channel'}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
+                            {selectedPost.linkedin_post_url || selectedPost.facebook_post_url || 'https://www.linkedin.com/feed/'}
+                          </span>
+                        </div>
+                      </div>
+                      <a
+                        href={selectedPost.linkedin_post_url || selectedPost.facebook_post_url || 'https://www.linkedin.com/feed/'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          backgroundColor: primaryPlatform === 'linkedin' ? '#0A66C2' : '#1877F2',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        View Post ↗
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -29,12 +29,10 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 
 ## 📌 3. File: `src/frontend/src/component/PMmodule.jsx`
 
-* **Vị trí**: Dòng 287 – 320, Dòng 390 – 430 & Dòng 880 – 930.
+* **Vị trí**: Dòng 285 – 325, Dòng 460 – 480 & Dòng 885 – 980.
 * **Thay đổi**:
-  * Lưu danh sách đầy đủ các kênh truyền thông xã hội đã kết nối (`connectedChannelsList`) bao gồm `id`, `platform`, và `display_name`.
-  * Bổ sung tùy chọn **`🌐 All Connected Accounts (Tất cả tài khoản)`** trong Menu thả xuống **Target Account Selector**.
-  * Bổ sung logic xuất bản song song bằng `Promise.all()` cho phép 1 bài viết được tự động đăng đồng thời lên **TẤT CẢ các tài khoản/nền tảng đã kết nối cùng một lúc**.
-  * Truyền tham số `&channel_id=${selectedChannelId}` sang Backend khi thực hiện đăng bài (`POST /api/v1/distribution/channels/publish/{postId}`).
-  * Bổ sung cơ chế `AbortController` với thời gian chờ 45 giây cho yêu cầu `fetch` đăng bài đồng thời đa kênh.
+  * Lưu vết vĩnh viễn danh sách tất cả các đường dẫn bài viết đã đăng (`publishedUrlsList`) theo từng tài khoản và lưu vào bộ nhớ đệm `localStorage` (`published_urls_${postId}`).
+  * Gọi API `GET /api/v1/distribution/channels/published-urls/{post_id}` để tự động khôi phục danh sách link bài viết đầy đủ khi xem bài đăng hoặc khi F5 tải lại trang.
+  * Hiển thị danh sách đường dẫn bài viết cho **TẤT CẢ các tài khoản đã đăng** trong Modal bài viết (`Published`), kèm biểu tượng mạng xã hội và nút bấm **View on LinkedIn / Facebook ↗** riêng biệt cho từng tài khoản.
 * **Lý do thay đổi**:
-  * Cho phép xuất bản đồng thời 1 nội dung bài viết lên nhiều tài khoản LinkedIn/Facebook cùng một lúc chỉ với 1 thao tác nhấp nút. KHÔNG thay đổi thiết kế tổng thể hay layout UI.
+  * Giải quyết dứt điểm vấn đề F5 bị mất link bài viết. Giúp người dùng dễ dàng xem lại toàn bộ link đăng của tất cả các tài khoản bất kỳ lúc nào.
