@@ -170,6 +170,7 @@ class LinkedInOAuthProvider:
             "state": state,
             "scope": scope,
             "prompt": "login",
+            "max_age": "0",
         }
         return f"{cls.AUTH_URL}?{urlencode(params)}"
 
