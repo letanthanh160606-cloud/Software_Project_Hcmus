@@ -17,22 +17,23 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 
 ## 📌 2. File: `src/frontend/src/component/Dismodule.jsx`
 
-* **Vị trí**: Dòng 130 – 144.
+* **Vị trí**: Dòng 130 – 160.
 * **Thay đổi**:
   * Thêm bước tự động kiểm tra token `localStorage.getItem('token')` trước khi khởi tạo kết nối.
   * Bổ sung thông báo lỗi Tiếng Việt thân thiện khi nhận HTTP status `401 Unauthorized`.
+  * Chuyển hướng trình duyệt qua `window.location.href = data.authorization_url` cho cả luồng OAuth thật và luồng Dev/Mock callback.
 * **Lý do thay đổi**:
-  * Tránh lỗi im lặng và hỗ trợ người dùng nhận biết ngay khi phiên đăng nhập JWT bị hết hạn/chưa đăng nhập (`401 Unauthorized`).
+  * Khắc phục triệt để lỗi `Failed to fetch` do lệnh AJAX `fetch()` tự động đi theo phản hồi chuyển hướng HTTP 302 (`RedirectResponse`) từ Backend vi phạm chính sách CORS cross-origin của trình duyệt. KHÔNG thay đổi bố cục hay kiểu dáng UI.
 
 ---
 
 ## 📌 3. File: `src/frontend/src/component/PMmodule.jsx`
 
-* **Vị trí**: Dòng 385 – 410 & Dòng 439 – 446.
+* **Vị trí**: Dòng 287 – 320, Dòng 390 – 405 & Dòng 880 – 930.
 * **Thay đổi**:
-  * Truyền tham số `?platform=${primaryPlatform}` khi gọi API xuất bản bài viết (`POST /api/v1/distribution/channels/publish/{postId}?platform=linkedin`).
+  * Lưu danh sách đầy đủ các kênh truyền thông xã hội đã kết nối (`connectedChannelsList`) bao gồm `id`, `platform`, và `display_name`.
+  * Bổ sung Menu thả xuống **Target Account Selector** trong Modal chi tiết bài viết, cho phép người dùng chủ động chọn tài khoản LinkedIn/Facebook cụ thể (theo tên hiển thị) trước khi bấm Publish.
+  * Truyền tham số `&channel_id=${selectedChannelId}` sang Backend khi thực hiện đăng bài (`POST /api/v1/distribution/channels/publish/{postId}`).
   * Bổ sung cơ chế `AbortController` với thời gian chờ 30 giây (`timeout 30000ms`) cho yêu cầu `fetch` xuất bản bài viết.
-  * Bổ sung câu thông báo lỗi Tiếng Việt rõ ràng cho trường hợp `Failed to fetch` (Backend chưa bật/mất mạng) và `AbortError` (Quá thời gian chờ).
-  * Cập nhật URL xem bài đăng thực tế cho LinkedIn (`linkedin_post_url`).
 * **Lý do thay đổi**:
-  * Tránh lỗi im lặng hoặc thông báo lỗi tiếng Anh mơ hồ của trình duyệt (`Failed to fetch`), giúp người dùng nhận biết chính xác nguyên nhân lỗi. KHÔNG thay đổi bất kỳ bố cục, thiết kế hay màu sắc UI nào.
+  * Cho phép người dùng đăng bài chính xác lên từng tài khoản LinkedIn/Facebook đã kết nối, khắc phục việc Backend bị mặc định chọn kênh mới nhất.

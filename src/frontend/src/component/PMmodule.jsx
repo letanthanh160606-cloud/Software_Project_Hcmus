@@ -283,6 +283,8 @@ export default function PMmodule({ user }) {
   const [isLoading, setIsLoading] = useState(true);
   const [connectedPlatforms, setConnectedPlatforms] = useState(['facebook']);
   const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
+  const [connectedChannelsList, setConnectedChannelsList] = useState([]);
+  const [selectedChannelId, setSelectedChannelId] = useState('');
 
   useEffect(() => {
     const fetchConnectedChannels = async () => {
@@ -304,10 +306,13 @@ export default function PMmodule({ user }) {
         const res = await fetch(url, { headers });
         if (res.ok) {
           const data = await res.json();
-          const pList = (data.channels || []).map(c => c.platform);
-          if (pList.length > 0) {
+          const channels = data.channels || [];
+          setConnectedChannelsList(channels);
+          if (channels.length > 0) {
+            const pList = channels.map(c => c.platform);
             setConnectedPlatforms(pList);
             setPrimaryPlatform(pList[0]);
+            setSelectedChannelId(channels[0].id);
           }
         }
       } catch (err) {
@@ -382,14 +387,18 @@ export default function PMmodule({ user }) {
 
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const handlePublishToFacebook = async (postId) => {
+  const handlePublishToFacebook = async (postId, targetChannelId = selectedChannelId) => {
     setIsPublishing(true);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
       const token = localStorage.getItem('token');
       const targetPlat = primaryPlatform || 'facebook';
-      const res = await fetch(`http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${targetPlat}`, {
+      let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${targetPlat}`;
+      if (targetChannelId) {
+        publishUrl += `&channel_id=${targetChannelId}`;
+      }
+      const res = await fetch(publishUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -869,60 +878,88 @@ export default function PMmodule({ user }) {
             )}
 
             {selectedPost.status === 'Drafts' && (isIndividual || role === 'manager') && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRealPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
-                    setSelectedPost(null);
-                    toast.success('Draft deleted');
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid #ef4444',
-                    backgroundColor: '#fef2f2',
-                    color: '#dc2626',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePublishToFacebook(selectedPost.id)}
-                  disabled={isPublishing}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: '#FE7216',
-                    color: '#ffffff',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Publish
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditModal(selectedPost)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid #d1d5db',
-                    backgroundColor: '#ffffff',
-                    color: '#374151',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Edit
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                {connectedChannelsList.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Target Account:</span>
+                    <select
+                      value={selectedChannelId}
+                      onChange={(e) => setSelectedChannelId(e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        backgroundColor: '#ffffff',
+                        color: '#1e293b',
+                        fontWeight: '600',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {connectedChannelsList.map((ch) => (
+                        <option key={ch.id} value={ch.id}>
+                          {ch.platform === 'linkedin' ? '🔗 LinkedIn' : '📘 Facebook'} — {ch.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRealPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
+                      setSelectedPost(null);
+                      toast.success('Draft deleted');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #ef4444',
+                      backgroundColor: '#fef2f2',
+                      color: '#dc2626',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePublishToFacebook(selectedPost.id, selectedChannelId)}
+                    disabled={isPublishing}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: '#FE7216',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Publish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(selectedPost)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
               </div>
             )}
 
