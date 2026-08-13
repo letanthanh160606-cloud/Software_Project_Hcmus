@@ -844,18 +844,24 @@ export default function PromptContextmodule() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#7c7c7c' }}>Documents (comma-separated)</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#4b5563' }}>Attachment</label>
                 <input
-                  type="text"
-                  placeholder="e.g. Brand_Guidelines.pdf, Logo_Files.zip"
-                  value={newCtxDocs}
-                  onChange={(e) => setNewCtxDocs(e.target.value)}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setNewCtxDocs(files.map(f => f.name).join(', '));
+                  }}
                   style={{
-                    padding: '12px',
+                    padding: '10px 12px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(0,0,0,0.08)',
-                    fontSize: '14px',
+                    border: '1.5px dashed #FE7216',
+                    backgroundColor: '#FFF7ED',
+                    color: '#C2410C',
+                    fontSize: '13px',
                     outline: 'none',
+                    cursor: 'pointer',
                     fontFamily: 'Satoshi, system-ui, sans-serif'
                   }}
                 />

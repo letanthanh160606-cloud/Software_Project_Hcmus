@@ -500,6 +500,7 @@ export default function PMmodule({ user }) {
 
   const [selectedPost, setSelectedPost] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
+  const [newCommentText, setNewCommentText] = useState('');
 
   const handleOpenEditModal = (post) => {
     setEditingPost({
@@ -512,6 +513,29 @@ export default function PMmodule({ user }) {
 
   const handleRowClick = (post) => {
     setSelectedPost(post);
+  };
+
+  const handleAddComment = () => {
+    if (!newCommentText.trim()) return;
+    const newComment = {
+      id: Date.now(),
+      author: 'Member',
+      text: newCommentText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    const updatedComments = [...(selectedPost.comments || []), newComment];
+    setSelectedPost((prev) => ({
+      ...prev,
+      comments: updatedComments
+    }));
+    setRealPosts((prev) =>
+      prev.map((p) =>
+        p.id === selectedPost.id
+          ? { ...p, comments: updatedComments }
+          : p
+      )
+    );
+    setNewCommentText('');
   };
 
   return (
@@ -825,6 +849,77 @@ export default function PMmodule({ user }) {
               </div>
             </div>
 
+            {selectedPost.status?.toLowerCase() === 'rejected' && !isIndividual && (
+              <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                  Comments
+                </label>
+                <div style={{
+                  marginTop: '8px',
+                  maxHeight: '120px',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  paddingRight: '4px'
+                }} className="custom-scroll">
+                  {(selectedPost.comments || []).length === 0 ? (
+                    <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No comments yet.</span>
+                  ) : (
+                    (selectedPost.comments || []).map((c) => (
+                      <div key={c.id} style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>{c.author}</span>
+                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>{c.timestamp}</span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#334155' }}>{c.text}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {role === 'member' && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                    <input
+                      type="text"
+                      placeholder="Write a comment..."
+                      value={newCommentText}
+                      onChange={(e) => setNewCommentText(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        outline: 'none',
+                        fontFamily: 'Satoshi, system-ui, sans-serif'
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddComment();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddComment}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: '#FE7216',
+                        color: '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Post
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Published Social Link */}
             {selectedPost.status === 'Published' && (
               <div>
@@ -1025,60 +1120,94 @@ export default function PMmodule({ user }) {
             )}
 
             {selectedPost.status === 'Pending' && role === 'manager' && !isIndividual && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                <button
-                  type="button"
-                  onClick={() => handlePublishToFacebook(selectedPost.id)}
-                  disabled={isPublishing}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: '#22c55e',
-                    color: '#ffffff',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Approve & Publish
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditModal(selectedPost)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid #d1d5db',
-                    backgroundColor: '#ffffff',
-                    color: '#374151',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected' } : p));
-                    setSelectedPost(null);
-                    toast.error('Post rejected');
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid #ef4444',
-                    backgroundColor: 'transparent',
-                    color: '#ef4444',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Reject
-                </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                    Rejection Comment (Required to Reject)
+                  </label>
+                  <textarea
+                    placeholder="Provide a reason for rejection..."
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    rows={2}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      outline: 'none',
+                      fontFamily: 'Satoshi, system-ui, sans-serif',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handlePublishToFacebook(selectedPost.id)}
+                    disabled={isPublishing}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: '#22c55e',
+                      color: '#ffffff',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Approve & Publish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(selectedPost)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newCommentText.trim()) {
+                        alert('A comment explaining the rejection is required.');
+                        return;
+                      }
+                      const newComment = {
+                        id: Date.now(),
+                        author: 'Manager',
+                        text: newCommentText,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      };
+                      const updatedComments = [...(selectedPost.comments || []), newComment];
+                      setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments } : p));
+                      setSelectedPost(null);
+                      setNewCommentText('');
+                      toast.error('Post rejected');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '10px',
+                      border: '1px solid #ef4444',
+                      backgroundColor: 'transparent',
+                      color: '#ef4444',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1103,6 +1232,47 @@ export default function PMmodule({ user }) {
                   }}
                 >
                   Cancel Submission
+                </button>
+              </div>
+            )}
+
+            {selectedPost.status?.toLowerCase() === 'rejected' && role === 'member' && !isIndividual && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedPost)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Pending' } : p));
+                    setSelectedPost(null);
+                    toast.success('Post resubmitted for approval');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#FE7216',
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Resubmit
                 </button>
               </div>
             )}

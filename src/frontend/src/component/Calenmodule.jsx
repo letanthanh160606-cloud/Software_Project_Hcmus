@@ -33,6 +33,10 @@ export default function Calenmodule({ user, userRole }) {
   const [apiTasks, setApiTasks] = useState([]);
   const [todoCount, setTodoCount] = useState(0);
   const [assignedToOthersCount, setAssignedToOthersCount] = useState(0);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newPriority, setNewPriority] = useState('medium');
+  const [newDescription, setNewDescription] = useState('');
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
    const PRIORITY_TYPE_LABEL = {
@@ -68,6 +72,7 @@ export default function Calenmodule({ user, userRole }) {
               ? 'Workspace Task'
               : PRIORITY_TYPE_LABEL[t.priority] || 'Medium Priority',
             workspaceOnly: t.source === 'workspace',
+            content: t.content || '',
           };
         });
 
@@ -77,6 +82,32 @@ export default function Calenmodule({ user, userRole }) {
     } catch (err) {
       console.error('Error fetching calendar tasks', err);
     }
+  };
+
+  const handleAddTask = () => {
+    if (!newTitle.trim() || !newDueDate) {
+      alert('Task title and due date are required');
+      return;
+    }
+    const d = new Date(newDueDate);
+    const newLocalTask = {
+      id: Date.now().toString(),
+      day: d.getDate(),
+      month: d.getMonth(),
+      year: d.getFullYear(),
+      time: d.toTimeString().slice(0, 5),
+      title: newTitle,
+      priority: newPriority,
+      type: newPriority === 'workspace' ? 'Workspace Task' : PRIORITY_TYPE_LABEL[newPriority] || 'Medium Priority',
+      workspaceOnly: newPriority === 'workspace',
+      content: newDescription,
+    };
+    setApiTasks((prev) => [...prev, newLocalTask]);
+    setNewTitle('');
+    setNewDescription('');
+    setNewDueDate('');
+    setNewPriority('medium');
+    setShowTaskModal(false);
   };
 
   useEffect(() => {
@@ -682,19 +713,37 @@ export default function Calenmodule({ user, userRole }) {
                     {activeModalTask.type}
                   </span>
                 </div>
+                {activeModalTask.content && (
+                  <div><strong>Description:</strong> {activeModalTask.content}</div>
+                )}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <input
                   type="text"
                   placeholder="Task Title (e.g. [SE - PA00])"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
                   style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '13px' }}
+                />
+                <textarea
+                  placeholder="Task Description..."
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  rows={3}
+                  style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '13px', resize: 'vertical', fontFamily: 'inherit' }}
                 />
                 <input
                   type="datetime-local"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
                   style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '13px' }}
                 />
-                <select style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '13px' }}>
+                <select
+                  value={newPriority}
+                  onChange={(e) => setNewPriority(e.target.value)}
+                  style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '13px' }}
+                >
                   <option value="high">Red - Urgent (High Priority)</option>
                   <option value="medium">Yellow - Medium Priority</option>
                   <option value="low">Green - Low Priority</option>
@@ -703,22 +752,59 @@ export default function Calenmodule({ user, userRole }) {
               </div>
             )}
 
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
+                type="button"
                 onClick={() => setShowTaskModal(false)}
                 style={{
                   padding: '8px 18px',
                   borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#FE7216',
-                  color: '#ffffff',
+                  border: '1px solid #ccc',
+                  backgroundColor: '#ffffff',
+                  color: '#333333',
                   fontWeight: '600',
                   fontSize: '13px',
                   cursor: 'pointer',
                 }}
               >
-                Close
+                Cancel
               </button>
+              {!activeModalTask && (
+                <button
+                  type="button"
+                  onClick={handleAddTask}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#FE7216',
+                    color: '#ffffff',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Add Task
+                </button>
+              )}
+              {activeModalTask && (
+                <button
+                  type="button"
+                  onClick={() => setShowTaskModal(false)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#FE7216',
+                    color: '#ffffff',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -1255,6 +1255,26 @@ const handleCancelRequest = async (id) => {
                   <option>High</option>
                 </select>
               </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: '#4b5563' }}>Attachment</label>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  multiple
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1.5px dashed #FE7216',
+                    backgroundColor: '#FFF7ED',
+                    color: '#C2410C',
+                    boxSizing: 'border-box',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                />
+              </div>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px' }}>Assignee</label>
                 <div className="custom-scroll" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', borderRadius: '8px', padding: '8px' }}>
