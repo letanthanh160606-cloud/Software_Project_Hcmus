@@ -286,6 +286,8 @@ export default function PMmodule({ user }) {
   const [connectedChannelsList, setConnectedChannelsList] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [publishedUrlsList, setPublishedUrlsList] = useState([]);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [editingPost, setEditingPost] = useState(null);
 
   useEffect(() => {
     const fetchPublishedUrls = async () => {
@@ -559,9 +561,6 @@ export default function PMmodule({ user }) {
         return 0;
     }
   });
-
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [editingPost, setEditingPost] = useState(null);
 
   const handleOpenEditModal = (post) => {
     setEditingPost({

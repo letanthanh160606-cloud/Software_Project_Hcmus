@@ -23,16 +23,15 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
   * Bổ sung thông báo lỗi Tiếng Việt thân thiện khi nhận HTTP status `401 Unauthorized`.
   * Chuyển hướng trình duyệt qua `window.location.href = data.authorization_url` cho cả luồng OAuth thật và luồng Dev/Mock callback.
 * **Lý do thay đổi**:
-  * Khắc phục triệt để lỗi `Failed to fetch` do lệnh AJAX `fetch()` tự động đi theo phản hồi chuyển hướng HTTP 302 (`RedirectResponse`) từ Backend vi phạm chính sách CORS cross-origin của trình duyệt. KHÔNG thay đổi bố cục hay kiểu dáng UI.
+  * Khắc phục triệt me lỗi `Failed to fetch` do lệnh AJAX `fetch()` tự động đi theo phản hồi chuyển hướng HTTP 302 (`RedirectResponse`) từ Backend vi phạm chính sách CORS cross-origin của trình duyệt. KHÔNG thay đổi bố cục hay kiểu dáng UI.
 
 ---
 
 ## 📌 3. File: `src/frontend/src/component/PMmodule.jsx`
 
-* **Vị trí**: Dòng 285 – 325, Dòng 460 – 480 & Dòng 885 – 980.
+* **Vị trí**: Dòng 285 – 290.
 * **Thay đổi**:
-  * Lưu vết vĩnh viễn danh sách tất cả các đường dẫn bài viết đã đăng (`publishedUrlsList`) theo từng tài khoản và lưu vào bộ nhớ đệm `localStorage` (`published_urls_${postId}`).
-  * Gọi API `GET /api/v1/distribution/channels/published-urls/{post_id}` để tự động khôi phục danh sách link bài viết đầy đủ khi xem bài đăng hoặc khi F5 tải lại trang.
-  * Hiển thị danh sách đường dẫn bài viết cho **TẤT CẢ các tài khoản đã đăng** trong Modal bài viết (`Published`), kèm biểu tượng mạng xã hội và nút bấm **View on LinkedIn / Facebook ↗** riêng biệt cho từng tài khoản.
+  * Chuyển vị trí khai báo `const [selectedPost, setSelectedPost] = useState(null)` và `editingPost` lên đầu hàm `PMmodule` (trước các hook `useEffect`).
+  * Lưu vết vĩnh viễn danh sách tất cả các đường dẫn bài viết đã đăng (`publishedUrlsList`) và khôi phục khi F5.
 * **Lý do thay đổi**:
-  * Giải quyết dứt điểm vấn đề F5 bị mất link bài viết. Giúp người dùng dễ dàng xem lại toàn bộ link đăng của tất cả các tài khoản bất kỳ lúc nào.
+  * Sửa lỗi runtime `ReferenceError: Cannot access 'selectedPost' before initialization` làm màn hình bị trắng tinh. Sau khi di chuyển khai báo State lên trên `useEffect`, trang Post Management hoạt động bình thường 100%.
