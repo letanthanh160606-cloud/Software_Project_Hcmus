@@ -1,7 +1,6 @@
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
-from app.models import Post, SocialAccount, Task
-
+from app.models import PromptTemplate, Context, Post, SocialAccount, Task
 from app.models import Post, User, Workspace, WorkspaceMember, Notifications
 from app.security import hash_password, hash_pin
 
@@ -383,3 +382,100 @@ def get_tasks_due_soon(db: Session, hours: int = 24) -> list[Task]:
             Task.status.notin_(["completed", "cancelled"]),
         )
     ).all()
+
+def create_prompt_template(
+    db: Session,
+    *,
+    title: str,
+    content: str,
+    tags: list[dict] | None = None,
+) -> PromptTemplate:
+    template = PromptTemplate(
+        title=title,
+        content=content,
+        tags=tags,
+    )
+
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+
+    return template
+
+
+def list_prompt_templates(db: Session) -> list[PromptTemplate]:
+    return db.scalars(
+        select(PromptTemplate).order_by(PromptTemplate.created_at.desc())
+    ).all()
+
+
+def get_prompt_template_by_id(
+    db: Session,
+    template_id,
+) -> PromptTemplate | None:
+    return db.scalar(
+        select(PromptTemplate).where(PromptTemplate.id == template_id)
+    )
+
+
+def update_prompt_template(
+    db: Session,
+    template: PromptTemplate,
+    updates: dict,
+) -> PromptTemplate:
+    for field, value in updates.items():
+        setattr(template, field, value)
+
+    db.commit()
+    db.refresh(template)
+
+    return template
+
+
+def create_context(
+    db: Session,
+    *,
+    title: str,
+    documents: list | None = None,
+    tags: list[dict] | None = None,
+) -> Context:
+    context = Context(
+        title=title,
+        documents=documents,
+        tags=tags,
+    )
+
+    db.add(context)
+    db.commit()
+    db.refresh(context)
+
+    return context
+
+
+def list_contexts(db: Session) -> list[Context]:
+    return db.scalars(
+        select(Context).order_by(Context.created_at.desc())
+    ).all()
+
+
+def get_context_by_id(
+    db: Session,
+    context_id,
+) -> Context | None:
+    return db.scalar(
+        select(Context).where(Context.id == context_id)
+    )
+
+
+def update_context(
+    db: Session,
+    context: Context,
+    updates: dict,
+) -> Context:
+    for field, value in updates.items():
+        setattr(context, field, value)
+
+    db.commit()
+    db.refresh(context)
+
+    return context

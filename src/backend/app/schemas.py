@@ -276,4 +276,45 @@ class NotificationResponse(BaseModel):
 class NotificationCountUnreadResponse(BaseModel):
     unread_count: int
 
+class PromptTemplateCreate(BaseModel):
+    title: str
+    content: str
+    tags: list[dict] | None = None
 
+
+class PromptTemplateUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    tags: list[dict] | None = None
+
+
+class PromptTemplateResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    content: str
+    tags: list[dict] | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ContextCreate(BaseModel):
+    title: str
+    documents: list | None = None
+    tags: list[dict] | None = None
+
+
+class ContextUpdate(BaseModel):
+    title: str | None = None
+    documents: list | None = None
+    tags: list[dict] | None = None
+
+
+class ContextResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    documents: list | None = None
+    tags: list[dict] | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)    
