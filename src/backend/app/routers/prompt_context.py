@@ -1,10 +1,15 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app import crud, schemas
 from app.database import get_db
+
+from pathlib import Path
+
+KNOWLEDGE_BASE_DIR = Path("uploads/knowledge_base")
+KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(
     prefix="/prompt-context",
@@ -151,4 +156,95 @@ def update_context(
         db,
         context=context,
         updates=updates,
+    )
+
+@router.post(
+    "/contexts/{context_id}/documents",
+    response_model=schemas.ContextResponse,
+)
+async def upload_context_document(
+    context_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    context = crud.get_context_by_id(db, context_id)
+
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Context not found",
+        )
+
+    file_id = uuid.uuid4()
+    safe_filename = Path(file.filename).name
+    stored_filename = f"{file_id}_{safe_filename}"
+    file_path = KNOWLEDGE_BASE_DIR / stored_filename
+
+    content = await file.read()
+    file_size = len(content)
+    file_path.write_bytes(content)
+
+    documents = list(context.documents or [])
+
+    documents.append(
+        {
+            "id": str(file_id),
+            "name": safe_filename,
+            "stored_name": stored_filename,
+            "path": str(file_path),
+            "content_type": file.content_type,
+            "size": file_size,
+        }
+    )
+
+    return crud.update_context(
+        db,
+        context=context,
+        updates={"documents": documents},
+    )
+
+@router.delete(
+    "/contexts/{context_id}/documents/{document_id}",
+    response_model=schemas.ContextResponse,
+)
+def delete_context_document(
+    context_id: uuid.UUID,
+    document_id: str,
+    db: Session = Depends(get_db),
+):
+    context = crud.get_context_by_id(db, context_id)
+
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Context not found",
+        )
+
+    documents = list(context.documents or [])
+
+    document = next(
+        (item for item in documents if item.get("id") == document_id),
+        None,
+    )
+
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    file_path = Path(document.get("path", ""))
+
+    if file_path.exists():
+        file_path.unlink()
+
+    documents = [
+        item for item in documents
+        if item.get("id") != document_id
+    ]
+
+    return crud.update_context(
+        db,
+        context=context,
+        updates={"documents": documents},
     )
