@@ -224,6 +224,70 @@ class PostDistribution(Base):
     )
 
 
+class PromptTemplate(Base):
+    __tablename__ = "prompt_templates"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("uuidv7()"),
+    )
+
+    title: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    tags: Mapped[list[dict] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class Context(Base):
+    __tablename__ = "contexts"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("uuidv7()"),
+    )
+
+    title: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    documents: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+
+    tags: Mapped[list[dict] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
 class Post(Base):
     __tablename__ = "posts"
     __table_args__ = {"schema": "workspaces"}

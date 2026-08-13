@@ -8,6 +8,8 @@ from app.distribution.router import router as distribution_router
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.jobs.notification_jobs import check_due_soon_tasks
 
+from app.routers import prompt_context
+
 settings = get_settings()
 
 app = FastAPI(title="Omni Platforms")
@@ -27,6 +29,7 @@ app.include_router(posts.router)
 app.include_router(calendar.router)
 app.include_router(notifications.router)
 app.include_router(distribution_router)
+app.include_router(prompt_context.router)
 
 scheduler = BackgroundScheduler()
 
