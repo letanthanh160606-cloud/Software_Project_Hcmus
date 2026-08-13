@@ -29,11 +29,12 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 
 ## 📌 3. File: `src/frontend/src/component/PMmodule.jsx`
 
-* **Vị trí**: Dòng 287 – 320, Dòng 390 – 405 & Dòng 880 – 930.
+* **Vị trí**: Dòng 287 – 320, Dòng 390 – 430 & Dòng 880 – 930.
 * **Thay đổi**:
   * Lưu danh sách đầy đủ các kênh truyền thông xã hội đã kết nối (`connectedChannelsList`) bao gồm `id`, `platform`, và `display_name`.
-  * Bổ sung Menu thả xuống **Target Account Selector** trong Modal chi tiết bài viết, cho phép người dùng chủ động chọn tài khoản LinkedIn/Facebook cụ thể (theo tên hiển thị) trước khi bấm Publish.
+  * Bổ sung tùy chọn **`🌐 All Connected Accounts (Tất cả tài khoản)`** trong Menu thả xuống **Target Account Selector**.
+  * Bổ sung logic xuất bản song song bằng `Promise.all()` cho phép 1 bài viết được tự động đăng đồng thời lên **TẤT CẢ các tài khoản/nền tảng đã kết nối cùng một lúc**.
   * Truyền tham số `&channel_id=${selectedChannelId}` sang Backend khi thực hiện đăng bài (`POST /api/v1/distribution/channels/publish/{postId}`).
-  * Bổ sung cơ chế `AbortController` với thời gian chờ 30 giây (`timeout 30000ms`) cho yêu cầu `fetch` xuất bản bài viết.
+  * Bổ sung cơ chế `AbortController` với thời gian chờ 45 giây cho yêu cầu `fetch` đăng bài đồng thời đa kênh.
 * **Lý do thay đổi**:
-  * Cho phép người dùng đăng bài chính xác lên từng tài khoản LinkedIn/Facebook đã kết nối, khắc phục việc Backend bị mặc định chọn kênh mới nhất.
+  * Cho phép xuất bản đồng thời 1 nội dung bài viết lên nhiều tài khoản LinkedIn/Facebook cùng một lúc chỉ với 1 thao tác nhấp nút. KHÔNG thay đổi thiết kế tổng thể hay layout UI.

@@ -390,30 +390,46 @@ export default function PMmodule({ user }) {
   const handlePublishToFacebook = async (postId, targetChannelId = selectedChannelId) => {
     setIsPublishing(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const token = localStorage.getItem('token');
-      const targetPlat = primaryPlatform || 'facebook';
-      let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${targetPlat}`;
-      if (targetChannelId) {
-        publishUrl += `&channel_id=${targetChannelId}`;
-      }
-      const res = await fetch(publishUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        signal: controller.signal
-      });
+      const channelsToPublish = (targetChannelId === 'all' && connectedChannelsList.length > 0)
+        ? connectedChannelsList
+        : connectedChannelsList.filter(c => c.id === targetChannelId);
+
+      const targetList = channelsToPublish.length > 0 
+        ? channelsToPublish 
+        : [{ id: targetChannelId, platform: primaryPlatform || 'facebook' }];
+
+      const results = await Promise.all(
+        targetList.map(async (ch) => {
+          let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${ch.platform || 'facebook'}`;
+          if (ch.id && ch.id !== 'all') {
+            publishUrl += `&channel_id=${ch.id}`;
+          }
+          const res = await fetch(publishUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            signal: controller.signal
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.detail || `Publish failed for ${ch.display_name || ch.platform}`);
+          }
+          return data;
+        })
+      );
       clearTimeout(timeoutId);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Publish failed');
-      }
-      const platformName = data.platform === 'linkedin' ? 'LinkedIn' : 'Facebook';
-      toast.success(data.message || `Post published to ${platformName} successfully!`);
-      const publishedUrl = data.linkedin_post_url || data.facebook_post_url;
+
+      const successNames = results.map(r => r.channel_name || (r.platform === 'linkedin' ? 'LinkedIn' : 'Facebook')).join(', ');
+      toast.success(`Published successfully to ${results.length} account(s): ${successNames}!`);
+
+      const publishedUrl = results.find(r => r.linkedin_post_url || r.facebook_post_url)?.linkedin_post_url 
+                        || results.find(r => r.linkedin_post_url || r.facebook_post_url)?.facebook_post_url;
+
       if (publishedUrl) {
         setSelectedPost((prev) => prev ? { 
           ...prev, 
@@ -897,6 +913,9 @@ export default function PMmodule({ user }) {
                         cursor: 'pointer'
                       }}
                     >
+                      {connectedChannelsList.length > 1 && (
+                        <option value="all">🌐 All Connected Accounts ({connectedChannelsList.length} accounts)</option>
+                      )}
                       {connectedChannelsList.map((ch) => (
                         <option key={ch.id} value={ch.id}>
                           {ch.platform === 'linkedin' ? '🔗 LinkedIn' : '📘 Facebook'} — {ch.display_name}
