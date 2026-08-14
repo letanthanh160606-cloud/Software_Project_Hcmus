@@ -1,8 +1,8 @@
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import Session, selectinload
 from app.models import Post, SocialAccount, Task
 
-from app.models import Post, User, Workspace, WorkspaceMember, Notifications, TaskAttachment
+from app.models import Post, User, Workspace, WorkspaceMember, Notifications, TaskAttachment, PostReviews
 from app.security import hash_password, hash_pin
 
 import uuid
@@ -20,6 +20,11 @@ def get_user_by_username(db: Session, username: str) -> User | None:
 
 def get_workspace_by_id(db: Session, workspace_id: str) -> Workspace | None:
     return db.get(Workspace, workspace_id)
+
+def is_active_member(db: Session, user_id) -> bool:
+    member =  db.scalar(select(WorkspaceMember).where(WorkspaceMember.user_id == user_id, WorkspaceMember.status == "active"))
+    return member is not None
+                 
 
 
 def _build_user(*, username: str, email: str, password: str, account_type: str) -> User:
@@ -149,9 +154,9 @@ def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     ).all()
 
 def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
-    query = select(Post).where(Post.workspace_id == workspace_id).options(selectinload(Post.attachment))
+    query = select(Post).where(Post.workspace_id == workspace_id, Post.status == "pending_review").options(selectinload(Post.attachment))
     if role == "member":
-        query = query.where(Post.author_id == user_id)
+        query = query.where(Post.author_id == user_id, Post.status != "cancel")
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
@@ -303,18 +308,30 @@ def create_personal_task(
     return task
 
 def list_calendar_tasks(db: Session, *, user_id) -> list[Task]:
+    is_manager = db.scalar(select(Workspace).where(Workspace.manager_id == user_id))
+    if is_active_member(db, user_id) or is_manager is not None:
+        filter_condition = or_(Task.created_by == user_id, Task.assigned_to == user_id)
+    else:
+        filter_condition = and_(Task.created_by == user_id, Task.assigned_to == user_id)
+
     query = (
-        select(Task)
-        .where(or_(Task.created_by == user_id, Task.assigned_to == user_id))
-        .order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.created_at.desc())
-    )
+            select(Task)
+            .where(filter_condition)
+            .order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.created_at.desc())
+            )
     return db.scalars(query).all()
 
 def count_todo_tasks_for_user(db: Session, user_id) -> int:
+    is_manager = db.scalar(select(Workspace).where(Workspace.manager_id == user_id))
+    if is_active_member(db, user_id) or is_manager is not None:
+        filter_condition = or_(Task.created_by == user_id, Task.assigned_to == user_id)
+    else:
+        filter_condition = and_(Task.created_by == user_id, Task.assigned_to == user_id)
     return db.scalar(
         select(func.count()).select_from(Task).where(
             Task.assigned_to == user_id,
             Task.status.notin_(["completed", "cancelled"]),
+            filter_condition,
         )
     ) or 0
 
@@ -453,5 +470,17 @@ def deny_pending_member(db: Session, workspace_id: str, user_id) -> WorkspaceMem
     db.commit()
     db.refresh(membership)
     return membership
+
+def create_post_review(db: Session, *, post_id: uuid.UUID, reviewer_id: uuid.UUID, comment: str | None) -> PostReviews:
+    review = PostReviews(
+        post_id=post_id,
+        reviewer_id=reviewer_id,
+        comment=comment,
+        action="reject",
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return review
 
 

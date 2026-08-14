@@ -67,7 +67,7 @@ export default function Calenmodule({ user, userRole }) {
             year: d.getFullYear(),
             time: d.toTimeString().slice(0, 5),
             title: t.title,
-            priority: t.source === 'workspace' && !t.is_created_by_me ? 'workspace' : t.priority,
+            priority: t.source === 'workspace' ? 'workspace' : t.priority,
             type: t.source === 'workspace' && !t.is_created_by_me
               ? 'Workspace Task'
               : PRIORITY_TYPE_LABEL[t.priority] || 'Medium Priority',

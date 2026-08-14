@@ -50,6 +50,8 @@ export default function WSmodule({ user }) {
   const [workspaceDetail, setWorkspaceDetail] = useState(null);
   const [workspaceDetailLoading, setWorkspaceDetailLoading] = useState(true);
 
+  const [postReviews, setPostReviews] = useState([]);
+
   const workspaceId = user?.workspace_id || user?.workspace?.workspace_id || null;
 
 
@@ -239,12 +241,30 @@ useEffect(() => {
     }
   };
 
-  // Fetch pending join requests each time the modal is opened
   useEffect(() => {
     if (showJoinModal) {
       fetchJoinRequests();
     }
   }, [showJoinModal, workspaceId]);
+
+  const fetchPostReviews = async (postId) => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts/${postId}/reviews`, { headers });
+    if (res.ok) {
+      setPostReviews(await res.json());
+    } else {
+      setPostReviews([]);
+    }
+  } catch (err) {
+    console.error('Failed to fetch post reviews:', err);
+    setPostReviews([]);
+  }
+};
+
 
 
   const handleAcceptJoinRequest = async (userId, username) => {
@@ -422,6 +442,17 @@ const handleApprove = async (id) => {
 const handleDenyWithComment = async (id, comment) => {
   try {
     await patchPost(id, { status: 'rejected' });
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(
+      `http://localhost:8000/workspaces/${workspaceId}/posts/${id}/reviews?comment=${encodeURIComponent(comment)}`,
+      { method: 'POST', headers }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to save rejection reason');
+    }
     setApprovalRequests(prev => prev.filter(r => r.id !== id));
     toast.error(`Request Rejected: "${comment}"`);
   } catch (err) { toast.error(err.message); }
@@ -429,7 +460,7 @@ const handleDenyWithComment = async (id, comment) => {
 
 const handleCancelRequest = async (id) => {
   try {
-    await patchPost(id, { status: 'rejected' });
+    await patchPost(id, { status: 'cancel' }); 
     setApprovalRequests(prev => prev.filter(r => r.id !== id));
     toast('Request Cancelled', { icon: 'ℹ️' });
   } catch (err) { toast.error(err.message); }
@@ -439,6 +470,7 @@ const handleCancelRequest = async (id) => {
     setSelectedRequest(req);
     setShowRejectReason(false);
     setRejectComment('');
+    fetchPostReviews(req.id);
   };
 
   const getPriorityStyle = (priority) => {

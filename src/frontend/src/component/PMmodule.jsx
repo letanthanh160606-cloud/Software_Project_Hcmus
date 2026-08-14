@@ -1167,6 +1167,22 @@ export default function PMmodule({ user }) {
                     Edit
                   </button>
                 </div>
+                  type="button"
+                  onClick={() => handleOpenEditModal(selectedPost)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
+                    color: '#374151',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Edit
+                </button>
+>>>>>>> origin/BEdev
               </div>
             )}
 
@@ -1256,7 +1272,7 @@ export default function PMmodule({ user }) {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
                   <button
                     type="button"
-                    onClick={() => handlePublishToFacebook(selectedPost.id)}
+                    onClick={() => handlePublishToFacebook(selectedPost.id, selectedChannelId)}
                     disabled={isPublishing}
                     style={{
                       padding: '8px 16px',

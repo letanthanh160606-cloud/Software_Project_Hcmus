@@ -17,7 +17,8 @@ from app.schemas import (
     TaskCreateRequest,
     TaskResponse,
     WorkspaceDetailResponse,
-    TaskAttachmentResponse
+    TaskAttachmentResponse,
+    PostReviewReponse,
 )
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -139,8 +140,8 @@ def update_post(
             if updates["status"] not in ("rejected", "ready_for_distribution"):
                 raise HTTPException(status_code=403, detail="Unauthorized status")
         else:  # member
-            if updates["status"] != "rejected":
-                raise HTTPException(status_code=403, detail="Members are only allowed to move posts to 'rejected'.")
+            if updates["status"] != "cancel":
+                raise HTTPException(status_code=403, detail="Members are only allowed to move posts to 'cancel'.")
             if post.author_id != current_user.users_uuid:
                 raise HTTPException(status_code=403, detail="You are not the author of this post.")
 
@@ -248,3 +249,27 @@ def deny_join_request(
         status=membership.status,
         joined_at=membership.joined_at,
     )
+
+@router.post("/{workspace_id}/posts/{post_id}/reviews", response_model=PostReviewReponse, status_code=201)
+def create_post_review(
+    post_id: uuid.UUID,
+    comment: str | None = None,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PostReviewReponse:
+    if ctx.role != "manager":
+        raise HTTPException(status_code=403, detail="Only managers can review posts.")
+    
+    post = crud.get_post_by_id(db, post_id, ctx.workspace.workspace_uuid)
+    if post is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    review = crud.create_post_review(
+    db,
+    post_id=post_id,
+    reviewer_id=current_user.users_uuid,
+    comment=comment,
+)
+    
+    return PostReviewReponse.model_validate(review)
