@@ -29,9 +29,9 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 
 ## 📌 3. File: `src/frontend/src/component/PMmodule.jsx`
 
-* **Vị trí**: Dòng 285 – 290.
+* **Vị trí**: Dòng 1170 – 1186.
 * **Thay đổi**:
-  * Chuyển vị trí khai báo `const [selectedPost, setSelectedPost] = useState(null)` và `editingPost` lên đầu hàm `PMmodule` (trước các hook `useEffect`).
-  * Lưu vết vĩnh viễn danh sách tất cả các đường dẫn bài viết đã đăng (`publishedUrlsList`) và khôi phục khi F5.
+  * Dọn dẹp đoạn thẻ trùng lặp thừa `>>>>>>> origin/BEdev` bị dư sau quá trình merge.
+  * Giữ thẻ đóng `</div>` hợp lệ cho Modal bài đăng.
 * **Lý do thay đổi**:
-  * Sửa lỗi runtime `ReferenceError: Cannot access 'selectedPost' before initialization` làm màn hình bị trắng tinh. Sau khi di chuyển khai báo State lên trên `useEffect`, trang Post Management hoạt động bình thường 100%.
+  * Khắc phục lỗi `[BabelError] Expected corresponding JSX closing tag for <div> (1184:16)`, giúp Vite bundler biên dịch lại giao diện React bình thường 100%.
