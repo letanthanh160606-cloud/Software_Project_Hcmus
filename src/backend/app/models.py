@@ -31,7 +31,16 @@ PostStatus = Enum(
     "ready_for_distribution",
     "published",
     "failed",
+    "cancel",
     name="post_status_enum",
+    schema="public",
+    create_type=False,
+)
+
+ReviewActionEnum = Enum(
+    "approve",
+    "reject",
+    name="review_action_enum",
     schema="public",
     create_type=False,
 )
@@ -404,3 +413,14 @@ class Notifications(Base):
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("False"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
+
+
+class PostReviews(Base):
+    __tablename__ = "post_reviews"
+    __table_args__ = {"schema" : "workspaces"}
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    post_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("workspaces.posts.id"), nullable= False)
+    reviewer_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
+    action: Mapped[str] = mapped_column(ReviewActionEnum, nullable=False, server_default="reject")
+    comment: Mapped[str] = mapped_column(String, nullable=False, server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

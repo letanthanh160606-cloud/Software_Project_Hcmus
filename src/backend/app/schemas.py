@@ -239,7 +239,7 @@ class PostUpdateRequest(BaseModel):
     title: str | None = None
     content: str | None = None
     status: Literal[
-        "draft", "pending_review", "rejected", "ready_for_distribution", "published", "failed"
+        "draft", "pending_review", "rejected", "ready_for_distribution", "published", "failed", "cancel",
     ] | None = None
 
 
@@ -294,5 +294,16 @@ class NotificationResponse(BaseModel):
 
 class NotificationCountUnreadResponse(BaseModel):
     unread_count: int
+
+
+class PostReviewReponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    post_id: uuid.UUID
+    reviewer_id: uuid.UUID
+    comments: str | None = None
+    action: Literal["approve", "reject"]
+    created_at: datetime
 
 
