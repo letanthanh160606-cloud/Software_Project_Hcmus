@@ -156,7 +156,7 @@ def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
 def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
     query = select(Post).where(Post.workspace_id == workspace_id, Post.status == "pending_review").options(selectinload(Post.attachment))
     if role == "member":
-        query = query.where(Post.author_id == user_id, Post.status != "cancel")
+        query = query.where(Post.author_id == user_id)
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
