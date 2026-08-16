@@ -269,6 +269,7 @@ def create_post(
     knowledge_base_id=None,
     seo_keywords: list[str] | None = None,
     seo_hashtags: list[str] | None = None,
+    target_platforms: list[str] | None = None,
     status: str = "draft",
 ) -> Post:
     post = Post(
@@ -282,6 +283,7 @@ def create_post(
         ai_generated=False,
         seo_keywords=seo_keywords,
         seo_hashtags=seo_hashtags,
+        target_platforms=target_platforms or [],
     )
 
     db.add(post)

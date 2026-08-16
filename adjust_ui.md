@@ -74,3 +74,15 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
   * Thêm dropdown **Target Account** vào khu vực Modal xét duyệt bài viết (`Pending`) của Manager để Manager có thể chủ động chọn đăng lên **Facebook**, **LinkedIn**, hoặc **Tất cả các tài khoản**.
 * **Lý do thay đổi**:
   * Khắc phục tình trạng khi duyệt bài viết Pending, hệ thống tự động gán kênh mặc định là LinkedIn mà không cho Manager lựa chọn Facebook.
+
+---
+
+## 📌 7. File: `src/frontend/src/component/Contmodule.jsx` & `PMmodule.jsx` (Dynamic Selected Platforms)
+
+* **Vị trí**: `Contmodule.jsx` (Dòng 320 – 335), `PMmodule.jsx` (Dòng 405 – 410, 520 – 530).
+* **Thay đổi**:
+  * `Contmodule.jsx`: Thu thập chính xác danh sách các nền tảng mạng xã hội đang được tích chọn (Facebook, LinkedIn hoặc cả hai) và gửi lên Backend qua trường `target_platforms`.
+  * `PMmodule.jsx`: Hiển thị icon nền tảng (`PlatformIcons`) dựa trên đúng danh sách `p.target_platforms` được lưu trữ của từng bài viết thay vì gán cứng toàn bộ các kênh kết nối của Workspace.
+* **Lý do thay đổi**:
+  * Khi người dùng chỉ tích chọn Facebook bên Content, bài viết tại Post Management chỉ hiển thị biểu tượng Facebook.
+  * Khi người dùng tích chọn cả Facebook & LinkedIn, bài viết hiển thị cả 2 biểu tượng.

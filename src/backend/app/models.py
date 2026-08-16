@@ -320,6 +320,12 @@ class Post(Base):
         nullable=True,
     )
 
+    target_platforms: Mapped[list[str] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        server_default=text("'[]'::jsonb"),
+    )
+
     submitted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

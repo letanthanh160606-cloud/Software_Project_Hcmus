@@ -171,6 +171,7 @@ class PostCreate(BaseModel):
 
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
+    target_platforms: list[str] | None = None
 
 class PostMediaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -197,6 +198,7 @@ class PostResponse(BaseModel):
     ai_generated: bool = False
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
+    target_platforms: list[str] | None = None
 
     attachment: PostMediaResponse | None = None
 

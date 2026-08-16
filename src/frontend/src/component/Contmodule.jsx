@@ -323,6 +323,10 @@ export default function Contmodule() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      const selectedPlatformNames = platforms
+        .filter(p => p.selected)
+        .map(p => p.name.toLowerCase());
+
       const response = await fetch('http://localhost:8000/posts', {
         method: 'POST',
         headers: headers,
@@ -331,6 +335,7 @@ export default function Contmodule() {
           title: title.trim() || 'Untitled Post',
           content: body.trim(),
           status: statusType,
+          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['facebook'],
           seo_keywords: [],
           seo_hashtags: []
         }),

@@ -60,6 +60,7 @@ def create_post(
             knowledge_base_id=payload.knowledge_base_id,
             seo_keywords=payload.seo_keywords,
             seo_hashtags=payload.seo_hashtags,
+            target_platforms=payload.target_platforms,
             status=post_status,
         )
 

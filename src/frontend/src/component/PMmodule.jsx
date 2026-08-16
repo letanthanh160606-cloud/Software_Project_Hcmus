@@ -404,7 +404,9 @@ export default function PMmodule({ user }) {
               title: p.title || 'Untitled Post',
               content: p.content || '',
               thumbnail: null,
-              platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook'],
+              platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
+                ? p.target_platforms
+                : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
               status: statusLabel,
               publishedDate: p.published_at || createdDate,
               engagement: 0,
@@ -521,7 +523,9 @@ export default function PMmodule({ user }) {
             title: p.title || 'Untitled Post',
             content: p.content || '',
             thumbnail: null,
-            platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook'],
+            platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
+              ? p.target_platforms
+              : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
             status: statusLabel,
             publishedDate: p.published_at || createdDate,
             engagement: 0,
