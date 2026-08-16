@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # --- Token Encryption ---
     fernet_secret_key: str = ""  # Auto-generated at startup if empty
 
+    # --- Analytics & Ingestion & AI ---
+    internal_api_key: str = "default-internal-secret-key-12345"
+    gemini_api_key: str = ""
+    openai_api_key: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

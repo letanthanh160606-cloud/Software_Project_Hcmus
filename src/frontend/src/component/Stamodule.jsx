@@ -30,7 +30,7 @@ ChartJS.register(
   Filler
 );
 
-function MultiLineChart({ timeframe }) {
+function MultiLineChart({ timeframe, seriesData, labelsData }) {
   const labelsMap = {
     Weekly: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
     Monthly: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
@@ -52,15 +52,16 @@ function MultiLineChart({ timeframe }) {
     },
   };
 
-  const currentLabels = labelsMap[timeframe] || labelsMap.Weekly;
-  const currentData = dataMap[timeframe] || dataMap.Weekly;
+  const currentLabels = labelsData || labelsMap[timeframe] || labelsMap.Weekly;
+  const currentFbData = seriesData?.facebook || dataMap[timeframe]?.fb || dataMap.Weekly.fb;
+  const currentLiData = seriesData?.linkedin || dataMap[timeframe]?.li || dataMap.Weekly.li;
 
   const chartData = {
     labels: currentLabels,
     datasets: [
       {
         label: 'Facebook',
-        data: currentData.fb,
+        data: currentFbData,
         borderColor: '#FE7216',
         backgroundColor: 'rgba(254, 114, 22, 0.1)',
         tension: 0.4,
@@ -71,7 +72,7 @@ function MultiLineChart({ timeframe }) {
       },
       {
         label: 'LinkedIn',
-        data: currentData.li,
+        data: currentLiData,
         borderColor: '#FFC097',
         backgroundColor: 'rgba(255, 192, 151, 0.15)',
         tension: 0.4,
@@ -119,12 +120,31 @@ function MultiLineChart({ timeframe }) {
 
 export default function Stamodule({ user }) {
   const isManager = user?.role === 'manager';
+  const token = localStorage.getItem('token');
+  const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || 'default_ws';
 
   const [graphTimeframe, setGraphTimeframe] = useState('Weekly');
+  const [timelineSeries, setTimelineSeries] = useState(null);
+  const [timelineLabels, setTimelineLabels] = useState(null);
+
+  const [overviewStats, setOverviewStats] = useState({
+    fb_pct: 75,
+    fb_attraction: 321342,
+    li_pct: 25,
+    li_attraction: 14345,
+  });
+
+  const [todayData, setTodayData] = useState({
+    total_interactions: 149320,
+    user_contribution: 32433,
+  });
+
   const [reportTimeframe, setReportTimeframe] = useState('Monthly');
+  const [reportTitle, setReportTitle] = useState('[Monthly report for July 2026]');
   const [reportText, setReportText] = useState(
     "The provided data reveals that Facebook is the dominant platform for overall audience attraction, securing the vast majority of visibility with 450,000 total impressions compared to LinkedIn's 180,000. However, the critical joining point - where exposure successfully translates into meaningful user interaction - unveils a clear divergence in platform efficiency. While Facebook achieves a massive raw volume of 25,200 engagements through broad-appeal short-form videos and reactions, LinkedIn exhibits a superior conversion of views into meaningful user interaction."
   );
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const [reportHistoryList, setReportHistoryList] = useState([
     { id: 1, name: '[Monthly report for July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
@@ -136,11 +156,154 @@ export default function Stamodule({ user }) {
     { id: 7, name: '[Weekly report for 29 May - 4 June 2026]', savedDate: 'May 04, 2026', data: 'Document' },
   ]);
 
+  const [topPosts, setTopPosts] = useState([
+    { id: 1, title: '[TA - P1] Archeology' },
+    { id: 2, title: 'Ecology' },
+    { id: 3, title: 'HR - IT dep.' },
+    { id: 4, title: 'HR - FI dep.' },
+    { id: 5, title: 'HR - IT dep.' },
+    { id: 6, title: '[TA - P1] Archeology' },
+    { id: 7, title: 'Ecology' },
+  ]);
+
   // Interactive Date Range Filter state
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState('2026-06-30');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef(null);
+
+  // Common Headers helper
+  const getAuthHeaders = () => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
+  // 1. Fetch Timeline Analytics
+  const fetchTimeline = async (tf) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=${tf}`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTimelineSeries(data.series);
+        setTimelineLabels(data.labels);
+      }
+    } catch (err) {
+      console.warn('Using default timeline series:', err);
+    }
+  };
+
+  // 2. Fetch Overview Analytics
+  const fetchOverview = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/overview`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOverviewStats({
+          fb_pct: data.facebook.percentage,
+          fb_attraction: data.facebook.total_attraction,
+          li_pct: data.linkedin.percentage,
+          li_attraction: data.linkedin.total_attraction,
+        });
+      }
+    } catch (err) {
+      console.warn('Using default overview stats:', err);
+    }
+  };
+
+  // 3. Fetch Today Interactions
+  const fetchTodayStats = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/today`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTodayData({
+          total_interactions: data.total_interactions_today,
+          user_contribution: data.user_contribution_today,
+        });
+      }
+    } catch (err) {
+      console.warn('Using default today stats:', err);
+    }
+  };
+
+  // 4. Fetch Top Posts
+  const fetchTopPosts = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/top-posts?limit=7`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.posts && data.posts.length > 0) {
+          setTopPosts(data.posts);
+        }
+      }
+    } catch (err) {
+      console.warn('Using default top posts:', err);
+    }
+  };
+
+  // 5. Fetch Reports History
+  const fetchReports = async () => {
+    try {
+      let url = `http://localhost:8000/api/v1/reports/${workspaceId}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reports && data.reports.length > 0) {
+          setReportHistoryList(data.reports);
+        }
+      }
+    } catch (err) {
+      console.warn('Using default reports history:', err);
+    }
+  };
+
+  // 6. Generate AI Report on Timeframe Change
+  const fetchAIReport = async (tf) => {
+    setIsGeneratingReport(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/generate`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ timeframe: tf }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReportTitle(data.title);
+        setReportText(data.summary);
+      }
+    } catch (err) {
+      console.warn('Using default report summary:', err);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTimeline(graphTimeframe);
+    fetchOverview();
+    fetchTodayStats();
+    fetchTopPosts();
+    fetchReports();
+  }, [workspaceId]);
+
+  useEffect(() => {
+    fetchTimeline(graphTimeframe);
+  }, [graphTimeframe]);
+
+  useEffect(() => {
+    fetchAIReport(reportTimeframe);
+  }, [reportTimeframe]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -170,22 +333,12 @@ export default function Stamodule({ user }) {
     return itemTime >= startTime && itemTime <= endTime;
   });
 
-  const topPosts = [
-    { id: 1, title: '[TA - P1] Archeology' },
-    { id: 2, title: 'Ecology' },
-    { id: 3, title: 'HR - IT dep.' },
-    { id: 4, title: 'HR - FI dep.' },
-    { id: 5, title: 'HR - IT dep.' },
-    { id: 6, title: '[TA - P1] Archeology' },
-    { id: 7, title: 'Ecology' },
-  ];
-
-  // Pie chart datasets matching DBmodule format
+  // Pie chart datasets matching overviewStats
   const fbPieData = {
     labels: ['Facebook', 'Other'],
     datasets: [
       {
-        data: [75, 25],
+        data: [overviewStats.fb_pct, 100 - overviewStats.fb_pct],
         backgroundColor: ['#FE7216', '#FFE3D1'],
         borderWidth: 0,
       },
@@ -196,7 +349,7 @@ export default function Stamodule({ user }) {
     labels: ['LinkedIn', 'Other'],
     datasets: [
       {
-        data: [25, 75],
+        data: [overviewStats.li_pct, 100 - overviewStats.li_pct],
         backgroundColor: ['#FE7216', '#FFE3D1'],
         borderWidth: 0,
       },
@@ -213,13 +366,35 @@ export default function Stamodule({ user }) {
     },
   };
 
-  const handleSaveReport = () => {
+  const handleSaveReport = async () => {
     const todayStr = new Date().toLocaleDateString('en-US', {
       month: 'short',
       day: '2-digit',
       year: 'numeric',
     });
-    const newTitle = `[${reportTimeframe} report saved]`;
+    const newTitle = reportTitle || `[${reportTimeframe} report saved]`;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title: newTitle,
+          timeframe: reportTimeframe,
+          summary: reportText,
+        }),
+      });
+
+      if (res.ok) {
+        const savedItem = await res.json();
+        setReportHistoryList((prev) => [savedItem, ...prev]);
+        toast.success('Statistical report saved successfully!');
+        return;
+      }
+    } catch (err) {
+      console.warn('Offline save fallback:', err);
+    }
+
     setReportHistoryList((prev) => [
       { id: Date.now(), name: newTitle, savedDate: todayStr, data: 'Document' },
       ...prev,
@@ -227,8 +402,24 @@ export default function Stamodule({ user }) {
     toast.success('Statistical report saved successfully!');
   };
 
-  const handleViewPost = (postTitle) => {
-    toast(`Viewing analytics for: ${postTitle}`, { icon: '📊' });
+  const handleDownloadReport = async (item) => {
+    try {
+      if (item.id && typeof item.id === 'string') {
+        window.open(`http://localhost:8000/api/v1/reports/${workspaceId}/${item.id}/download`, '_blank');
+        return;
+      }
+    } catch (e) {
+      console.warn('Download error:', e);
+    }
+    toast(`Downloading ${item.name}`, { icon: '📄' });
+  };
+
+  const handleViewPost = (post) => {
+    if (post.published_url) {
+      window.open(post.published_url, '_blank');
+    } else {
+      toast(`Viewing analytics for: ${post.title}`, { icon: '📊' });
+    }
   };
 
   return (
@@ -375,7 +566,11 @@ export default function Stamodule({ user }) {
 
               {/* Chart Component */}
               <div style={{ flex: 1, minHeight: 0 }}>
-                <MultiLineChart timeframe={graphTimeframe} />
+                <MultiLineChart
+                  timeframe={graphTimeframe}
+                  seriesData={timelineSeries}
+                  labelsData={timelineLabels}
+                />
               </div>
             </div>
 
@@ -433,9 +628,13 @@ export default function Stamodule({ user }) {
 
                 {/* Right side: Facebook Stats */}
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>75%</div>
+                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>
+                    {overviewStats.fb_pct}%
+                  </div>
                   <div style={{ fontSize: '12px', color: '#7E7A72', fontWeight: '500' }}>Facebook attracts</div>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>321,342</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>
+                    {overviewStats.fb_attraction.toLocaleString()}
+                  </div>
                 </div>
               </div>
 
@@ -455,9 +654,13 @@ export default function Stamodule({ user }) {
               >
                 {/* Left side: LinkedIn Stats */}
                 <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>14,345</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>
+                    {overviewStats.li_attraction.toLocaleString()}
+                  </div>
                   <div style={{ fontSize: '12px', color: '#7E7A72', fontWeight: '500' }}>LinkedIn attracts</div>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>25%</div>
+                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>
+                    {overviewStats.li_pct}%
+                  </div>
                 </div>
 
                 {/* Right side: Doughnut with LinkedIn Logo */}
@@ -586,7 +789,7 @@ export default function Stamodule({ user }) {
               }}
             >
               <div style={{ fontWeight: '700', fontSize: '13px', color: '#1E1E1E', marginBottom: '6px' }}>
-                [{reportTimeframe} report for July 2026]
+                {reportTitle || `[${reportTimeframe} report for July 2026]`}
               </div>
               <p
                 style={{
@@ -643,7 +846,7 @@ export default function Stamodule({ user }) {
 
             <div style={{ position: 'relative', zIndex: 2 }}>
               <div style={{ fontSize: '28px', fontWeight: '800', color: '#1E1E1E', lineHeight: 1.1 }}>
-                149,320
+                {todayData.total_interactions.toLocaleString()}
               </div>
               <div style={{ fontSize: '12px', color: '#7E7A72', fontWeight: '500', marginTop: '3px' }}>
                 Interactions
@@ -654,7 +857,9 @@ export default function Stamodule({ user }) {
               {isManager ? (
                 <div style={{ fontSize: '12px', color: '#1E1E1E', fontWeight: '500', lineHeight: 1.4 }}>
                   With you making up <br />
-                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#1E1E1E' }}>32,433</span>
+                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#1E1E1E' }}>
+                    {todayData.user_contribution.toLocaleString()}
+                  </span>
                 </div>
               ) : (
                 <div style={{ fontSize: '12px', color: '#1E1E1E', fontWeight: '500' }}>
@@ -864,7 +1069,7 @@ export default function Stamodule({ user }) {
                   <div>{item.savedDate}</div>
                   <div>
                     <span
-                      onClick={() => toast(`Downloading ${item.name}`, { icon: '📄' })}
+                      onClick={() => handleDownloadReport(item)}
                       style={{
                         color: '#7E7A72',
                         cursor: 'pointer',
@@ -931,7 +1136,7 @@ export default function Stamodule({ user }) {
             >
               <span style={{ color: '#1E1E1E', fontWeight: '500' }}>{post.title}</span>
               <button
-                onClick={() => handleViewPost(post.title)}
+                onClick={() => handleViewPost(post)}
                 style={{
                   background: 'none',
                   border: 'none',

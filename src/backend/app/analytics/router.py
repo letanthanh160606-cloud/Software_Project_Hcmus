@@ -1,0 +1,150 @@
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy.orm import Session
+
+from app.analytics import service
+from app.analytics.schemas import (
+    GenerateReportRequest,
+    GenerateReportResponse,
+    OverviewResponse,
+    ReportItemResponse,
+    ReportListResponse,
+    SaveReportRequest,
+    TimelineResponse,
+    TodayStatsResponse,
+    TopPostsResponse,
+)
+from app.database import get_db
+from app.dependencies import WorkspaceContext, get_current_user, get_workspace_context
+from app.models import User
+
+router = APIRouter(prefix="/api/v1", tags=["analytics-and-reports"])
+
+
+# ---------------------------------------------------------
+# ANALYTICS METRICS ENDPOINTS
+# ---------------------------------------------------------
+
+@router.get("/analytics/{workspace_id}/timeline", response_model=TimelineResponse)
+def get_timeline_analytics(
+    workspace_id: str,
+    timeframe: str = Query("Weekly", description="Weekly | Monthly | Yearly"),
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns time-series performance data for Facebook and LinkedIn.
+    """
+    return service.get_timeline(db, workspace_id, timeframe)
+
+
+@router.get("/analytics/{workspace_id}/overview", response_model=OverviewResponse)
+def get_overview_analytics(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns total audience attraction, percentage share, and total engagements.
+    """
+    return service.get_overview(db, workspace_id)
+
+
+@router.get("/analytics/{workspace_id}/today", response_model=TodayStatsResponse)
+def get_today_interactions(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns total interactions recorded today based on the caller's role (Manager vs Member).
+    """
+    return service.get_today_stats(db, workspace_id, current_user, ctx.role)
+
+
+@router.get("/analytics/{workspace_id}/top-posts", response_model=TopPostsResponse)
+def get_top_engaging_posts(
+    workspace_id: str,
+    limit: int = Query(7, ge=1, le=50),
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns highest-engaging posts published in this workspace.
+    """
+    return service.get_top_posts(db, workspace_id, limit)
+
+
+# ---------------------------------------------------------
+# AI STATISTICAL REPORT ENDPOINTS
+# ---------------------------------------------------------
+
+@router.post("/reports/{workspace_id}/generate", response_model=GenerateReportResponse)
+async def generate_statistical_report(
+    workspace_id: str,
+    req: GenerateReportRequest,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generates a structured executive statistical report using the AI Report Engine.
+    """
+    return await service.generate_ai_report(db, workspace_id, req.timeframe, req.period)
+
+
+@router.post("/reports/{workspace_id}", response_model=ReportItemResponse, status_code=status.HTTP_201_CREATED)
+def save_statistical_report(
+    workspace_id: str,
+    req: SaveReportRequest,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Saves an AI-generated or custom report into the workspace history.
+    """
+    return service.save_report(db, workspace_id, current_user.users_uuid, req)
+
+
+@router.get("/reports/{workspace_id}", response_model=ReportListResponse)
+def list_saved_reports(
+    workspace_id: str,
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lists saved reports with interactive date range filtering.
+    """
+    return service.list_reports(db, workspace_id, start_date, end_date)
+
+
+@router.get("/reports/{workspace_id}/{report_id}/download")
+def download_report_document(
+    workspace_id: str,
+    report_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Exports and streams the report document for download.
+    """
+    from app.analytics.models import Report
+    report = db.get(Report, report_id)
+    if not report or report.workspace_id != workspace_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+
+    content = f"# {report.title}\nSaved Date: {report.saved_date}\nTimeframe: {report.timeframe}\n\n## Summary\n{report.summary}\n"
+    return Response(
+        content=content,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{report.title}.md"'},
+    )
