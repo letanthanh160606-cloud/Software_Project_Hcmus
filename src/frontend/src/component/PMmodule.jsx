@@ -423,6 +423,18 @@ export default function PMmodule({ user }) {
                 })
               : '—';
 
+            let comments = [];
+            if (p.reject_reason) {
+              comments.push({
+                id: 'mgr-reject',
+                author: 'Manager',
+                text: p.reject_reason,
+                timestamp: p.reviewed_at
+                  ? new Date(p.reviewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'Recently'
+              });
+            }
+
             return {
               id: p.id,
               title: p.title || 'Untitled Post',
@@ -435,6 +447,8 @@ export default function PMmodule({ user }) {
               publishedDate: p.published_at || createdDate,
               engagement: 0,
               belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+              comments: comments,
+              reject_reason: p.reject_reason || null,
             };
           });
           setRealPosts(mapped);
@@ -548,6 +562,18 @@ export default function PMmodule({ user }) {
               })
             : '—';
 
+          let comments = [];
+          if (p.reject_reason) {
+            comments.push({
+              id: 'mgr-reject',
+              author: 'Manager',
+              text: p.reject_reason,
+              timestamp: p.reviewed_at
+                ? new Date(p.reviewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'Recently'
+            });
+          }
+
           return {
             id: p.id,
             title: p.title || 'Untitled Post',
@@ -560,6 +586,8 @@ export default function PMmodule({ user }) {
             publishedDate: p.published_at || createdDate,
             engagement: 0,
             belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+            comments: comments,
+            reject_reason: p.reject_reason || null,
           };
         }));
       }
@@ -1341,23 +1369,51 @@ export default function PMmodule({ user }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           if (!newCommentText.trim()) {
                             alert('A comment explaining the rejection is required.');
                             return;
                           }
-                          const newComment = {
-                            id: Date.now(),
-                            author: 'Manager',
-                            text: newCommentText,
-                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          };
-                          const updatedComments = [...(selectedPost.comments || []), newComment];
-                          setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments } : p));
-                          setSelectedPost(null);
-                          setNewCommentText('');
-                          setShowRejectInput(false);
-                          toast.error('Post rejected');
+                          const reasonText = newCommentText.trim();
+                          try {
+                            const token = localStorage.getItem('token');
+                            const savedUserStr = localStorage.getItem('user');
+                            const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+                            const workspaceId = user?.workspace_id || parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid;
+
+                            if (workspaceId && selectedPost?.id) {
+                              const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts/${selectedPost.id}`, {
+                                method: 'PATCH',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                  status: 'rejected',
+                                  reject_reason: reasonText
+                                })
+                              });
+                              if (!res.ok) {
+                                const data = await res.json();
+                                throw new Error(data.detail || 'Failed to reject post on server');
+                              }
+                            }
+
+                            const newComment = {
+                              id: Date.now(),
+                              author: 'Manager',
+                              text: reasonText,
+                              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            };
+                            const updatedComments = [...(selectedPost.comments || []), newComment];
+                            setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments, reject_reason: reasonText } : p));
+                            setSelectedPost(null);
+                            setNewCommentText('');
+                            setShowRejectInput(false);
+                            toast.error('Post rejected');
+                          } catch (err) {
+                            toast.error(err.message || 'Error rejecting post');
+                          }
                         }}
                         style={{
                           padding: '8px 16px',

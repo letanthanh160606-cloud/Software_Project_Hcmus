@@ -142,11 +142,15 @@ def update_post(
         else:  # member
             if updates["status"] != "cancel":
                 raise HTTPException(status_code=403, detail="Members are only allowed to move posts to 'cancel'.")
-            if post.author_id != current_user.users_uuid:
-                raise HTTPException(status_code=403, detail="You are not the author of this post.")
-
-    if ("title" in updates or "content" in updates) and post.author_id != current_user.users_uuid:
-        raise HTTPException(status_code=403, detail="Only the author is allowed to edit the content of the post.")
+    if updates.get("status") == "rejected" and ctx.role == "manager":
+        updates["reviewed_by"] = current_user.users_uuid
+        if updates.get("reject_reason"):
+            crud.create_post_review(
+                db,
+                post_id=post.id,
+                reviewer_id=current_user.users_uuid,
+                comment=updates["reject_reason"],
+            )
 
     return crud.update_post(db, post, updates)
 

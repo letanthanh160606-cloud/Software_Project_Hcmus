@@ -245,6 +245,7 @@ class DistributorUpdateRequest(BaseModel):
 class PostUpdateRequest(BaseModel):
     title: str | None = None
     content: str | None = None
+    reject_reason: str | None = None
     status: Literal[
         "draft", "pending_review", "rejected", "ready_for_distribution", "published", "failed", "cancel",
     ] | None = None

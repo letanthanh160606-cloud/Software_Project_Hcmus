@@ -492,4 +492,20 @@ def create_post_review(db: Session, *, post_id: uuid.UUID, reviewer_id: uuid.UUI
     db.refresh(review)
     return review
 
+def get_post_by_id(db: Session, post_id: uuid.UUID, workspace_id: str | None = None) -> Post | None:
+    query = select(Post).where(Post.id == post_id).options(selectinload(Post.attachment))
+    if workspace_id:
+        query = query.where(Post.workspace_id == workspace_id)
+    return db.scalar(query)
+
+def update_post(db: Session, post: Post, updates: dict) -> Post:
+    for key, value in updates.items():
+        if hasattr(post, key):
+            setattr(post, key, value)
+    if updates.get("status") == "rejected":
+        post.reviewed_at = func.now()
+    db.commit()
+    db.refresh(post)
+    return post
+
 
