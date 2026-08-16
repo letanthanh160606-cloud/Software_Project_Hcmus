@@ -65,6 +65,27 @@ class DistributionRepository:
         status: str = "active",
         enabled_for_workspace: bool = True,
     ) -> SocialAccount:
+        existing = self.db.scalar(
+            select(SocialAccount).where(
+                SocialAccount.platform == platform,
+                SocialAccount.platform_account_id == platform_account_id,
+            )
+        )
+        if existing:
+            existing.display_name = display_name
+            existing.note = note
+            existing.owner_type = owner_type
+            existing.owner_id = owner_id
+            existing.connected_by = connected_by
+            existing.access_token_encrypted = access_token_encrypted
+            existing.refresh_token_encrypted = refresh_token_encrypted
+            existing.token_expires_at = token_expires_at
+            existing.status = status
+            existing.enabled_for_workspace = enabled_for_workspace
+            self.db.commit()
+            self.db.refresh(existing)
+            return existing
+
         channel = SocialAccount(
             platform=platform,
             platform_account_id=platform_account_id,

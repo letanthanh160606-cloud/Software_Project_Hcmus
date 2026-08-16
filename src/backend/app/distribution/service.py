@@ -525,11 +525,6 @@ class DistributionService:
                     if not author_urn:
                         author_urn = f"urn:li:person:{account_id}"
 
-                    # Cache resolved author URN to DB so future calls don't need profile lookup API requests
-                    if author_urn and channel.platform_account_id != author_urn:
-                        channel.platform_account_id = author_urn
-                        self.db.commit()
-
                     # Try v2/posts API first, fallback to v2/ugcPosts
                     res = client.post(
                         "https://api.linkedin.com/v2/posts",
