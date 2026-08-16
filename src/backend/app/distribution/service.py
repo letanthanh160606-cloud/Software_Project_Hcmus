@@ -354,19 +354,15 @@ class DistributionService:
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
 
-        # Idempotency Check: prevent duplicate publishing
-        if post.status in ("ready_for_distribution", "published") and post.published_at:
-            raise HTTPException(
-                status_code=409,
-                detail="Bài viết này đã được xuất bản trước đó. Không thể đăng trùng lặp!"
-            )
-
         # 2. Get Channel
         if channel_id:
             channel = self.repo.get_channel_by_id(channel_id)
         else:
-            owner_type, owner_id, _ = self._determine_owner_and_role(user)
+            target_ws_id = post.workspace_id
+            owner_type, owner_id, _ = self._determine_owner_and_role(user, target_ws_id)
             channels = self.repo.list_channels_by_owner(owner_type, owner_id)
+            if not channels and owner_type == "workspace":
+                channels = self.repo.list_enabled_workspace_channels(owner_id)
             channel = None
             if platform:
                 target_platform = platform.lower().strip()
@@ -378,7 +374,27 @@ class DistributionService:
                 channel = channels[0] if channels else None
 
         if not channel:
-            raise HTTPException(status_code=400, detail="No connected active social channel found")
+            raise HTTPException(status_code=400, detail="Không tìm thấy kênh mạng xã hội nào đang kết nối.")
+
+        # Idempotency Check per channel: check if this post was already published on this channel
+        existing_dist = self.db.scalar(
+            select(PostDistribution).where(
+                PostDistribution.post_id == post_id,
+                PostDistribution.channel_id == channel.id,
+                PostDistribution.status == "published",
+            )
+        )
+        if existing_dist and existing_dist.published_url:
+            return {
+                "success": True,
+                "platform": channel.platform,
+                "facebook_post_id": f"fb_pub_{str(post_id)[:8]}",
+                "facebook_post_url": existing_dist.published_url if channel.platform == "facebook" else None,
+                "linkedin_post_id": f"li_pub_{str(post_id)[:8]}",
+                "linkedin_post_url": existing_dist.published_url if channel.platform == "linkedin" else None,
+                "channel_name": channel.display_name,
+                "message": f"Bài viết đã được xuất bản lên {channel.display_name}.",
+            }
 
         # 3. Decrypt Access Token
         access_token = decrypt_token(channel.access_token_encrypted)
@@ -481,13 +497,10 @@ class DistributionService:
 
             try:
                 with httpx.Client(timeout=15.0) as client:
-                    # 1. Fetch userinfo to get exact valid person URN if not organization
-                    if account_id.isdigit():
-                        author_urn = f"urn:li:organization:{account_id}"
-                    elif account_id.startswith("urn:li:"):
+                    # 1. Fetch userinfo to get exact valid person URN
+                    if account_id.startswith("urn:li:person:"):
                         author_urn = account_id
-
-                    if not author_urn or "li_user_" in author_urn:
+                    else:
                         # 1. Try OpenID Connect /v2/userinfo
                         me_res = client.get(
                             "https://api.linkedin.com/v2/userinfo",
@@ -509,10 +522,8 @@ class DistributionService:
                             if person_id:
                                 author_urn = f"urn:li:person:{person_id}"
 
-                    if not author_urn or author_urn in ("urn:li:person:me", "urn:li:person:"):
-                        # 3. Fallback to Company Page Organization URN
-                        org_id = account_id if account_id.isdigit() else "143138993"
-                        author_urn = f"urn:li:organization:{org_id}"
+                    if not author_urn:
+                        author_urn = f"urn:li:person:{account_id}"
 
                     # Cache resolved author URN to DB so future calls don't need profile lookup API requests
                     if author_urn and channel.platform_account_id != author_urn:
