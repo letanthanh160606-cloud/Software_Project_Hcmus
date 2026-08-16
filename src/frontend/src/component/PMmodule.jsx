@@ -288,12 +288,15 @@ export default function PMmodule({ user }) {
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [selectedAccountIds, setSelectedAccountIds] = useState([]);
   const [targetAccountsMode, setTargetAccountsMode] = useState('ALL_SELECTED_PLATFORMS');
+  const [showRejectInput, setShowRejectInput] = useState(false);
   const [publishedUrlsList, setPublishedUrlsList] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
 
   // Initialize selectedAccountIds whenever selectedPost changes
   useEffect(() => {
+    setShowRejectInput(false);
+    setNewCommentText('');
     if (!selectedPost) {
       setSelectedAccountIds([]);
       setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
@@ -1293,93 +1296,137 @@ export default function PMmodule({ user }) {
                     }}
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
-                    Rejection Comment (Required to Reject)
-                  </label>
-                  <textarea
-                    placeholder="Provide a reason for rejection..."
-                    value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                    rows={2}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '12px',
-                      outline: 'none',
-                      fontFamily: 'Satoshi, system-ui, sans-serif',
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handlePublishToFacebook(selectedPost.id)}
-                    disabled={isPublishing}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      backgroundColor: '#22c55e',
-                      color: '#ffffff',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Approve & Publish
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditModal(selectedPost)}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: '1px solid #d1d5db',
-                      backgroundColor: '#ffffff',
-                      color: '#374151',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newCommentText.trim()) {
-                        alert('A comment explaining the rejection is required.');
-                        return;
-                      }
-                      const newComment = {
-                        id: Date.now(),
-                        author: 'Manager',
-                        text: newCommentText,
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      };
-                      const updatedComments = [...(selectedPost.comments || []), newComment];
-                      setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments } : p));
-                      setSelectedPost(null);
-                      setNewCommentText('');
-                      toast.error('Post rejected');
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: '1px solid #ef4444',
-                      backgroundColor: 'transparent',
-                      color: '#ef4444',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
+                {/* Rejection comment section - only shown when Manager clicks Reject */}
+                {showRejectInput ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '12px 14px', borderRadius: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#b91c1c', letterSpacing: '0.5px' }}>
+                      Rejection Reason (Required to Reject)
+                    </label>
+                    <textarea
+                      placeholder="Explain why this post is being rejected..."
+                      value={newCommentText}
+                      onChange={(e) => setNewCommentText(e.target.value)}
+                      rows={2}
+                      autoFocus
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #fca5a5',
+                        fontSize: '12px',
+                        outline: 'none',
+                        fontFamily: 'Satoshi, system-ui, sans-serif',
+                        resize: 'vertical',
+                        backgroundColor: '#ffffff'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRejectInput(false);
+                          setNewCommentText('');
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#ffffff',
+                          color: '#475569',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newCommentText.trim()) {
+                            alert('A comment explaining the rejection is required.');
+                            return;
+                          }
+                          const newComment = {
+                            id: Date.now(),
+                            author: 'Manager',
+                            text: newCommentText,
+                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          };
+                          const updatedComments = [...(selectedPost.comments || []), newComment];
+                          setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments } : p));
+                          setSelectedPost(null);
+                          setNewCommentText('');
+                          setShowRejectInput(false);
+                          toast.error('Post rejected');
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          backgroundColor: '#ef4444',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Confirm Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handlePublishToFacebook(selectedPost.id)}
+                      disabled={isPublishing}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: '#22c55e',
+                        color: '#ffffff',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Approve & Publish
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(selectedPost)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid #d1d5db',
+                        backgroundColor: '#ffffff',
+                        color: '#374151',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRejectInput(true)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid #ef4444',
+                        backgroundColor: 'transparent',
+                        color: '#ef4444',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

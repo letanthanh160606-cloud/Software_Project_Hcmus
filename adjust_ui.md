@@ -99,3 +99,14 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 * **Lý do thay đổi**:
   * Giải quyết triệt để vấn đề logic: Không cho phép hiển thị tài khoản LinkedIn khi bài viết chỉ chọn Facebook.
   * Đảm bảo khả năng mở rộng (scale) lên hàng chục hoặc hàng trăm tài khoản trên nhiều nền tảng (Facebook, LinkedIn, Instagram, TikTok, X,...) trong tương lai mà không bị vỡ giao diện.
+
+---
+
+## 📌 9. File: `src/frontend/src/component/PMmodule.jsx` (Conditional Reject Comment Modal)
+
+* **Vị trí**: Dòng 288, 1295 – 1380.
+* **Thay đổi**:
+  * Mặc định ẩn hoàn toàn khung nhập lý do từ chối `Rejection Comment` trong Modal duyệt bài của Manager.
+  * Khi Manager bấm nút **Reject**, giao diện chuyển mượt mà sang khung nhập lý do từ chối màu đỏ nhạt (`#fef2f2`) với 2 nút hành động: **Cancel** (hủy từ chối và quay lại giao diện nút ban đầu) và **Confirm Reject** (xác nhận từ chối kèm lý do).
+* **Lý do thay đổi**:
+  * Giữ cho giao diện Modal duyệt bài ban đầu luôn gọn gàng, trực quan và chỉ yêu cầu nhập lý do khi người dùng thực sự muốn từ chối bài viết.
