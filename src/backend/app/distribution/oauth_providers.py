@@ -162,7 +162,7 @@ class LinkedInOAuthProvider:
             }
             return f"http://localhost:8000/api/v1/distribution/channels/connect/callback?code=mock_li_code_{state[:8]}&{urlencode(params)}"
 
-        scope = "openid profile w_member_social" if not is_workspace else "openid profile w_organization_social r_organization_social"
+        scope = "openid profile w_member_social"
         params = {
             "response_type": "code",
             "client_id": client_id,

@@ -77,13 +77,23 @@ from fastapi.responses import RedirectResponse
     ),
 )
 def handle_oauth_callback(
-    code: str = Query(..., description="Authorization code from provider"),
-    state: str = Query(..., description="CSRF state token issued in Step 1"),
+    code: str | None = Query(None, description="Authorization code from provider"),
+    state: str | None = Query(None, description="CSRF state token issued in Step 1"),
+    error: str | None = Query(None, description="Error code from provider"),
+    error_description: str | None = Query(None, description="Error description from provider"),
     db: Session = Depends(get_db),
 ):
+    if error or not code or not state:
+        err_msg = error_description or error or "Authorization was cancelled or failed"
+        logger.error(f"OAuth callback failed: {err_msg}")
+        return RedirectResponse(
+            url=f"http://localhost:5173/dashboard?oauth_error={err_msg}",
+            status_code=status.HTTP_302_FOUND,
+        )
+
     service = DistributionService(db)
     service.handle_oauth_callback(code=code, state_token=state)
-    return RedirectResponse(url="http://localhost:5173", status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url="http://localhost:5173/dashboard", status_code=status.HTTP_302_FOUND)
 
 
 @router.patch(
