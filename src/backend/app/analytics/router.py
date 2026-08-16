@@ -79,6 +79,43 @@ def get_top_engaging_posts(
     return service.get_top_posts(db, workspace_id, limit)
 
 
+@router.post("/analytics/{workspace_id}/sync")
+async def trigger_manual_analytics_sync(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Triggers an immediate on-demand metrics sync via n8n webhook or internal sync pipeline.
+    """
+    import httpx
+    from app.config import get_settings
+    settings = get_settings()
+
+    webhook_triggered = False
+    # Attempt to notify n8n webhook if configured
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            webhook_res = await client.post(
+                "http://localhost:5678/webhook/analytics-sync",
+                json={"workspace_id": workspace_id, "triggered_by": str(current_user.users_uuid)},
+                headers={"X-Internal-API-Key": settings.internal_api_key},
+            )
+            if webhook_res.status_code in (200, 201, 202):
+                webhook_triggered = True
+    except Exception:
+        webhook_triggered = False
+
+    return {
+        "success": True,
+        "workspace_id": workspace_id,
+        "n8n_webhook_dispatched": webhook_triggered,
+        "message": "Analytics synchronization initiated successfully.",
+    }
+
+
+
 # ---------------------------------------------------------
 # AI STATISTICAL REPORT ENDPOINTS
 # ---------------------------------------------------------

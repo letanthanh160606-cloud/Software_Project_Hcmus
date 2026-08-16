@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.analytics import service
-from app.analytics.schemas import BatchIngestRequest, BatchIngestResponse
+from app.analytics.schemas import ActivePostsSyncResponse, BatchIngestRequest, BatchIngestResponse
 from app.config import get_settings
 from app.database import get_db
 
@@ -62,3 +62,24 @@ def get_channel_token_for_worker(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to decrypt token: {str(e)}",
         )
+
+
+@router.get("/posts/active", response_model=ActivePostsSyncResponse)
+def get_active_published_posts(
+    platform: str | None = None,
+    workspace_id: str | None = None,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_internal_api_key),
+):
+    """
+    Internal discovery endpoint for n8n to fetch active published posts across channels that need metrics syncing.
+    """
+    try:
+        return service.get_active_posts_for_sync(db, platform=platform, workspace_id=workspace_id, limit=limit)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch active posts: {str(e)}",
+        )
+

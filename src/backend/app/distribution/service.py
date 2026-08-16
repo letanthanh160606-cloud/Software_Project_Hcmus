@@ -501,7 +501,7 @@ class DistributionService:
             # Update Post status
             post.status = "ready_for_distribution"
             post.published_at = datetime.now(timezone.utc)
-            self._record_post_distribution(post.id, channel.id, fb_post_url)
+            self._record_post_distribution(post.id, channel.id, fb_post_url, external_post_id=fb_post_id)
             self.db.commit()
 
             return {
@@ -633,7 +633,7 @@ class DistributionService:
 
                     post.status = "ready_for_distribution"
                     post.published_at = datetime.now(timezone.utc)
-                    self._record_post_distribution(post.id, channel.id, li_post_url)
+                    self._record_post_distribution(post.id, channel.id, li_post_url, external_post_id=li_post_id)
                     self.db.commit()
 
                     return {
@@ -659,8 +659,14 @@ class DistributionService:
         else:
             raise HTTPException(status_code=400, detail=f"Publishing to {channel.platform} is not supported yet.")
 
-    def _record_post_distribution(self, post_id: uuid.UUID, channel_id: uuid.UUID, published_url: str) -> None:
-        """Creates or updates a PostDistribution record to persist the published URL per channel."""
+    def _record_post_distribution(
+        self,
+        post_id: uuid.UUID,
+        channel_id: uuid.UUID,
+        published_url: str,
+        external_post_id: str | None = None,
+    ) -> None:
+        """Creates or updates a PostDistribution record to persist the published URL and external post ID per channel."""
         from app.models import PostDistribution
         dist = self.db.scalar(
             select(PostDistribution).where(
@@ -674,11 +680,14 @@ class DistributionService:
                 channel_id=channel_id,
                 status="published",
                 published_url=published_url,
+                external_post_id=external_post_id,
             )
             self.db.add(dist)
         else:
             dist.status = "published"
             dist.published_url = published_url
+            if external_post_id:
+                dist.external_post_id = external_post_id
 
     def get_published_urls_for_post(self, post_id: uuid.UUID) -> list[dict]:
         """Returns a list of published URLs for all channels linked to this post."""

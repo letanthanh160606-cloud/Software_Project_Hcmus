@@ -1,0 +1,30 @@
+﻿version: '3.8'
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: omni_n8n_worker
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
+      - TZ=Asia/Ho_Chi_Minh
+      - N8N_ENCRYPTION_KEY=omni-platforms-n8n-secret-encryption-key-2026
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - N8N_METRICS=false
+      - BACKEND_INTERNAL_URL=http://host.docker.internal:8000
+    volumes:
+      - n8n_data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  n8n_data:
+    driver: local

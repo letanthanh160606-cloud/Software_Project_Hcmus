@@ -106,3 +106,20 @@ class ReportItemResponse(BaseModel):
 
 class ReportListResponse(BaseModel):
     reports: list[ReportItemResponse]
+
+
+class ActivePostSyncItem(BaseModel):
+    post_id: uuid.UUID
+    workspace_id: str
+    channel_id: uuid.UUID
+    platform: str
+    platform_account_id: str
+    external_post_id: str | None = None
+    published_url: str | None = None
+    published_at: datetime | None = None
+
+
+class ActivePostsSyncResponse(BaseModel):
+    total_posts: int
+    posts: list[ActivePostSyncItem]
+

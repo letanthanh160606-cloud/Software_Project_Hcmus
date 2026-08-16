@@ -192,21 +192,43 @@ erDiagram
         uuid id PK
         string workspace_id FK
         uuid post_id FK
-        string platform
+        uuid channel_id FK
+        string platform "facebook | linkedin"
+        string external_post_id
         date metric_date
         int impressions
-        int engagements
+        int reach
+        int views
+        int likes
+        int comments
+        int shares
         int clicks
+        int engagements
+        float engagement_rate
+        datetime snapshot_time
+    }
+
+    INGESTION_RUNS {
+        uuid id PK
+        string platform
+        string status "running | success | partial | failed"
+        int total_records
+        int success_count
+        int error_count
+        text error_message
+        datetime started_at
+        datetime finished_at
     }
 
     REPORTS {
         uuid id PK
         string workspace_id FK
-        uuid generated_by FK
+        uuid created_by FK
         string timeframe "Weekly | Monthly | Yearly"
+        string title
         text summary
-        jsonb platform_analysis
-        text strategic_recommendations
+        jsonb report_data
+        string saved_date
         datetime created_at
     }
 ```
@@ -217,26 +239,35 @@ erDiagram
 
 ```text
 Software_Project_Hcmus/
+├── docker-compose.yml                    # Khởi tạo n8n self-hosted automation container
 ├── adjust_ui.md                          # Nhật ký chi tiết mọi thay đổi UI & lý do
 ├── System_Overall.md                     # Tài liệu tổng quan toàn bộ hệ thống
+├── n8n/                                  # Cấu hình & Kịch bản Workflow n8n
+│   ├── README.md                         # Hướng dẫn setup và import workflows
+│   └── workflows/                        # Các mẫu Workflow JSON sẵn sàng import
+│       ├── 01_main_scheduler.json        # Lịch chạy cron quét bài viết cần sync
+│       ├── 02_facebook_sync.json         # Lấy số liệu Facebook Graph API /insights
+│       ├── 03_linkedin_sync.json         # Lấy số liệu LinkedIn REST API stats
+│       └── 04_manual_sync_webhook.json   # Webhook đồng bộ tức thời khi bấm Refresh
 ├── src/
 │   ├── backend/                          # Backend FastAPI (Python 3.11+)
 │   │   ├── app/
 │   │   │   ├── analytics/                # Module Thống kê & Báo cáo AI
 │   │   │   │   ├── ai_engine.py          # Google Gemini AI & Rule-based fallback
-│   │   │   │   ├── ingest_router.py      # Cổng nhận dữ liệu tự động từ n8n
-│   │   │   │   ├── models.py             # CSDL Models cho Analytics & Reports
-│   │   │   │   ├── router.py             # REST API Endpoints thống kê & báo cáo
+│   │   │   │   ├── ingest_router.py      # Cổng nhận dữ liệu tự động từ n8n (Internal Auth)
+│   │   │   │   ├── models.py             # CSDL Models cho Analytics, Runs & Reports
+│   │   │   │   ├── router.py             # REST API Endpoints thống kê, báo cáo & sync
 │   │   │   │   ├── schemas.py            # Pydantic Schemas cho Analytics
-│   │   │   │   └── service.py            # Business logic tính toán chỉ số
+│   │   │   │   └── service.py            # Business logic tính toán chỉ số & UPSERT
 │   │   │   ├── distribution/             # Module Kênh phân phối & Đăng bài
-│   │   │   │   ├── crypto.py             # Mã hóa Fernet AES-256 Token
+│   │   │   │   ├── crypto.py             # Mã hóa Fernet AES-128 Token
 │   │   │   │   ├── repository.py         # Truy vấn CSDL kênh phân phối
 │   │   │   │   ├── router.py             # REST API OAuth2 & Publish Endpoints
 │   │   │   │   ├── schemas.py            # Pydantic Schemas Distribution
 │   │   │   │   └── service.py            # Facebook Graph API & LinkedIn REST API
-│   │   │   ├── routers/                  # Các Router chính (Auth, Posts, Workspaces)
+│   │   │   ├── routers/                  # Các Router chính (Auth, Posts, Workspaces, Calendar)
 │   │   │   │   ├── auth.py
+│   │   │   │   ├── calendar.py
 │   │   │   │   ├── posts.py
 │   │   │   │   └── workspaces.py
 │   │   │   ├── config.py                 # Đọc biến môi trường (.env)
@@ -244,25 +275,22 @@ Software_Project_Hcmus/
 │   │   │   ├── database.py               # Kết nối SQLAlchemy Engine & Session
 │   │   │   ├── dependencies.py           # Dependency Injection & Token Auth
 │   │   │   ├── main.py                   # Điểm khởi tạo FastAPI App chính
-│   │   │   ├── models.py                 # SQLAlchemy Core Models (User, Post, Workspace)
+│   │   │   ├── models.py                 # SQLAlchemy Core Models (User, Post, Workspace, PostDistribution)
+│   │   │   ├── r2.py                     # Cloudflare R2 Storage Upload Integration
 │   │   │   └── schemas.py                # Core Pydantic Schemas
-│   │   ├── database/
-│   │   │   └── file_database.sql         # Script khởi tạo cấu trúc CSDL PostgreSQL
-│   │   ├── test_analytics.py             # Test suite tự động Module Statistics (7 TCs)
-│   │   ├── test_distribution.py          # Test suite tự động Module Distribution (8 TCs)
-│   │   └── requirements.txt              # Danh sách thư viện Python
-│   │
+│   │   ├── test_distribution.py          # Unit & Integration tests cho Distribution
+│   │   ├── test_analytics.py             # Unit & Integration tests cho Statistics & AI
+│   │   └── test_analytics_n8n.py         # Unit & Integration tests cho n8n Ingestion
 │   └── frontend/                         # Frontend React + Vite SPA
 │       ├── src/
-│       │   ├── component/                # Các Module giao diện chính
-│       │   │   ├── Contmodule.jsx        # 1. Module Soạn thảo nội dung
-│       │   │   ├── PMmodule.jsx          # 2. Module Quản lý & Phê duyệt bài đăng
-│       │   │   ├── Dismodule.jsx         # 3. Module Kết nối kênh phân phối
-│       │   │   ├── Stamodule.jsx         # 4. Module Thống kê & Báo cáo AI
-│       │   │   ├── TargetAccountSelector.jsx # Bộ chọn tài khoản phân cấp đa nền tảng
-│       │   │   ├── Taskmodule.jsx        # 5. Module Giao việc (Task Board)
-│       │   │   ├── WSinfomodule.jsx      # Quản lý thành viên Workspace
-│       │   │   └── Settingsmodule.jsx    # Cài đặt tài khoản & cấu hình
+│       │   ├── component/
+│       │   │   ├── Calenmodule.jsx       # Giao diện Lịch & Phân công Task
+│       │   │   ├── Contentmodule.jsx     # Giao diện Tạo nội dung
+│       │   │   ├── PMmodule.jsx          # Giao diện Quản lý Bài viết & Phê duyệt
+│       │   │   ├── Stamodule.jsx         # Giao diện Thống kê & Báo cáo AI
+│       │   │   ├── WSmodule.jsx          # Giao diện Quản lý Không gian làm việc
+│       │   │   └── TargetAccountSelector.jsx # Bộ chọn tài khoản đích phân cấp
+
 │       │   ├── page/
 │       │   │   ├── MainDashboard.jsx     # Trang Dashboard điều hướng chính
 │       │   │   └── Signin_Signup.jsx     # Trang Đăng nhập / Đăng ký

@@ -488,3 +488,51 @@ def get_decrypted_token(db: Session, channel_id: uuid.UUID) -> dict[str, str]:
         "platform_account_id": channel.platform_account_id,
         "access_token": decrypted_token,
     }
+
+
+def get_active_posts_for_sync(
+    db: Session,
+    platform: str | None = None,
+    workspace_id: str | None = None,
+    limit: int = 100,
+) -> dict:
+    """
+    Discovery query for n8n: returns published posts with their target distribution channels.
+    """
+    query = (
+        select(Post, PostDistribution, SocialAccount)
+        .join(PostDistribution, Post.id == PostDistribution.post_id)
+        .join(SocialAccount, PostDistribution.channel_id == SocialAccount.id)
+        .where(
+            Post.status.in_(["published", "ready_for_distribution"]),
+            PostDistribution.status == "published",
+            SocialAccount.status == "active",
+        )
+    )
+
+    if platform:
+        query = query.where(SocialAccount.platform == platform.lower())
+    if workspace_id:
+        query = query.where(Post.workspace_id == workspace_id)
+
+    query = query.order_by(Post.created_at.desc()).limit(limit)
+    rows = db.execute(query).all()
+
+    items = []
+    for post, dist, channel in rows:
+        items.append({
+            "post_id": post.id,
+            "workspace_id": post.workspace_id,
+            "channel_id": channel.id,
+            "platform": channel.platform,
+            "platform_account_id": channel.platform_account_id,
+            "external_post_id": dist.external_post_id or "",
+            "published_url": dist.published_url,
+            "published_at": post.published_at or post.created_at,
+        })
+
+    return {
+        "total_posts": len(items),
+        "posts": items,
+    }
+
