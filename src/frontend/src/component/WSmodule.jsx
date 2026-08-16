@@ -212,6 +212,80 @@ useEffect(() => {
   const [rejectComment, setRejectComment] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState(null);
 
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskContent, setNewTaskContent] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState('low');
+  const [newTaskFile, setNewTaskFile] = useState(null);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+
+  const resetAddTaskForm = () => {
+  setNewTaskTitle('');
+  setNewTaskContent('');
+  setNewTaskPriority('low');
+  setNewTaskDueDate('');
+  setNewTaskFile(null);
+  setSelectedAssignee(null);
+  };
+
+  const handleCreateTask = async (e) => {
+  e.preventDefault();
+  if (isCreatingTask) return;
+  if (!selectedAssignee) {
+    toast.error('Please select an assignee');
+    return;
+  }
+  setIsCreatingTask(true);
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const payload = {
+      title: newTaskTitle,
+      content: newTaskContent,
+      priority: newTaskPriority,
+      assigned_to: selectedAssignee.id,
+      file_name: newTaskFile ? newTaskFile.name : null,
+      content_type: newTaskFile ? newTaskFile.type : null,
+      due_date: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : null,
+    };
+
+    const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create task');
+    }
+
+    const data = await res.json();
+
+    if (newTaskFile && data.upload_url) {
+      const uploadRes = await fetch(data.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': newTaskFile.type },
+        body: newTaskFile,
+      });
+      if (!uploadRes.ok) {
+        toast.error('Task created but file upload failed');
+      }
+    }
+
+    toast.success('New Task Assigned successfully');
+    setShowAddTaskModal(false);
+    resetAddTaskForm();
+    fetchTasks();
+  } catch (err) {
+    toast.error(err.message || 'Failed to create task');
+  } finally {
+    setIsCreatingTask(false);
+  }
+  };
+
 
   const [joinRequests, setJoinRequests] = useState([]);
   const [joinRequestsLoading, setJoinRequestsLoading] = useState(false);
@@ -472,6 +546,31 @@ const handleCancelRequest = async (id) => {
     setRejectComment('');
     fetchPostReviews(req.id);
   };
+
+  const handleKickMember = async (userId, username) => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(
+      `http://localhost:8000/workspaces/${workspaceId}/members/${userId}`,
+      { method: 'DELETE', headers }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.detail || 'Failed to remove member');
+      return;
+    }
+
+    setMembers(prev => prev.filter(m => m.id !== userId));
+    toast.success(`${username} has been removed`);
+  } catch (err) {
+    console.error('Failed to remove member:', err);
+    toast.error('Network error while removing member');
+  }
+};
 
   const getPriorityStyle = (priority) => {
     const p = String(priority || '').toLowerCase();
@@ -1068,7 +1167,7 @@ const handleCancelRequest = async (id) => {
                               href={task.attachment.image_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              download
+                              download={task.attachment.image_url.split('/').pop()}
                               style={{ color: '#FE7216', fontWeight: '600', textDecoration: 'none' }}
                             >
                               Download
@@ -1266,33 +1365,49 @@ const handleCancelRequest = async (id) => {
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700' }}>Assign New Task</h3>
               <button onClick={() => setShowAddTaskModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✕</button>
             </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              setShowAddTaskModal(false);
-              toast.success('New Task Assigned successfully');
-            }}>
+            <form onSubmit={handleCreateTask}>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Task Name</label>
-                <input required placeholder="Enter task name..." style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+                <input required
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                placeholder='Enter task name...'
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Description</label>
-                <textarea placeholder="Enter task description..." rows={3} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', fontSize: '13px' }} />
+                <textarea
+                value={newTaskContent}
+                onChange={(e) => setNewTaskContent(e.target.value)}
+                rows={3} style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', fontSize: '13px' }} />
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Priority</label>
-                <select style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc' }}>
-                  <option>Low</option>
-                  <option>Medium</option>
-                  <option>High</option>
+                <select 
+                value={newTaskPriority}
+                onChange={(e) => setNewTaskPriority(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc' }}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
                 </select>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Due Date</label>
+                <input
+                  type="datetime-local"
+                  value={newTaskDueDate}
+                  onChange={(e) => setNewTaskDueDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                />
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px', color: '#4b5563' }}>Attachment</label>
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx"
-                  multiple
+                  onChange={(e)=>setNewTaskFile(e.target.files[0] || null)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -1343,8 +1458,10 @@ const handleCancelRequest = async (id) => {
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setShowAddTaskModal(false)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#FE7216', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>Assign</button>
+                <button type="button" onClick={() => { setShowAddTaskModal(false); resetAddTaskForm(); }} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={isCreatingTask} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#FE7216', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>
+                  {isCreatingTask ? 'Assigning...' : 'Assign'}
+                </button>
               </div>
             </form>
           </div>
@@ -1677,7 +1794,7 @@ const handleCancelRequest = async (id) => {
                   {isManager && (
                     <button
                       onClick={() => {
-                        toast.success(`${m.name} has been removed`);
+                        handleKickMember(m.id, m.name);
                       }}
                       style={{
                         padding: '5px 12px',

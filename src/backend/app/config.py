@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # --- Token Encryption ---
     fernet_secret_key: str = ""  # Auto-generated at startup if empty
 
+
+    R2_ACCOUNT_ID: str
+    R2_ACCESS_KEY_ID: str
+    R2_SECRET_ACCESS_KEY: str
+    R2_BUCKET_NAME: str
+    R2_PUBLIC_BASE_URL: str
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

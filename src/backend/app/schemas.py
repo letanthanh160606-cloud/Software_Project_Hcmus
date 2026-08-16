@@ -228,6 +228,8 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     created_by: uuid.UUID | None = None
+    upload_url: str | None = None
+
 
 
 class DistributorUpdateRequest(BaseModel):
@@ -252,6 +254,8 @@ class TaskCreateRequest(BaseModel):
     assigned_to: uuid.UUID | None = None
     due_date: datetime | None = None
     image_url: str | None = None  
+    file_name: str | None = None
+    content_type: str | None = None
 
 
 class TaskUpdateRequest(BaseModel):

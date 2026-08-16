@@ -23,7 +23,7 @@ from app.schemas import (
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
-def _task_to_response(db: Session, task) -> TaskResponse:
+def _task_to_response(db: Session, task, upload_url: str | None = None) -> TaskResponse:
     assignee = crud.get_user_by_id(db, task.assigned_to) if task.assigned_to else None
     attachment_response = (
         TaskAttachmentResponse.model_validate(task.attachment)
@@ -42,6 +42,7 @@ def _task_to_response(db: Session, task) -> TaskResponse:
         created_at=task.created_at,
         updated_at=task.updated_at,
         created_by=task.created_by,
+        upload_url=upload_url,
     )
 
 
@@ -159,7 +160,7 @@ def create_task(
 ) -> TaskResponse:
     if ctx.role != "manager":
         raise HTTPException(status_code=403, detail="Only Manager")
-    task =  crud.create_task(
+    task, upload_url =  crud.create_task(
         db,
         workspace_id=ctx.workspace.workspace_uuid,
         title=payload.title,
@@ -168,9 +169,10 @@ def create_task(
         assigned_to=payload.assigned_to,
         created_by=current_user.users_uuid,
         due_date=payload.due_date,
-        image_url=payload.image_url,
+        file_name=payload.file_name,
+        content_type=payload.content_type,
     )
-    return _task_to_response(db, task) 
+    return _task_to_response(db, task, upload_url) 
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
 def remove_member(

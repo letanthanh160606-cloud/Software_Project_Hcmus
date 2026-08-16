@@ -367,26 +367,39 @@ export default function PMmodule({ user }) {
         const token = localStorage.getItem('token');
         const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
 
-        let url = 'http://localhost:8000/posts';
-        if (workspaceId) {
-          url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
-        }
-
         const headers = { 'Content-Type': 'application/json' };
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const res = await fetch(url, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          const mapped = (Array.isArray(data) ? data : []).map((p) => {
-            let statusLabel = 'Drafts';
-            if (p.status === 'draft') statusLabel = 'Drafts';
-            else if (p.status === 'pending_review') statusLabel = 'Pending';
-            else if (p.status === 'rejected') statusLabel = 'Rejected';
-            else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
-            else if (p.status === 'failed') statusLabel = 'Failed';
+        const personalRes = await fetch('http://localhost:8000/posts', { headers });
+        let data = personalRes.ok ? await personalRes.json() : [];
+        data = Array.isArray(data) ? data : [];
+      
+        if (role === 'manager' && workspaceId) {
+          const reviewRes = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts`, { headers });
+          if (reviewRes.ok) {
+            const reviewData = await reviewRes.json();
+            const reviewList = Array.isArray(reviewData) ? reviewData : [];
+            const existingIds = new Set(data.map((p) => p.id));
+            reviewList.forEach((p) => {
+              if (!existingIds.has(p.id)) {
+                data.push(p);
+                existingIds.add(p.id);
+              }
+            });
+          }
+        }
+
+      
+    
+        const mapped = data.map((p) => {
+        let statusLabel = 'Drafts';
+        if (p.status === 'draft') statusLabel = 'Drafts';
+          else if (p.status === 'pending_review') statusLabel = 'Pending';
+          else if (p.status === 'rejected') statusLabel = 'Rejected';
+          else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
+          else if (p.status === 'failed') statusLabel = 'Failed';
 
             const createdDate = p.created_at
               ? new Date(p.created_at).toLocaleDateString('en-US', {
@@ -412,7 +425,7 @@ export default function PMmodule({ user }) {
             };
           });
           setRealPosts(mapped);
-        }
+        
       } catch (err) {
         console.error('Error fetching posts in PMmodule:', err);
       } finally {

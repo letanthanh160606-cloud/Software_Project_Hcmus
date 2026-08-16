@@ -4,9 +4,13 @@ from app.models import Post, SocialAccount, Task
 
 from app.models import Post, User, Workspace, WorkspaceMember, Notifications, TaskAttachment, PostReviews
 from app.security import hash_password, hash_pin
+from app.r2 import generate_presigned_url
 
 import uuid
+from fastapi import HTTPException
 
+from app.config import get_settings
+settings = get_settings()
 
 
 
@@ -154,9 +158,11 @@ def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     ).all()
 
 def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
-    query = select(Post).where(Post.workspace_id == workspace_id, Post.status == "pending_review").options(selectinload(Post.attachment))
+    query = select(Post).where(Post.workspace_id == workspace_id).options(selectinload(Post.attachment))
     if role == "member":
-        query = query.where(Post.author_id == user_id)
+        query = query.where(Post.author_id == user_id, Post.status != "cancel")
+    if role == "manager":
+        query = query.where(Post.author_id != user_id, Post.status == "pending_review")
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
@@ -176,10 +182,17 @@ def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> l
 def get_post_by_id(db: Session, post_id, workspace_id: str) -> Post | None:
     return db.scalar(select(Post).where(Post.id == post_id, Post.workspace_id == workspace_id))
 
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
 def create_task(
     db: Session, *, workspace_id: str, title: str,
     content: str, priority: str, assigned_to, created_by, due_date=None,
-    image_url: str | None = None, 
+    file_name: str | None = None,
+    content_type: str | None = None,
 ) -> Task:
     task = Task(
         workspace_id=workspace_id, title=title, content=content,
@@ -189,11 +202,19 @@ def create_task(
     db.add(task)
     db.flush()
     create_task_notification(db, task)
-    if image_url:                          # THÊM
-        db.add(TaskAttachment(task_id=task.id, image_url=image_url))
+    upload_url = None
+    if file_name and content_type:
+        if content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(status_code=400, detail=" only PDF, DOC or DOCX")
+
+        ext = file_name.rsplit(".", 1)[-1] if "." in file_name else ""
+        object_key = f"tasks/{task.id}/{file_name}"
+        upload_url = generate_presigned_url(object_key, content_type)
+        public_url = f"{settings.R2_PUBLIC_BASE_URL}/{object_key}"
+        db.add(TaskAttachment(task_id=task.id, image_url=public_url))
     db.commit()
     db.refresh(task)
-    return task
+    return task, upload_url
 
 def update_post(db: Session, post: Post, updates: dict) -> Post:
     for field, value in updates.items():
