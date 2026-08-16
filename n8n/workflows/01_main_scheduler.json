@@ -1,0 +1,77 @@
+﻿{
+  "name": "[ANALYTICS] 01_Main_Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger (Every 2h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:8000/api/v1/internal/posts/active",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "default-internal-secret-key-12345"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Active Published Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst posts = response.posts || [];\nconst fbPosts = posts.filter(p => p.platform === 'facebook');\nconst liPosts = posts.filter(p => p.platform === 'linkedin');\nreturn [{\n  json: {\n    total: posts.length,\n    facebook_count: fbPosts.length,\n    linkedin_count: liPosts.length,\n    facebook_posts: fbPosts,\n    linkedin_posts: liPosts\n  }\n}];"
+      },
+      "name": "Filter by Platform",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Every 2h)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Published Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Published Posts": {
+      "main": [
+        [
+          {
+            "node": "Filter by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

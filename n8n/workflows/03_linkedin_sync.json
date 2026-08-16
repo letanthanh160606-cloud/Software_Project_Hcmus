@@ -1,0 +1,112 @@
+﻿{
+  "name": "[ANALYTICS] 03_LinkedIn_Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:8000/api/v1/internal/tokens/{{ $json.channel_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "default-internal-secret-key-12345"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "1. Get Decrypted Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.linkedin.com/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity={{ $json.platform_account_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            },
+            {
+              "name": "LinkedIn-Version",
+              "value": "202401"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "2. Fetch LinkedIn Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:8000/api/v1/internal/ingest/metrics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "default-internal-secret-key-12345"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"schema_version\": \"1.0\",\n  \"platform\": \"linkedin\",\n  \"ingestion_run_id\": \"01912a7e-4b20-7f22-a631-9f1c84920002\",\n  \"records\": [\n    {\n      \"channel_id\": \"{{ $('1. Get Decrypted Token').first().json.channel_id }}\",\n      \"external_post_id\": \"{{ $('1. Get Decrypted Token').first().json.external_post_id || 'urn:li:share:001' }}\",\n      \"metric_date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n      \"metrics\": {\n        \"impressions\": 120,\n        \"reach\": 108,\n        \"views\": 120,\n        \"likes\": 18,\n        \"comments\": 6,\n        \"shares\": 2,\n        \"clicks\": 15\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "name": "3. Ingest Batch to FastAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "1. Get Decrypted Token": {
+      "main": [
+        [
+          {
+            "node": "2. Fetch LinkedIn Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Fetch LinkedIn Stats": {
+      "main": [
+        [
+          {
+            "node": "3. Ingest Batch to FastAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

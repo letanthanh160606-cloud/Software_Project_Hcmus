@@ -1,0 +1,95 @@
+﻿{
+  "name": "[ANALYTICS] 02_Facebook_Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:8000/api/v1/internal/tokens/{{ $json.channel_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "default-internal-secret-key-12345"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "1. Get Decrypted Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $json.external_post_id }}/insights?metric=post_impressions,post_engaged_users,post_reactions_by_type_total,post_clicks&access_token={{ $json.access_token }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "2. Fetch FB Post Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://host.docker.internal:8000/api/v1/internal/ingest/metrics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "default-internal-secret-key-12345"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"schema_version\": \"1.0\",\n  \"platform\": \"facebook\",\n  \"ingestion_run_id\": \"01912a7e-4b20-7f22-a631-9f1c84920001\",\n  \"records\": [\n    {\n      \"channel_id\": \"{{ $('1. Get Decrypted Token').first().json.channel_id }}\",\n      \"external_post_id\": \"{{ $('1. Get Decrypted Token').first().json.external_post_id || 'fb_post_001' }}\",\n      \"metric_date\": \"{{ new Date().toISOString().split('T')[0] }}\",\n      \"metrics\": {\n        \"impressions\": 150,\n        \"reach\": 120,\n        \"views\": 150,\n        \"likes\": 25,\n        \"comments\": 8,\n        \"shares\": 3,\n        \"clicks\": 12\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "name": "3. Ingest Batch to FastAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "1. Get Decrypted Token": {
+      "main": [
+        [
+          {
+            "node": "2. Fetch FB Post Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Fetch FB Post Insights": {
+      "main": [
+        [
+          {
+            "node": "3. Ingest Batch to FastAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
