@@ -297,8 +297,7 @@ export default function Contmodule() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
-  const handleCreatePost = async (e) => {
-    if (e) e.preventDefault();
+  const handleCreatePost = async (statusType = 'pending_review') => {
     if (!title.trim() && !body.trim()) {
       toast.error('Please enter a title or content for your post.');
       return;
@@ -331,6 +330,7 @@ export default function Contmodule() {
           workspace_id: workspaceId,
           title: title.trim() || 'Untitled Post',
           content: body.trim(),
+          status: statusType,
           seo_keywords: [],
           seo_hashtags: []
         }),
@@ -342,7 +342,11 @@ export default function Contmodule() {
         throw new Error(errMsg);
       }
 
-      toast.success('Post created successfully!');
+      if (statusType === 'draft') {
+        toast.success('Bài viết đã được lưu dưới dạng Bản nháp (Draft)!');
+      } else {
+        toast.success('Bài viết đã được gửi duyệt thành công (Pending)!');
+      }
       setTitle('');
       setBody('');
       setMediaFiles([]);
@@ -658,7 +662,7 @@ export default function Contmodule() {
             {/* Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '140px' }}>
               <button
-                onClick={handleCreatePost}
+                onClick={() => handleCreatePost('pending_review')}
                 disabled={isSubmitting}
                 style={{
                   padding: '12px 0',
@@ -689,6 +693,8 @@ export default function Contmodule() {
               </button>
 
               <button
+                onClick={() => handleCreatePost('draft')}
+                disabled={isSubmitting}
                 style={{
                   padding: '10px 0',
                   borderRadius: '10px',
@@ -698,7 +704,8 @@ export default function Contmodule() {
                   fontFamily: 'Satoshi, system-ui, sans-serif',
                   fontSize: '13px',
                   fontWeight: '500',
-                  cursor: 'pointer',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1,
                   width: '100%',
                   transition: 'background-color 0.15s ease, border-color 0.15s ease',
                 }}

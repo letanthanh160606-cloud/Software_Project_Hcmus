@@ -47,6 +47,8 @@ def create_post(
                 detail="You do not have access to this workspace",
             )
 
+    post_status = "pending_review" if payload.status in ("pending", "pending_review") else "draft"
+
     try:
         return crud.create_post(
             db,
@@ -58,6 +60,7 @@ def create_post(
             knowledge_base_id=payload.knowledge_base_id,
             seo_keywords=payload.seo_keywords,
             seo_hashtags=payload.seo_hashtags,
+            status=post_status,
         )
 
     except IntegrityError as exc:

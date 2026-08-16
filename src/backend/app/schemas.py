@@ -164,6 +164,7 @@ class PostCreate(BaseModel):
     )
 
     content: str = ""
+    status: str = "draft"
 
     prompt_template_id: uuid.UUID | None = None
     knowledge_base_id: uuid.UUID | None = None

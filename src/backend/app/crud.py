@@ -154,9 +154,11 @@ def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     ).all()
 
 def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
-    query = select(Post).where(Post.workspace_id == workspace_id, Post.status == "pending_review").options(selectinload(Post.attachment))
+    query = select(Post).where(Post.workspace_id == workspace_id).options(selectinload(Post.attachment))
     if role == "member":
-        query = query.where(Post.author_id == user_id)
+        query = query.where(
+            (Post.author_id == user_id) | (Post.status.in_(["ready_for_distribution", "published"]))
+        )
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
@@ -267,13 +269,14 @@ def create_post(
     knowledge_base_id=None,
     seo_keywords: list[str] | None = None,
     seo_hashtags: list[str] | None = None,
+    status: str = "draft",
 ) -> Post:
     post = Post(
         workspace_id=workspace_id,
         author_id=author.users_uuid,
         title=title,
         content=content,
-        status="draft",
+        status=status,
         prompt_template_id=prompt_template_id,
         knowledge_base_id=knowledge_base_id,
         ai_generated=False,

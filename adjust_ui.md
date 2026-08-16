@@ -51,3 +51,15 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 * **Lý do thay đổi**:
   * Nâng cấp từ Mock Data tĩnh sang kết nối dữ liệu thật của Backend FastAPI theo tài liệu `Statistics Module Backend Architecture với n8n + AI.md`.
   * **TUÂN THỦ TUYỆT ĐỐI**: Giữ nguyên 100% bố cục visual layout, kích thước, màu sắc, font chữ Satoshi và hoạt ảnh (animation) gốc.
+
+---
+
+## 📌 5. File: `src/frontend/src/component/Contmodule.jsx`
+
+* **Vị trí**: Dòng 300 – 355, 660 – 720.
+* **Thay đổi**:
+  * Gắn sự kiện `onClick={() => handleCreatePost('pending_review')}` cho nút **Submit** màu cam $\rightarrow$ Lưu bài viết ở trạng thái `pending_review` (Pending).
+  * Gắn sự kiện `onClick={() => handleCreatePost('draft')}` cho nút **Save as Draft** $\rightarrow$ Lưu bài viết ở trạng thái `draft` (Drafts).
+* **Lý do thay đổi**:
+  * Phân biệt rõ ràng 2 luồng lưu bài viết: Gửi duyệt (Pending) và Lưu bản nháp (Draft) theo đúng yêu cầu nghiệp vụ.
+  * Giữ nguyên 100% bố cục, màu sắc, style hover của các nút bấm.
