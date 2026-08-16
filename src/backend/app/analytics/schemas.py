@@ -110,7 +110,7 @@ class ReportListResponse(BaseModel):
 
 class ActivePostSyncItem(BaseModel):
     post_id: uuid.UUID
-    workspace_id: str
+    workspace_id: str | None = None
     channel_id: uuid.UUID
     platform: str
     platform_account_id: str

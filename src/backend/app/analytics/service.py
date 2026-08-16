@@ -37,7 +37,7 @@ logger = logging.getLogger("analytics.service")
 
 def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> TimelineResponse:
     """
-    Computes time-series interaction metrics for Facebook and LinkedIn.
+    Computes real time-series interaction metrics for Facebook and LinkedIn.
     """
     timeframe_clean = timeframe.capitalize()
     labels_map = {
@@ -45,6 +45,7 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
         "Monthly": ["Week 1", "Week 2", "Week 3", "Week 4"],
         "Yearly": ["Jan", "Mar", "May", "Jul", "Sep", "Nov"],
     }
+    labels = labels_map.get(timeframe_clean, labels_map["Weekly"])
 
     # Query metrics from DB
     now = datetime.now(timezone.utc)
@@ -62,29 +63,27 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
     li_metrics = [r for r in rows if r.platform.lower() == "linkedin"]
 
     if fb_metrics or li_metrics:
-        # Aggregate DB points
-        labels = labels_map.get(timeframe_clean, labels_map["Weekly"])
-        fb_series = [sum(r.engagements for r in fb_metrics) // len(labels) or 150] * len(labels)
-        li_series = [sum(r.engagements for r in li_metrics) // len(labels) or 100] * len(labels)
+        # Aggregate real DB points per bucket
+        if timeframe_clean == "Weekly":
+            # Map by weekday (0=Mon, 6=Sun)
+            fb_buckets = [0] * 7
+            li_buckets = [0] * 7
+            for r in fb_metrics:
+                idx = r.metric_date.weekday()
+                if 0 <= idx < 7:
+                    fb_buckets[idx] += r.engagements
+            for r in li_metrics:
+                idx = r.metric_date.weekday()
+                if 0 <= idx < 7:
+                    li_buckets[idx] += r.engagements
+            fb_series = fb_buckets
+            li_series = li_buckets
+        else:
+            fb_series = [sum(r.engagements for r in fb_metrics) // len(labels)] * len(labels)
+            li_series = [sum(r.engagements for r in li_metrics) // len(labels)] * len(labels)
     else:
-        # Default baseline calibrated curves matching high-converting UX
-        labels = labels_map.get(timeframe_clean, labels_map["Weekly"])
-        default_data = {
-            "Weekly": {
-                "facebook": [210, 150, 240, 160, 220, 110, 280],
-                "linkedin": [130, 220, 180, 170, 190, 250, 120],
-            },
-            "Monthly": {
-                "facebook": [850, 1120, 980, 1340],
-                "linkedin": [620, 780, 890, 950],
-            },
-            "Yearly": {
-                "facebook": [4200, 5800, 6100, 7500, 8200, 9400],
-                "linkedin": [3100, 4200, 4900, 5600, 6300, 7100],
-            },
-        }
-        fb_series = default_data.get(timeframe_clean, default_data["Weekly"])["facebook"]
-        li_series = default_data.get(timeframe_clean, default_data["Weekly"])["linkedin"]
+        fb_series = [0] * len(labels)
+        li_series = [0] * len(labels)
 
     return TimelineResponse(
         timeframe=timeframe_clean,
@@ -95,7 +94,7 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
 
 def get_overview(db: Session, workspace_id: str) -> OverviewResponse:
     """
-    Computes overall platform attraction (impressions) and percentage share.
+    Computes overall platform attraction (impressions) and percentage share from real database records.
     """
     metrics = db.scalars(
         select(EngagementMetric).where(EngagementMetric.workspace_id == workspace_id)
@@ -104,15 +103,15 @@ def get_overview(db: Session, workspace_id: str) -> OverviewResponse:
     fb_records = [m for m in metrics if m.platform.lower() == "facebook"]
     li_records = [m for m in metrics if m.platform.lower() == "linkedin"]
 
-    fb_attraction = sum(m.impressions or m.views for m in fb_records) or 321342
-    fb_engagements = sum(m.engagements for m in fb_records) or 25200
+    fb_attraction = sum((m.impressions or m.views) for m in fb_records)
+    fb_engagements = sum(m.engagements for m in fb_records)
 
-    li_attraction = sum(m.impressions or m.views for m in li_records) or 14345
-    li_engagements = sum(m.engagements for m in li_records) or 8400
+    li_attraction = sum((m.impressions or m.views) for m in li_records)
+    li_engagements = sum(m.engagements for m in li_records)
 
     total_attraction = fb_attraction + li_attraction
-    fb_pct = round((fb_attraction / total_attraction) * 100) if total_attraction > 0 else 75
-    li_pct = 100 - fb_pct
+    fb_pct = round((fb_attraction / total_attraction) * 100) if total_attraction > 0 else 0
+    li_pct = round((li_attraction / total_attraction) * 100) if total_attraction > 0 else 0
 
     return OverviewResponse(
         facebook=PlatformOverview(
@@ -140,8 +139,8 @@ def get_today_stats(db: Session, workspace_id: str, user: User, role: str) -> To
         )
     ).all()
 
-    total_interactions = sum(m.engagements for m in today_metrics) or 149320
-    user_contribution = round(total_interactions * 0.22) or 32433
+    total_interactions = sum(m.engagements for m in today_metrics)
+    user_contribution = total_interactions if role == "manager" else 0
 
     return TodayStatsResponse(
         role=role,
@@ -157,7 +156,10 @@ def get_top_posts(db: Session, workspace_id: str, limit: int = 7) -> TopPostsRes
     """
     posts = db.scalars(
         select(Post)
-        .where(Post.workspace_id == workspace_id)
+        .where(
+            Post.workspace_id == workspace_id,
+            Post.status.in_(["published", "ready_for_distribution"]),
+        )
         .options(selectinload(Post.attachment))
         .order_by(desc(Post.created_at))
         .limit(limit)
@@ -173,8 +175,8 @@ def get_top_posts(db: Session, workspace_id: str, limit: int = 7) -> TopPostsRes
         metric = db.scalar(
             select(EngagementMetric).where(EngagementMetric.post_id == p.id)
         )
-        engagements = metric.engagements if metric else 12500
-        eng_rate = metric.engagement_rate if metric else 4.5
+        engagements = metric.engagements if metric else 0
+        eng_rate = metric.engagement_rate if metric else 0.0
         platform = metric.platform if metric else "facebook"
 
         thumb = p.attachment.image_url if p.attachment else None
@@ -191,29 +193,8 @@ def get_top_posts(db: Session, workspace_id: str, limit: int = 7) -> TopPostsRes
             )
         )
 
-    # If workspace has fewer than limit posts, fill with default showcase items
-    if len(items) < limit:
-        defaults = [
-            "[TA - P1] Archeology",
-            "Ecology",
-            "HR - IT dep.",
-            "HR - FI dep.",
-            "HR - IT dep.",
-            "[TA - P1] Archeology",
-            "Ecology",
-        ]
-        for i in range(len(items), limit):
-            items.append(
-                TopPostItem(
-                    id=str(uuid.uuid4()),
-                    title=defaults[i % len(defaults)],
-                    platform="facebook" if i % 2 == 0 else "linkedin",
-                    published_url="https://facebook.com",
-                    total_engagements=14500 - (i * 800),
-                    engagement_rate=4.8 - (i * 0.3),
-                )
-            )
-
+    # Sort by total_engagements descending
+    items.sort(key=lambda x: x.total_engagements, reverse=True)
     return TopPostsResponse(posts=items[:limit])
 
 
@@ -296,33 +277,6 @@ def list_reports(
     query = select(Report).where(Report.workspace_id == workspace_id).order_by(desc(Report.created_at))
 
     reports = db.scalars(query).all()
-
-    if not reports:
-        # Seed initial history items so UI table has rich initial documents
-        initial_seeds = [
-            ("[Monthly report for July 2026]", "May 18, 2026", "Monthly"),
-            ("[Weekly report for 6 - 12 July 2026]", "May 18, 2026", "Weekly"),
-            ("[Yearly report for 2026]", "May 18, 2026", "Yearly"),
-            ("[Weekly report for 6 - 12 July 2026]", "May 18, 2026", "Weekly"),
-            ("[Weekly report for 6 - 12 July 2026]", "May 18, 2026", "Weekly"),
-            ("[Monthly report for June 2026]", "May 10, 2026", "Monthly"),
-            ("[Weekly report for 29 May - 4 June 2026]", "May 04, 2026", "Weekly"),
-        ]
-        created_items = []
-        for title, sdate, tf in initial_seeds:
-            rep = Report(
-                workspace_id=workspace_id,
-                title=title,
-                saved_date=sdate,
-                timeframe=tf,
-                summary="Executive overview document.",
-            )
-            db.add(rep)
-            created_items.append(rep)
-        db.commit()
-        for c in created_items:
-            db.refresh(c)
-        reports = created_items
 
     items = [
         ReportItemResponse(
@@ -520,13 +474,25 @@ def get_active_posts_for_sync(
 
     items = []
     for post, dist, channel in rows:
+        ext_id = dist.external_post_id or ""
+        if not ext_id and dist.published_url:
+            if "urn:li:share:" in dist.published_url:
+                ext_id = "urn:li:share:" + dist.published_url.split("urn:li:share:")[1].split("/")[0]
+            elif "story_fbid=" in dist.published_url:
+                import urllib.parse
+                parsed = urllib.parse.urlparse(dist.published_url)
+                params = urllib.parse.parse_qs(parsed.query)
+                story_fbid = params.get("story_fbid", [""])[0]
+                page_id = params.get("id", [""])[0]
+                ext_id = f"{page_id}_{story_fbid}" if page_id and story_fbid else story_fbid
+
         items.append({
             "post_id": post.id,
             "workspace_id": post.workspace_id,
             "channel_id": channel.id,
             "platform": channel.platform,
             "platform_account_id": channel.platform_account_id,
-            "external_post_id": dist.external_post_id or "",
+            "external_post_id": ext_id,
             "published_url": dist.published_url,
             "published_at": post.published_at or post.created_at,
         })

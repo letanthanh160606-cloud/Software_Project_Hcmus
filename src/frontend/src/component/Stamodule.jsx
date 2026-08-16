@@ -37,24 +37,9 @@ function MultiLineChart({ timeframe, seriesData, labelsData }) {
     Yearly: ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov'],
   };
 
-  const dataMap = {
-    Weekly: {
-      fb: [210, 150, 240, 160, 220, 110, 280],
-      li: [130, 220, 180, 170, 190, 250, 120],
-    },
-    Monthly: {
-      fb: [850, 1120, 980, 1340],
-      li: [620, 780, 890, 950],
-    },
-    Yearly: {
-      fb: [4200, 5800, 6100, 7500, 8200, 9400],
-      li: [3100, 4200, 4900, 5600, 6300, 7100],
-    },
-  };
-
   const currentLabels = labelsData || labelsMap[timeframe] || labelsMap.Weekly;
-  const currentFbData = seriesData?.facebook || dataMap[timeframe]?.fb || dataMap.Weekly.fb;
-  const currentLiData = seriesData?.linkedin || dataMap[timeframe]?.li || dataMap.Weekly.li;
+  const currentFbData = seriesData?.facebook || new Array(currentLabels.length).fill(0);
+  const currentLiData = seriesData?.linkedin || new Array(currentLabels.length).fill(0);
 
   const chartData = {
     labels: currentLabels,
@@ -128,47 +113,28 @@ export default function Stamodule({ user }) {
   const [timelineLabels, setTimelineLabels] = useState(null);
 
   const [overviewStats, setOverviewStats] = useState({
-    fb_pct: 75,
-    fb_attraction: 321342,
-    li_pct: 25,
-    li_attraction: 14345,
+    fb_pct: 0,
+    fb_attraction: 0,
+    li_pct: 0,
+    li_attraction: 0,
   });
 
   const [todayData, setTodayData] = useState({
-    total_interactions: 149320,
-    user_contribution: 32433,
+    total_interactions: 0,
+    user_contribution: 0,
   });
 
   const [reportTimeframe, setReportTimeframe] = useState('Monthly');
-  const [reportTitle, setReportTitle] = useState('[Monthly report for July 2026]');
-  const [reportText, setReportText] = useState(
-    "The provided data reveals that Facebook is the dominant platform for overall audience attraction, securing the vast majority of visibility with 450,000 total impressions compared to LinkedIn's 180,000. However, the critical joining point - where exposure successfully translates into meaningful user interaction - unveils a clear divergence in platform efficiency. While Facebook achieves a massive raw volume of 25,200 engagements through broad-appeal short-form videos and reactions, LinkedIn exhibits a superior conversion of views into meaningful user interaction."
-  );
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportText, setReportText] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
-  const [reportHistoryList, setReportHistoryList] = useState([
-    { id: 1, name: '[Monthly report for July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 2, name: '[Weekly report for 6 - 12 July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 3, name: '[Yearly report for 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 4, name: '[Weekly report for 6 - 12 July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 5, name: '[Weekly report for 6 - 12 July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 6, name: '[Monthly report for June 2026]', savedDate: 'May 10, 2026', data: 'Document' },
-    { id: 7, name: '[Weekly report for 29 May - 4 June 2026]', savedDate: 'May 04, 2026', data: 'Document' },
-  ]);
-
-  const [topPosts, setTopPosts] = useState([
-    { id: 1, title: '[TA - P1] Archeology' },
-    { id: 2, title: 'Ecology' },
-    { id: 3, title: 'HR - IT dep.' },
-    { id: 4, title: 'HR - FI dep.' },
-    { id: 5, title: 'HR - IT dep.' },
-    { id: 6, title: '[TA - P1] Archeology' },
-    { id: 7, title: 'Ecology' },
-  ]);
+  const [reportHistoryList, setReportHistoryList] = useState([]);
+  const [topPosts, setTopPosts] = useState([]);
 
   // Interactive Date Range Filter state
-  const [startDate, setStartDate] = useState('2024-01-01');
-  const [endDate, setEndDate] = useState('2026-06-30');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef(null);
 
@@ -193,7 +159,7 @@ export default function Stamodule({ user }) {
         setTimelineLabels(data.labels);
       }
     } catch (err) {
-      console.warn('Using default timeline series:', err);
+      console.warn('Error fetching timeline:', err);
     }
   };
 
@@ -213,7 +179,7 @@ export default function Stamodule({ user }) {
         });
       }
     } catch (err) {
-      console.warn('Using default overview stats:', err);
+      console.warn('Error fetching overview:', err);
     }
   };
 
@@ -231,7 +197,7 @@ export default function Stamodule({ user }) {
         });
       }
     } catch (err) {
-      console.warn('Using default today stats:', err);
+      console.warn('Error fetching today stats:', err);
     }
   };
 
@@ -243,12 +209,10 @@ export default function Stamodule({ user }) {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.posts && data.posts.length > 0) {
-          setTopPosts(data.posts);
-        }
+        setTopPosts(data.posts || []);
       }
     } catch (err) {
-      console.warn('Using default top posts:', err);
+      console.warn('Error fetching top posts:', err);
     }
   };
 
@@ -259,12 +223,10 @@ export default function Stamodule({ user }) {
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        if (data.reports && data.reports.length > 0) {
-          setReportHistoryList(data.reports);
-        }
+        setReportHistoryList(data.reports || []);
       }
     } catch (err) {
-      console.warn('Using default reports history:', err);
+      console.warn('Error fetching reports history:', err);
     }
   };
 
@@ -367,11 +329,6 @@ export default function Stamodule({ user }) {
   };
 
   const handleSaveReport = async () => {
-    const todayStr = new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-    });
     const newTitle = reportTitle || `[${reportTimeframe} report saved]`;
 
     try {
@@ -392,14 +349,9 @@ export default function Stamodule({ user }) {
         return;
       }
     } catch (err) {
-      console.warn('Offline save fallback:', err);
+      console.warn('Save report error:', err);
     }
-
-    setReportHistoryList((prev) => [
-      { id: Date.now(), name: newTitle, savedDate: todayStr, data: 'Document' },
-      ...prev,
-    ]);
-    toast.success('Statistical report saved successfully!');
+    toast.error('Failed to save report to server.');
   };
 
   const handleDownloadReport = async (item) => {
@@ -788,20 +740,28 @@ export default function Stamodule({ user }) {
                 boxSizing: 'border-box',
               }}
             >
-              <div style={{ fontWeight: '700', fontSize: '13px', color: '#1E1E1E', marginBottom: '6px' }}>
-                {reportTitle || `[${reportTimeframe} report for July 2026]`}
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '12px',
-                  lineHeight: '1.6',
-                  color: '#4A4A4A',
-                  fontFamily: 'Satoshi',
-                }}
-              >
-                {reportText}
-              </p>
+              {isGeneratingReport ? (
+                <div style={{ color: '#FE7216', fontSize: '13px', fontWeight: '600', padding: '10px 0' }}>
+                  Generating AI Statistical Report with Gemini...
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontWeight: '700', fontSize: '13px', color: '#1E1E1E', marginBottom: '6px' }}>
+                    {reportTitle || (reportText ? `[${reportTimeframe} report]` : 'AI Statistical Report')}
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '12px',
+                      lineHeight: '1.6',
+                      color: '#4A4A4A',
+                      fontFamily: 'Satoshi',
+                    }}
+                  >
+                    {reportText || 'No report generated yet. Select a timeframe or click Save to create an AI report.'}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -1122,37 +1082,43 @@ export default function Stamodule({ user }) {
             flexDirection: 'column',
           }}
         >
-          {topPosts.map((post) => (
-            <div
-              key={post.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '13px 0',
-                borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-                fontSize: '13px',
-              }}
-            >
-              <span style={{ color: '#1E1E1E', fontWeight: '500' }}>{post.title}</span>
-              <button
-                onClick={() => handleViewPost(post)}
+          {topPosts.length > 0 ? (
+            topPosts.map((post) => (
+              <div
+                key={post.id}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#FE7216',
-                  fontWeight: '700',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '13px 0',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
                   fontSize: '13px',
-                  cursor: 'pointer',
-                  padding: 0,
-                  textDecoration: 'underline',
-                  fontFamily: 'Satoshi',
                 }}
               >
-                View
-              </button>
+                <span style={{ color: '#1E1E1E', fontWeight: '500' }}>{post.title}</span>
+                <button
+                  onClick={() => handleViewPost(post)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#FE7216',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline',
+                    fontFamily: 'Satoshi',
+                  }}
+                >
+                  View
+                </button>
+              </div>
+            ))
+          ) : (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: '#7E7A72', fontSize: '13px', fontWeight: '500' }}>
+              No published posts yet.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

@@ -110,3 +110,23 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
   * Khi Manager bấm nút **Reject**, giao diện chuyển mượt mà sang khung nhập lý do từ chối màu đỏ nhạt (`#fef2f2`) với 2 nút hành động: **Cancel** (hủy từ chối và quay lại giao diện nút ban đầu) và **Confirm Reject** (xác nhận từ chối kèm lý do).
 * **Lý do thay đổi**:
   * Giữ cho giao diện Modal duyệt bài ban đầu luôn gọn gàng, trực quan và chỉ yêu cầu nhập lý do khi người dùng thực sự muốn từ chối bài viết.
+
+---
+
+## 📌 10. File: `src/frontend/src/component/Stamodule.jsx` & `src/backend/app/analytics/service.py` (Purge Mock Data)
+
+* **Vị trí**:
+  * `Stamodule.jsx`: Dòng 35 – 280, 735 – 765, 1070 – 1115.
+  * `service.py`: Dòng 38 – 220, 270 – 340.
+* **Thay đổi**:
+  * Xóa bỏ hoàn toàn mảng dữ liệu mẫu `dataMap` (các số liệu biểu đồ đường cong cứng `[210, 150, 240, ...]`).
+  * Khởi tạo các giá trị state mặc định bằng `0` hoặc mảng rỗng `[]` (`overviewStats`, `todayData`, `reportTitle`, `reportText`, `reportHistoryList`, `topPosts`).
+  * Xóa bỏ các bài viết mẫu cứng (`"[TA - P1] Archeology"`, `"Ecology"`) và báo cáo mẫu tự sinh (`"[Monthly report for July 2026]"`).
+  * Bổ sung các thông báo trạng thái rỗng (Empty States) thân thiện khi Workspace mới chưa có dữ liệu:
+    * *"No published posts yet."* cho Top Posts.
+    * *"No reports found in the selected date range."* cho bảng lịch sử báo cáo.
+    * *"No report generated yet. Select a timeframe or click Save to create an AI report."* cho khung báo cáo AI.
+* **Lý do thay đổi**:
+  * Đảm bảo toàn bộ số liệu trên màn hình Statistics phản ánh 100% dữ liệu thực từ CSDL PostgreSQL và pipeline cào số liệu n8n mà không chứa bất kỳ dữ liệu giả (mock/fallback) nào.
+  * Giữ nguyên 100% thiết kế giao diện, kiểu dáng và bảng màu gốc.
+
