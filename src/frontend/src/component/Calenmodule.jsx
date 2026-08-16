@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast'; // NOTE: swap this for whatever toast lib WSmodule.jsx/PMmodule.jsx already use
 import calendar1stBg from '../assets/calendar_1stbg.png';
 import calendar2ndBg from '../assets/calendar_2ndbg.png';
 
@@ -37,17 +38,17 @@ export default function Calenmodule({ user, userRole }) {
   const [newDueDate, setNewDueDate] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
   const [newDescription, setNewDescription] = useState('');
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-   const PRIORITY_TYPE_LABEL = {
+  const PRIORITY_TYPE_LABEL = {
     low: 'Low Priority',
     medium: 'Medium Priority',
     high: 'High Priority (Urgent)',
     urgent: 'High Priority (Urgent)',
   };
 
-
-    const fetchCalendarTasks = async () => {
+  const fetchCalendarTasks = async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/calendar/tasks`, {
@@ -57,7 +58,7 @@ export default function Calenmodule({ user, userRole }) {
       const data = await res.json(); // CalendarSummaryResponse
 
       const mapped = data.tasks
-        .filter((t) => t.due_date) 
+        .filter((t) => t.due_date)
         .map((t) => {
           const d = new Date(t.due_date);
           return {
@@ -84,30 +85,52 @@ export default function Calenmodule({ user, userRole }) {
     }
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTitle.trim() || !newDueDate) {
-      alert('Task title and due date are required');
+      toast.error('Task title and due date are required');
       return;
     }
-    const d = new Date(newDueDate);
-    const newLocalTask = {
-      id: Date.now().toString(),
-      day: d.getDate(),
-      month: d.getMonth(),
-      year: d.getFullYear(),
-      time: d.toTimeString().slice(0, 5),
-      title: newTitle,
-      priority: newPriority,
-      type: newPriority === 'workspace' ? 'Workspace Task' : PRIORITY_TYPE_LABEL[newPriority] || 'Medium Priority',
-      workspaceOnly: newPriority === 'workspace',
-      content: newDescription,
-    };
-    setApiTasks((prev) => [...prev, newLocalTask]);
-    setNewTitle('');
-    setNewDescription('');
-    setNewDueDate('');
-    setNewPriority('medium');
-    setShowTaskModal(false);
+    if (newPriority === 'workspace') {
+      toast.error('Please select a valid priority (Low/Medium/High)');
+      return;
+    }
+    if (isCreatingTask) return;
+    setIsCreatingTask(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const payload = {
+        title: newTitle,
+        content: newDescription,
+        priority: newPriority,
+        due_date: new Date(newDueDate).toISOString(),
+      };
+
+      const res = await fetch(`${API_URL}/calendar/tasks`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to create task');
+      }
+
+      toast.success('Task created successfully');
+      setNewTitle('');
+      setNewDescription('');
+      setNewDueDate('');
+      setNewPriority('medium');
+      setShowTaskModal(false);
+      fetchCalendarTasks();
+    } catch (err) {
+      toast.error(err.message || 'Failed to create task');
+    } finally {
+      setIsCreatingTask(false);
+    }
   };
 
   useEffect(() => {
@@ -167,7 +190,7 @@ export default function Calenmodule({ user, userRole }) {
     };
   });
 
-  /* 
+  /*
     DYNAMIC TIMELINE FILTERING: Filtered relative to real today's date against fixed deadline dates.
   */
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -194,7 +217,7 @@ export default function Calenmodule({ user, userRole }) {
     return true;
   });
 
-  /* 
+  /*
     CALENDAR GRID INDICATORS: Shows indicator bars for tasks on the currently VIEWED month.
   */
   const getIndicatorsForDate = (dayNum) => {
@@ -246,18 +269,18 @@ export default function Calenmodule({ user, userRole }) {
           }}
         >
           {/* Box 1: Your Task */}
-          <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.75)', borderRadius: '15px', padding: '15px', height: '100%', width: '100%', boxSizing: 'border-box', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', position: 'relative' }} > 
-            <div> 
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', position: 'absolute', left: '15px', top: '15px' }}> 
-                Your Task 
-              </div> 
-              <div style={{ fontSize: '12px', color: '#9ca3af', position: 'absolute', bottom: '15px', left: '15px' }}> 
-                Your unfinished tasks 
-              </div> 
-            </div> 
-            <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}> 
+          <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.75)', borderRadius: '15px', padding: '15px', height: '100%', width: '100%', boxSizing: 'border-box', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', position: 'relative' }} >
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', position: 'absolute', left: '15px', top: '15px' }}>
+                Your Task
+              </div>
+              <div style={{ fontSize: '12px', color: '#9ca3af', position: 'absolute', bottom: '15px', left: '15px' }}>
+                Your unfinished tasks
+              </div>
+            </div>
+            <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}>
               {todoCount ?? '-'}
-            </div> 
+            </div>
           </div>
 
           {/* Box 2: Tasks Assigned to others (Manager) OR calendar_1stbg.png image (Member/Individual) */}
@@ -274,17 +297,17 @@ export default function Calenmodule({ user, userRole }) {
                 position: 'relative'
               }}
             >
-              <div> 
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', position: 'absolute', left: '15px', top: '15px' }}> 
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', position: 'absolute', left: '15px', top: '15px' }}>
                   Tasks Assigned to others
-                </div> 
-                <div style={{ fontSize: '12px', color: '#9ca3af', position: 'absolute', bottom: '15px', left: '15px' }}> 
+                </div>
+                <div style={{ fontSize: '12px', color: '#9ca3af', position: 'absolute', bottom: '15px', left: '15px' }}>
                   Team's unfinished tasks
-                </div> 
-              </div> 
-              <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}> 
+                </div>
+              </div>
+              <div style={{ fontSize: '56px', fontWeight: '800', color: '#4b5563', position: 'absolute', right: '15px', top: '11px' }}>
                 {assignedToOthersCount ?? '-'}
-              </div> 
+              </div>
             </div>
           ) : (
             /* calendar_1stbg.png image when box 2 is not used */
@@ -345,10 +368,12 @@ export default function Calenmodule({ user, userRole }) {
 
             {/* Add Task Button */}
             <button
+              type="button"
               onClick={() => {
                 setActiveModalTask(null);
                 setShowTaskModal(true);
               }}
+              disabled={isCreatingTask}
               style={{
                 width: '25px',
                 height: '25px',
@@ -773,6 +798,7 @@ export default function Calenmodule({ user, userRole }) {
                 <button
                   type="button"
                   onClick={handleAddTask}
+                  disabled={isCreatingTask}
                   style={{
                     padding: '8px 18px',
                     borderRadius: '10px',
