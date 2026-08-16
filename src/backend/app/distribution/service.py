@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 from app.config import get_settings
-from app.models import User, SocialAccount, Workspace, WorkspaceMember, Post
+from app.models import User, SocialAccount, Workspace, WorkspaceMember, Post, PostDistribution
 from app import crud
 from app.distribution.schemas import (
     ChannelInitiateResponse,
