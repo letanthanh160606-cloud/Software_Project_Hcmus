@@ -1410,7 +1410,7 @@ export default function PMmodule({ user }) {
                             setSelectedPost(null);
                             setNewCommentText('');
                             setShowRejectInput(false);
-                            toast.error('Post rejected');
+                            toast.success('Post rejected successfully');
                           } catch (err) {
                             toast.error(err.message || 'Error rejecting post');
                           }
