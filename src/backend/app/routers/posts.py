@@ -62,6 +62,8 @@ def create_post(
                     detail=f"Invalid target account: '{acc.display_name}' ({acc.platform}) does not belong to selected target platforms {list(selected_platforms)}."
                 )
 
+    post_status = "pending_review" if payload.status in ("pending", "pending_review") else "draft"
+
     try:
         return crud.create_post(
             db,
