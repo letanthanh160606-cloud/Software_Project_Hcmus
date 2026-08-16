@@ -497,17 +497,37 @@ export default function PMmodule({ user }) {
       const reloadRes = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
       if (reloadRes.ok) {
         const reloadData = await reloadRes.json();
-        setRealPosts((Array.isArray(reloadData) ? reloadData : []).map(p => ({
-          id: p.id,
-          title: p.title || 'Untitled Post',
-          content: p.content || '',
-          thumbnail: null,
-          platforms: ['facebook'],
-          status: p.status === 'ready_for_distribution' ? 'Published' : 'Drafts',
-          publishedDate: p.published_at ? new Date(p.published_at).toLocaleString() : '—',
-          engagement: 0,
-          belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
-        })));
+        setRealPosts((Array.isArray(reloadData) ? reloadData : []).map(p => {
+          let statusLabel = 'Drafts';
+          if (p.status === 'draft') statusLabel = 'Drafts';
+          else if (p.status === 'pending_review') statusLabel = 'Pending';
+          else if (p.status === 'rejected') statusLabel = 'Rejected';
+          else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
+          else if (p.status === 'failed') statusLabel = 'Failed';
+
+          const createdDate = p.created_at
+            ? new Date(p.created_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              }) + ' - ' + new Date(p.created_at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '—';
+
+          return {
+            id: p.id,
+            title: p.title || 'Untitled Post',
+            content: p.content || '',
+            thumbnail: null,
+            platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook'],
+            status: statusLabel,
+            publishedDate: p.published_at || createdDate,
+            engagement: 0,
+            belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+          };
+        }));
       }
     } catch (err) {
       if (err.name === 'AbortError') {
