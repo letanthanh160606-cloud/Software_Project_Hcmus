@@ -350,7 +350,7 @@ export default function PMmodule({ user }) {
             const pList = channels.map(c => c.platform);
             setConnectedPlatforms(pList);
             setPrimaryPlatform(pList[0]);
-            setSelectedChannelId(channels[0].id);
+            setSelectedChannelId(channels.length > 1 ? 'all' : channels[0].id);
           }
         }
       } catch (err) {
@@ -1253,6 +1253,35 @@ export default function PMmodule({ user }) {
 
             {selectedPost.status === 'Pending' && role === 'manager' && !isIndividual && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                {connectedChannelsList.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Target Account:</span>
+                    <select
+                      value={selectedChannelId}
+                      onChange={(e) => setSelectedChannelId(e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '12px',
+                        backgroundColor: '#ffffff',
+                        color: '#1e293b',
+                        fontWeight: '600',
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {connectedChannelsList.length > 1 && (
+                        <option value="all">🌐 All Connected Accounts ({connectedChannelsList.length} accounts)</option>
+                      )}
+                      {connectedChannelsList.map((ch) => (
+                        <option key={ch.id} value={ch.id}>
+                          {ch.platform === 'linkedin' ? '🔗 LinkedIn' : '📘 Facebook'} — {ch.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
                     Rejection Comment (Required to Reject)

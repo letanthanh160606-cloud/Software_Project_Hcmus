@@ -63,3 +63,14 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 * **Lý do thay đổi**:
   * Phân biệt rõ ràng 2 luồng lưu bài viết: Gửi duyệt (Pending) và Lưu bản nháp (Draft) theo đúng yêu cầu nghiệp vụ.
   * Giữ nguyên 100% bố cục, màu sắc, style hover của các nút bấm.
+
+---
+
+## 📌 6. File: `src/frontend/src/component/PMmodule.jsx` (Target Channel Selector)
+
+* **Vị trí**: Dòng 345 – 355, 1250 – 1285.
+* **Thay đổi**:
+  * Mặc định `selectedChannelId` là `'all'` khi Workspace có nhiều kênh kết nối (cả Facebook & LinkedIn).
+  * Thêm dropdown **Target Account** vào khu vực Modal xét duyệt bài viết (`Pending`) của Manager để Manager có thể chủ động chọn đăng lên **Facebook**, **LinkedIn**, hoặc **Tất cả các tài khoản**.
+* **Lý do thay đổi**:
+  * Khắc phục tình trạng khi duyệt bài viết Pending, hệ thống tự động gán kênh mặc định là LinkedIn mà không cho Manager lựa chọn Facebook.
