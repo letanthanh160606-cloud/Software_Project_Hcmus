@@ -326,6 +326,18 @@ class Post(Base):
         server_default=text("'[]'::jsonb"),
     )
 
+    target_account_ids: Mapped[list[str] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        server_default=text("'[]'::jsonb"),
+    )
+
+    target_accounts_mode: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        server_default="ALL_SELECTED_PLATFORMS",
+    )
+
     submitted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

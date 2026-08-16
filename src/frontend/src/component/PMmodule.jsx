@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import facebook from '../assets/fblg.png';
 import linkedin from '../assets/linkedinlg.png';
+import TargetAccountSelector from './TargetAccountSelector.jsx';
 
 // Dynamic Posts Data from Backend API
 const businessPosts = [];
@@ -285,9 +286,29 @@ export default function PMmodule({ user }) {
   const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
   const [connectedChannelsList, setConnectedChannelsList] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState('');
+  const [selectedAccountIds, setSelectedAccountIds] = useState([]);
+  const [targetAccountsMode, setTargetAccountsMode] = useState('ALL_SELECTED_PLATFORMS');
   const [publishedUrlsList, setPublishedUrlsList] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
+
+  // Initialize selectedAccountIds whenever selectedPost changes
+  useEffect(() => {
+    if (!selectedPost) {
+      setSelectedAccountIds([]);
+      setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
+      return;
+    }
+    const postPlatforms = (selectedPost.platforms || ['facebook']).map(p => p.toLowerCase().trim());
+    const scoped = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
+    if (selectedPost.target_account_ids && Array.isArray(selectedPost.target_account_ids) && selectedPost.target_account_ids.length > 0) {
+      setSelectedAccountIds(selectedPost.target_account_ids);
+      setTargetAccountsMode(selectedPost.target_accounts_mode || 'SELECTED');
+    } else {
+      setSelectedAccountIds(scoped.map(c => c.id));
+      setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
+    }
+  }, [selectedPost, connectedChannelsList]);
 
   useEffect(() => {
     const fetchPublishedUrls = async () => {
@@ -427,26 +448,32 @@ export default function PMmodule({ user }) {
 
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const handlePublishToFacebook = async (postId, targetChannelId = selectedChannelId) => {
+  const handlePublishToFacebook = async (postId) => {
     setIsPublishing(true);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const token = localStorage.getItem('token');
-      const channelsToPublish = (targetChannelId === 'all' && connectedChannelsList.length > 0)
-        ? connectedChannelsList
-        : connectedChannelsList.filter(c => c.id === targetChannelId);
+      // 1. Strictly scope to selectedPost.platforms
+      const postPlatforms = (selectedPost?.platforms || ['facebook']).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
+      const scopedChannels = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
 
-      const targetList = channelsToPublish.length > 0 
-        ? channelsToPublish 
-        : [{ id: targetChannelId, platform: primaryPlatform || 'facebook' }];
+      let targetList = [];
+      if (targetAccountsMode === 'ALL_SELECTED_PLATFORMS' || selectedAccountIds.length === 0) {
+        targetList = scopedChannels;
+      } else {
+        targetList = scopedChannels.filter(c => selectedAccountIds.includes(c.id));
+      }
+
+      if (targetList.length === 0) {
+        toast.error('Vui lòng chọn ít nhất 1 tài khoản đích thuộc nền tảng đã chọn!');
+        setIsPublishing(false);
+        return;
+      }
 
       const results = await Promise.all(
         targetList.map(async (ch) => {
-          let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${ch.platform || 'facebook'}`;
-          if (ch.id && ch.id !== 'all') {
-            publishUrl += `&channel_id=${ch.id}`;
-          }
+          let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${ch.platform}&channel_id=${ch.id}`;
           const res = await fetch(publishUrl, {
             method: 'POST',
             headers: {
@@ -1107,35 +1134,25 @@ export default function PMmodule({ user }) {
 
             {selectedPost.status === 'Drafts' && (isIndividual || role === 'manager') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                {connectedChannelsList.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Target Account:</span>
-                    <select
-                      value={selectedChannelId}
-                      onChange={(e) => setSelectedChannelId(e.target.value)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '12px',
-                        backgroundColor: '#ffffff',
-                        color: '#1e293b',
-                        fontWeight: '600',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {connectedChannelsList.length > 1 && (
-                        <option value="all">🌐 All Connected Accounts ({connectedChannelsList.length} accounts)</option>
-                      )}
-                      {connectedChannelsList.map((ch) => (
-                        <option key={ch.id} value={ch.id}>
-                          {ch.platform === 'linkedin' ? '🔗 LinkedIn' : '📘 Facebook'} — {ch.display_name}
-                        </option>
-                      ))}
-                    </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.5px' }}>
+                      Target Accounts
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      Filter: {selectedPost.platforms?.join(', ') || 'None'}
+                    </span>
                   </div>
-                )}
+                  <TargetAccountSelector
+                    selectedPlatforms={selectedPost.platforms || []}
+                    connectedChannels={connectedChannelsList}
+                    selectedAccountIds={selectedAccountIds}
+                    onChange={(newIds, newMode) => {
+                      setSelectedAccountIds(newIds);
+                      setTargetAccountsMode(newMode);
+                    }}
+                  />
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                   <button
                     type="button"
@@ -1159,7 +1176,7 @@ export default function PMmodule({ user }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handlePublishToFacebook(selectedPost.id, selectedChannelId)}
+                    onClick={() => handlePublishToFacebook(selectedPost.id)}
                     disabled={isPublishing}
                     style={{
                       padding: '8px 16px',
@@ -1257,35 +1274,25 @@ export default function PMmodule({ user }) {
 
             {selectedPost.status === 'Pending' && role === 'manager' && !isIndividual && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                {connectedChannelsList.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Target Account:</span>
-                    <select
-                      value={selectedChannelId}
-                      onChange={(e) => setSelectedChannelId(e.target.value)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '12px',
-                        backgroundColor: '#ffffff',
-                        color: '#1e293b',
-                        fontWeight: '600',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {connectedChannelsList.length > 1 && (
-                        <option value="all">🌐 All Connected Accounts ({connectedChannelsList.length} accounts)</option>
-                      )}
-                      {connectedChannelsList.map((ch) => (
-                        <option key={ch.id} value={ch.id}>
-                          {ch.platform === 'linkedin' ? '🔗 LinkedIn' : '📘 Facebook'} — {ch.display_name}
-                        </option>
-                      ))}
-                    </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.5px' }}>
+                      Target Accounts
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      Filter: {selectedPost.platforms?.join(', ') || 'None'}
+                    </span>
                   </div>
-                )}
+                  <TargetAccountSelector
+                    selectedPlatforms={selectedPost.platforms || []}
+                    connectedChannels={connectedChannelsList}
+                    selectedAccountIds={selectedAccountIds}
+                    onChange={(newIds, newMode) => {
+                      setSelectedAccountIds(newIds);
+                      setTargetAccountsMode(newMode);
+                    }}
+                  />
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
                     Rejection Comment (Required to Reject)
@@ -1309,7 +1316,7 @@ export default function PMmodule({ user }) {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
                   <button
                     type="button"
-                    onClick={() => handlePublishToFacebook(selectedPost.id, selectedChannelId)}
+                    onClick={() => handlePublishToFacebook(selectedPost.id)}
                     disabled={isPublishing}
                     style={{
                       padding: '8px 16px',

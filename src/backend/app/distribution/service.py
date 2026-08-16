@@ -376,6 +376,15 @@ class DistributionService:
         if not channel:
             raise HTTPException(status_code=400, detail="Không tìm thấy kênh mạng xã hội nào đang kết nối.")
 
+        # Validation: Verify channel platform is included in post.target_platforms if specified
+        if post.target_platforms and len(post.target_platforms) > 0:
+            allowed_platforms = set(p.lower().strip() for p in post.target_platforms)
+            if channel.platform.lower().strip() not in allowed_platforms:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Không thể xuất bản: Kênh '{channel.display_name}' ({channel.platform}) không nằm trong danh sách nền tảng đích của bài viết ({list(allowed_platforms)})."
+                )
+
         # Idempotency Check per channel: check if this post was already published on this channel
         existing_dist = self.db.scalar(
             select(PostDistribution).where(

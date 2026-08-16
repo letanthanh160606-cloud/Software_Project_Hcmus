@@ -201,6 +201,60 @@ class DistributionModuleTestSuite(unittest.TestCase):
 
         print("  [PASS] [TC7] DELETE Channel 409 Conflict Guard (blocking active posts) verified.")
 
+    def test_tc8_target_platform_scoping_and_cross_validation(self):
+        """TC8: Verify that publishing to a channel outside post.target_platforms is rejected."""
+        from app.models import Post, SocialAccount, User
+        from sqlalchemy import select
+        import uuid
+
+        # 1. Create a dummy user & channel
+        user = self.db.scalar(select(User).limit(1))
+        if not user:
+            user = User(email=f"test_{uuid.uuid4().hex[:6]}@example.com", password_hash="dummy", role="individual")
+            self.db.add(user)
+            self.db.commit()
+
+        fb_channel = self.service.repo.create_channel(
+            platform="facebook",
+            platform_account_id=f"fb_scope_{uuid.uuid4().hex[:8]}",
+            display_name="Scope Test FB Page",
+            owner_type="individual",
+            owner_id=str(user.users_uuid),
+            connected_by=user.users_uuid,
+            access_token_encrypted="mock_token",
+            note="Test note",
+            refresh_token_encrypted=None,
+            token_expires_at=None,
+        )
+
+        # 2. Create post with target_platforms=['linkedin'] (Facebook is NOT allowed)
+        post = Post(
+            author_id=user.users_uuid,
+            title="LinkedIn Only Post",
+            content="Content for LinkedIn only",
+            status="draft",
+            target_platforms=["linkedin"],
+            target_account_ids=[],
+            target_accounts_mode="ALL_SELECTED_PLATFORMS",
+        )
+        self.db.add(post)
+        self.db.commit()
+        self.db.refresh(post)
+
+        # 3. Attempt to publish to Facebook channel -> MUST be rejected with HTTP 400
+        with self.assertRaises(HTTPException) as ctx:
+            self.service.publish_post_to_channel(user=user, post_id=post.id, channel_id=fb_channel.id)
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("không nằm trong danh sách nền tảng đích", ctx.exception.detail)
+
+        # Clean up
+        self.db.delete(post)
+        self.db.delete(fb_channel)
+        self.db.commit()
+
+        print("  [PASS] [TC8] Target Platform Scoping & Cross-validation guard verified.")
+
 
 if __name__ == "__main__":
     print("\n=======================================================")

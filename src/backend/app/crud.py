@@ -270,6 +270,8 @@ def create_post(
     seo_keywords: list[str] | None = None,
     seo_hashtags: list[str] | None = None,
     target_platforms: list[str] | None = None,
+    target_account_ids: list[str] | None = None,
+    target_accounts_mode: str = "ALL_SELECTED_PLATFORMS",
     status: str = "draft",
 ) -> Post:
     post = Post(
@@ -284,6 +286,8 @@ def create_post(
         seo_keywords=seo_keywords,
         seo_hashtags=seo_hashtags,
         target_platforms=target_platforms or [],
+        target_account_ids=target_account_ids or [],
+        target_accounts_mode=target_accounts_mode or "ALL_SELECTED_PLATFORMS",
     )
 
     db.add(post)

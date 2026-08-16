@@ -172,6 +172,8 @@ class PostCreate(BaseModel):
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
     target_platforms: list[str] | None = None
+    target_account_ids: list[str] | None = None
+    target_accounts_mode: str = "ALL_SELECTED_PLATFORMS"
 
 class PostMediaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -199,6 +201,8 @@ class PostResponse(BaseModel):
     seo_keywords: list[str] | None = None
     seo_hashtags: list[str] | None = None
     target_platforms: list[str] | None = None
+    target_account_ids: list[str] | None = None
+    target_accounts_mode: str = "ALL_SELECTED_PLATFORMS"
 
     attachment: PostMediaResponse | None = None
 

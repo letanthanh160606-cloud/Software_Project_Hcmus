@@ -86,3 +86,16 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 * **Lý do thay đổi**:
   * Khi người dùng chỉ tích chọn Facebook bên Content, bài viết tại Post Management chỉ hiển thị biểu tượng Facebook.
   * Khi người dùng tích chọn cả Facebook & LinkedIn, bài viết hiển thị cả 2 biểu tượng.
+
+---
+
+## 📌 8. File: `src/frontend/src/component/TargetAccountSelector.jsx` & `PMmodule.jsx` (Hierarchical Scoped Accounts)
+
+* **Vị trí**: `TargetAccountSelector.jsx` (Toàn bộ component), `PMmodule.jsx` (Dòng 1130 – 1160, 1270 – 1300).
+* **Thay đổi**:
+  * Tạo component `TargetAccountSelector.jsx` dạng cây phân cấp (Hierarchical Tree) có ô tìm kiếm (Search), Master Checkbox *"All Accounts on Selected Platforms"*, Header phân nhóm theo Platform kèm số lượng đã chọn (ví dụ: `Facebook (2/2)`, `LinkedIn (4/10)`), nút chọn tất cả trong từng platform, và từng checkbox tài khoản độc lập.
+  * Tự động lọc tài khoản kết nối theo đúng `selectedPlatforms` của bài viết. Bất kỳ tài khoản nào không thuộc platform đã chọn sẽ bị loại khỏi bộ lọc và tự động xóa khỏi danh sách chọn khi platform bị uncheck.
+  * Tích hợp `TargetAccountSelector` vào Modal bài viết (`Drafts` và `Pending`) trong `PMmodule.jsx`.
+* **Lý do thay đổi**:
+  * Giải quyết triệt để vấn đề logic: Không cho phép hiển thị tài khoản LinkedIn khi bài viết chỉ chọn Facebook.
+  * Đảm bảo khả năng mở rộng (scale) lên hàng chục hoặc hàng trăm tài khoản trên nhiều nền tảng (Facebook, LinkedIn, Instagram, TikTok, X,...) trong tương lai mà không bị vỡ giao diện.

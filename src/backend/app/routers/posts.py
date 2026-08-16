@@ -47,7 +47,20 @@ def create_post(
                 detail="You do not have access to this workspace",
             )
 
-    post_status = "pending_review" if payload.status in ("pending", "pending_review") else "draft"
+    # Cross-validation between target_platforms and target_account_ids
+    if payload.target_account_ids and len(payload.target_account_ids) > 0:
+        from app.models import SocialAccount
+        from sqlalchemy import select
+        selected_platforms = set(p.lower().strip() for p in (payload.target_platforms or []))
+        accounts = db.scalars(
+            select(SocialAccount).where(SocialAccount.id.in_(payload.target_account_ids))
+        ).all()
+        for acc in accounts:
+            if acc.platform.lower().strip() not in selected_platforms:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid target account: '{acc.display_name}' ({acc.platform}) does not belong to selected target platforms {list(selected_platforms)}."
+                )
 
     try:
         return crud.create_post(
@@ -61,6 +74,8 @@ def create_post(
             seo_keywords=payload.seo_keywords,
             seo_hashtags=payload.seo_hashtags,
             target_platforms=payload.target_platforms,
+            target_account_ids=payload.target_account_ids,
+            target_accounts_mode=payload.target_accounts_mode or "ALL_SELECTED_PLATFORMS",
             status=post_status,
         )
 
