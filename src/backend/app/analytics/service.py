@@ -44,7 +44,7 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
     """
     timeframe_clean = timeframe.capitalize()
     labels_map = {
-        "Weekly": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+        "Weekly": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "Monthly": ["Week 1", "Week 2", "Week 3", "Week 4"],
         "Yearly": ["Jan", "Mar", "May", "Jul", "Sep", "Nov"],
     }

@@ -297,3 +297,22 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
     * Hiển thị tổng tương tác tháng này (ví dụ: `211`).
 * **Lý do thay đổi**:
   * Đáp ứng đúng nhu cầu phân tích tương tác thực tế giữa các kênh và đo lường tỷ lệ tăng trưởng theo tháng của người dùng, giữ nguyên vẹn 100% phong cách thiết kế thẩm mỹ gốc.
+
+---
+
+## 📌 22. File: `src/frontend/src/component/DBmodule.jsx` & `src/backend/app/analytics/service.py` (This Week Timeline & Card Transition)
+
+* **Vị trí**:
+  * `DBmodule.jsx`: Dòng 55 – 65, 110 – 125, 530 – 545.
+  * Backend: `service.py` (`get_timeline`).
+* **Thay đổi**:
+  * Chuyển đổi thẻ banner lớn màu cam và biểu đồ từ **"This Month"** sang **"This Week"**:
+    * Tiêu đề đổi thành **`This Week`** (thay cho `This Month`).
+    * Biểu đồ đường hiển thị 7 ngày trong tuần: `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`, `Sun` và các điểm tương tác tương ứng của từng ngày trong tuần hiện tại.
+    * Con số lớn hiển thị tổng số lượt tương tác của **Tuần này (This Week Interactions)** (ví dụ: `211` vào Thứ Năm - Thu).
+  * Backend:
+    * Chuẩn hóa bộ lọc thời gian `get_timeline(timeframe="Weekly")` từ Thứ Hai đến Chủ Nhật của tuần hiện tại.
+    * Cập nhật danh sách nhãn (labels) Title Case thân thiện: `['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']`.
+* **Lý do thay đổi**:
+  * Yêu cầu từ người dùng: chuyển đổi chế độ xem tiến độ tương tác nhanh trên Dashboard chính sang dạng Tuần này (This Week), giữ nguyên 100% bố cục và màu sắc thiết kế gốc.
+

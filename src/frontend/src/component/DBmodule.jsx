@@ -56,8 +56,8 @@ export default function DBmodule({ user }) {
   const [graphSta, setGraphSta] = useState(0);
 
   const [doughnutDataValues, setDoughnutDataValues] = useState([0, 0]);
-  const [monthlyGraphLabels, setMonthlyGraphLabels] = useState(['Week 1', 'Week 2', 'Week 3', 'Week 4']);
-  const [monthlyGraphData, setMonthlyGraphData] = useState([0, 0, 0, 0]);
+  const [monthlyGraphLabels, setMonthlyGraphLabels] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  const [monthlyGraphData, setMonthlyGraphData] = useState([0, 0, 0, 0, 0, 0, 0]);
 
   // KPI popup state
   const [showKPIPopup, setShowKPIPopup] = useState(false);
@@ -69,7 +69,7 @@ export default function DBmodule({ user }) {
     const fetchDashboardAnalytics = async () => {
       if (!workspaceId) {
         setDoughnutDataValues([0, 0]);
-        setMonthlyGraphData([0, 0, 0, 0]);
+        setMonthlyGraphData([0, 0, 0, 0, 0, 0, 0]);
         setMonthlyIncrease(0);
         setGraphSta(0);
         setNetGainPct(0);
@@ -109,17 +109,17 @@ export default function DBmodule({ user }) {
           }
         }
 
-        // 2. Timeline (Monthly)
-        const tlRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=Monthly`, { headers });
+        // 2. Timeline (Weekly)
+        const tlRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=Weekly`, { headers });
         if (tlRes.ok) {
           const tlData = await tlRes.json();
-          setMonthlyGraphLabels(tlData.labels || ['Week 1', 'Week 2', 'Week 3', 'Week 4']);
-          const fbSeries = tlData.series?.facebook || [0, 0, 0, 0];
-          const liSeries = tlData.series?.linkedin || [0, 0, 0, 0];
+          setMonthlyGraphLabels(tlData.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+          const fbSeries = tlData.series?.facebook || [0, 0, 0, 0, 0, 0, 0];
+          const liSeries = tlData.series?.linkedin || [0, 0, 0, 0, 0, 0, 0];
           const combined = fbSeries.map((v, i) => v + (liSeries[i] || 0));
           setMonthlyGraphData(combined);
-          const totalMonthly = combined.reduce((acc, curr) => acc + curr, 0);
-          setGraphSta(totalMonthly);
+          const totalWeekly = combined.reduce((acc, curr) => acc + curr, 0);
+          setGraphSta(totalWeekly);
         }
 
         // 3. Today stats
@@ -535,7 +535,7 @@ export default function DBmodule({ user }) {
                     fontWeight: '700',
                     fontSize: '32px',
                     position: 'absolute'
-                  }}>This Month</h1>
+                  }}>This Week</h1>
 
                   <h1 style={{
                     padding: '0px',
