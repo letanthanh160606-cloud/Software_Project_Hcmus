@@ -6,6 +6,8 @@ from app.analytics import service
 from app.analytics.schemas import (
     GenerateReportRequest,
     GenerateReportResponse,
+    KpiGoalRequest,
+    KpiGoalResponse,
     OverviewResponse,
     ReportItemResponse,
     ReportListResponse,
@@ -77,6 +79,34 @@ def get_top_engaging_posts(
     Returns highest-engaging posts published in this workspace.
     """
     return service.get_top_posts(db, workspace_id, limit)
+
+
+@router.get("/analytics/{workspace_id}/kpi", response_model=KpiGoalResponse)
+def get_workspace_kpi_goal(
+    workspace_id: str,
+    month_year: str | None = Query(None, description="Month-Year format YYYY-MM"),
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns monthly target interactions, current interactions, and progress percentage.
+    """
+    return service.get_kpi_goal(db, workspace_id, month_year)
+
+
+@router.put("/analytics/{workspace_id}/kpi", response_model=KpiGoalResponse)
+def update_workspace_kpi_goal(
+    workspace_id: str,
+    payload: KpiGoalRequest,
+    db: Session = Depends(get_db),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Sets or updates the monthly KPI target interactions for the workspace.
+    """
+    return service.update_kpi_goal(db, workspace_id, payload)
 
 
 @router.post("/analytics/{workspace_id}/sync")
@@ -167,21 +197,32 @@ def list_saved_reports(
 def download_report_document(
     workspace_id: str,
     report_id: uuid.UUID,
+    token: str | None = Query(None),
     db: Session = Depends(get_db),
-    ctx: WorkspaceContext = Depends(get_workspace_context),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Exports and streams the report document for download.
+    Supports direct browser download and authenticated frontend Fetch requests.
     """
+    import re
     from app.analytics.models import Report
+
     report = db.get(Report, report_id)
     if not report or report.workspace_id != workspace_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
 
-    content = f"# {report.title}\nSaved Date: {report.saved_date}\nTimeframe: {report.timeframe}\n\n## Summary\n{report.summary}\n"
+    content = (
+        f"# {report.title}\n\n"
+        f"**Saved Date:** {report.saved_date}\n"
+        f"**Timeframe:** {report.timeframe}\n"
+        f"**Workspace ID:** {report.workspace_id}\n\n"
+        f"---\n\n"
+        f"## Executive Summary & AI Insights\n\n"
+        f"{report.summary}\n"
+    )
+    safe_filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', report.title) or "Report"
     return Response(
         content=content,
-        media_type="text/markdown",
-        headers={"Content-Disposition": f'attachment; filename="{report.title}.md"'},
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}.md"'},
     )

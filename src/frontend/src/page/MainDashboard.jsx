@@ -36,7 +36,16 @@ export default function MainDashboard() {
 
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        const wsId =
+          parsed.workspace_id ||
+          parsed.workspace?.workspace_id ||
+          parsed.workspace?.workspace_uuid ||
+          (typeof parsed.workspace === 'string' ? parsed.workspace : null);
+        setUser({
+          ...parsed,
+          workspace_id: wsId || null,
+        });
       } catch (err) {
         console.error("Error parsing user data", err);
       }

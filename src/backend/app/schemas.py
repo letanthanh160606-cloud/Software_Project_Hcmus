@@ -212,6 +212,9 @@ class PostResponse(BaseModel):
     reject_reason: str | None = None
     published_at: datetime | None = None
 
+    engagement: int = 0
+    total_engagements: int = 0
+
     created_at: datetime
     updated_at: datetime
 

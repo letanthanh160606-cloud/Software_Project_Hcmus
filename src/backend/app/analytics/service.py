@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, selectinload
 from cryptography.fernet import Fernet
@@ -14,11 +14,14 @@ from app.analytics.models import (
     IngestionRun,
     Report,
     ReportExport,
+    WorkspaceKpiGoal,
 )
 from app.analytics.schemas import (
     BatchIngestRequest,
     BatchIngestResponse,
     GenerateReportResponse,
+    KpiGoalRequest,
+    KpiGoalResponse,
     OverviewResponse,
     PlatformOverview,
     ReportItemResponse,
@@ -30,7 +33,7 @@ from app.analytics.schemas import (
     TopPostsResponse,
 )
 from app.config import get_settings
-from app.models import Post, PostDistribution, PostMedia, SocialAccount, User
+from app.models import Post, PostDistribution, PostMedia, SocialAccount, User, Workspace
 
 logger = logging.getLogger("analytics.service")
 
@@ -78,9 +81,30 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
                     li_buckets[idx] += r.engagements
             fb_series = fb_buckets
             li_series = li_buckets
+        elif timeframe_clean == "Monthly":
+            # Map by 4 weeks of the month (Days 1-7: Week 1, 8-14: Week 2, 15-21: Week 3, 22+: Week 4)
+            fb_buckets = [0] * 4
+            li_buckets = [0] * 4
+            for r in fb_metrics:
+                w_idx = min((r.metric_date.day - 1) // 7, 3)
+                fb_buckets[w_idx] += r.engagements
+            for r in li_metrics:
+                w_idx = min((r.metric_date.day - 1) // 7, 3)
+                li_buckets[w_idx] += r.engagements
+            fb_series = fb_buckets
+            li_series = li_buckets
         else:
-            fb_series = [sum(r.engagements for r in fb_metrics) // len(labels)] * len(labels)
-            li_series = [sum(r.engagements for r in li_metrics) // len(labels)] * len(labels)
+            # Map across 6 bi-monthly buckets: Jan-Feb, Mar-Apr, May-Jun, Jul-Aug, Sep-Oct, Nov-Dec
+            fb_buckets = [0] * 6
+            li_buckets = [0] * 6
+            for r in fb_metrics:
+                m_idx = min((r.metric_date.month - 1) // 2, 5)
+                fb_buckets[m_idx] += r.engagements
+            for r in li_metrics:
+                m_idx = min((r.metric_date.month - 1) // 2, 5)
+                li_buckets[m_idx] += r.engagements
+            fb_series = fb_buckets
+            li_series = li_buckets
     else:
         fb_series = [0] * len(labels)
         li_series = [0] * len(labels)
@@ -94,10 +118,28 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
 
 def get_overview(db: Session, workspace_id: str) -> OverviewResponse:
     """
-    Computes overall platform attraction (impressions) and percentage share from real database records.
+    Computes overall platform attraction (impressions) and percentage share from the latest database records per channel.
     """
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where(EngagementMetric.workspace_id == workspace_id)
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
     metrics = db.scalars(
-        select(EngagementMetric).where(EngagementMetric.workspace_id == workspace_id)
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
     ).all()
 
     fb_records = [m for m in metrics if m.platform.lower() == "facebook"]
@@ -152,7 +194,7 @@ def get_today_stats(db: Session, workspace_id: str, user: User, role: str) -> To
 
 def get_top_posts(db: Session, workspace_id: str, limit: int = 7) -> TopPostsResponse:
     """
-    Retrieves highest-engaging published posts for the workspace.
+    Retrieves highest-engaging published posts for the workspace using latest metrics.
     """
     posts = db.scalars(
         select(Post)
@@ -165,19 +207,46 @@ def get_top_posts(db: Session, workspace_id: str, limit: int = 7) -> TopPostsRes
         .limit(limit)
     ).all()
 
+    if not posts:
+        return TopPostsResponse(posts=[])
+
+    post_ids = [p.id for p in posts]
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where(EngagementMetric.post_id.in_(post_ids))
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
+    latest_metrics = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
+    ).all()
+
+    metrics_by_post: dict[uuid.UUID, list[EngagementMetric]] = {}
+    for m in latest_metrics:
+        metrics_by_post.setdefault(m.post_id, []).append(m)
+
     items: list[TopPostItem] = []
     for p in posts:
-        # Check distribution
         dist = db.scalar(select(PostDistribution).where(PostDistribution.post_id == p.id))
         pub_url = dist.published_url if dist else None
 
-        # Check metrics
-        metric = db.scalar(
-            select(EngagementMetric).where(EngagementMetric.post_id == p.id)
-        )
-        engagements = metric.engagements if metric else 0
-        eng_rate = metric.engagement_rate if metric else 0.0
-        platform = metric.platform if metric else "facebook"
+        post_m_list = metrics_by_post.get(p.id, [])
+        total_eng = sum(m.engagements for m in post_m_list)
+        total_imp = sum((m.impressions or m.views) for m in post_m_list)
+        eng_rate = round((total_eng / total_imp) * 100, 2) if total_imp > 0 else 0.0
+        platform = post_m_list[0].platform if post_m_list else "facebook"
 
         thumb = p.attachment.image_url if p.attachment else None
 
@@ -187,7 +256,7 @@ def get_top_posts(db: Session, workspace_id: str, limit: int = 7) -> TopPostsRes
                 title=p.title or p.content[:40] or "Untitled Post",
                 platform=platform,
                 published_url=pub_url,
-                total_engagements=engagements,
+                total_engagements=total_eng,
                 engagement_rate=eng_rate,
                 thumbnail_url=thumb,
             )
@@ -315,94 +384,113 @@ def handle_batch_ingestion(db: Session, req: BatchIngestRequest) -> BatchIngestR
 
     for rec in req.records:
         try:
-            # Find associated workspace from channel
-            channel = db.get(SocialAccount, rec.channel_id)
-            if not channel:
-                raise ValueError(f"Channel {rec.channel_id} not found")
+            with db.begin_nested():
+                # Find associated workspace from channel
+                channel = db.get(SocialAccount, rec.channel_id)
+                if not channel:
+                    raise ValueError(f"Channel {rec.channel_id} not found")
 
-            workspace_id = (
-                channel.owner_id if channel.owner_type == "workspace" else "default_ws"
-            )
-
-            # Match post_id if external_post_id corresponds to a post distribution
-            matched_post_id = rec.post_id
-            if not matched_post_id:
-                dist = db.scalar(
-                    select(PostDistribution).where(
-                        PostDistribution.channel_id == rec.channel_id
+                # Match post_id if external_post_id corresponds to a post distribution
+                matched_post_id = rec.post_id
+                if not matched_post_id:
+                    dist = db.scalar(
+                        select(PostDistribution).where(
+                            PostDistribution.channel_id == rec.channel_id
+                        )
                     )
+                    if dist:
+                        matched_post_id = dist.post_id
+
+                workspace_id = None
+                if channel.owner_type == "workspace" and channel.owner_id:
+                    ws_exists = db.scalar(
+                        select(Workspace.workspace_uuid).where(
+                            Workspace.workspace_uuid == channel.owner_id
+                        )
+                    )
+                    if ws_exists:
+                        workspace_id = channel.owner_id
+
+                if not workspace_id and matched_post_id:
+                    post_obj = db.get(Post, matched_post_id)
+                    if post_obj and post_obj.workspace_id:
+                        workspace_id = post_obj.workspace_id
+
+                if not workspace_id:
+                    first_ws = db.scalar(select(Workspace.workspace_uuid).limit(1))
+                    workspace_id = first_ws or "38X7HD4924PRE3FG"
+
+                engagements = (
+                    rec.metrics.likes
+                    + rec.metrics.comments
+                    + rec.metrics.shares
+                    + rec.metrics.clicks
                 )
-                if dist:
-                    matched_post_id = dist.post_id
+                eng_rate = (
+                    round((engagements / max(rec.metrics.impressions, 1)) * 100, 2)
+                    if rec.metrics.impressions > 0
+                    else 0.0
+                )
 
-            engagements = (
-                rec.metrics.likes
-                + rec.metrics.comments
-                + rec.metrics.shares
-                + rec.metrics.clicks
-            )
-            eng_rate = (
-                round((engagements / max(rec.metrics.impressions, 1)) * 100, 2)
-                if rec.metrics.impressions > 0
-                else 0.0
-            )
+                # Upsert into analytics.engagement_metrics
+                stmt = insert(EngagementMetric).values(
+                    id=uuid.uuid4(),
+                    workspace_id=workspace_id,
+                    post_id=matched_post_id,
+                    channel_id=rec.channel_id,
+                    platform=rec.platform or channel.platform or req.platform,
+                    external_post_id=rec.external_post_id,
+                    metric_date=rec.metric_date,
+                    impressions=rec.metrics.impressions,
+                    reach=rec.metrics.reach,
+                    views=rec.metrics.views,
+                    likes=rec.metrics.likes,
+                    comments=rec.metrics.comments,
+                    shares=rec.metrics.shares,
+                    clicks=rec.metrics.clicks,
+                    engagements=engagements,
+                    engagement_rate=eng_rate,
+                    snapshot_time=datetime.now(timezone.utc),
+                )
+                stmt = stmt.on_conflict_do_update(
+                    constraint="uq_metric_channel_post_date",
+                    set_={
+                        "impressions": stmt.excluded.impressions,
+                        "reach": stmt.excluded.reach,
+                        "views": stmt.excluded.views,
+                        "likes": stmt.excluded.likes,
+                        "comments": stmt.excluded.comments,
+                        "shares": stmt.excluded.shares,
+                        "clicks": stmt.excluded.clicks,
+                        "engagements": stmt.excluded.engagements,
+                        "engagement_rate": stmt.excluded.engagement_rate,
+                        "snapshot_time": stmt.excluded.snapshot_time,
+                    },
+                )
+                db.execute(stmt)
+                success_cnt += 1
 
-            # Upsert into analytics.engagement_metrics
-            stmt = insert(EngagementMetric).values(
-                id=uuid.uuid4(),
-                workspace_id=workspace_id,
-                post_id=matched_post_id,
-                channel_id=rec.channel_id,
-                platform=req.platform,
-                external_post_id=rec.external_post_id,
-                metric_date=rec.metric_date,
-                impressions=rec.metrics.impressions,
-                reach=rec.metrics.reach,
-                views=rec.metrics.views,
-                likes=rec.metrics.likes,
-                comments=rec.metrics.comments,
-                shares=rec.metrics.shares,
-                clicks=rec.metrics.clicks,
-                engagements=engagements,
-                engagement_rate=eng_rate,
-                snapshot_time=datetime.now(timezone.utc),
-            )
-            stmt = stmt.on_conflict_do_update(
-                constraint="uq_metric_channel_post_date",
-                set_={
-                    "impressions": stmt.excluded.impressions,
-                    "reach": stmt.excluded.reach,
-                    "views": stmt.excluded.views,
-                    "likes": stmt.excluded.likes,
-                    "comments": stmt.excluded.comments,
-                    "shares": stmt.excluded.shares,
-                    "clicks": stmt.excluded.clicks,
-                    "engagements": stmt.excluded.engagements,
-                    "engagement_rate": stmt.excluded.engagement_rate,
-                    "snapshot_time": stmt.excluded.snapshot_time,
-                },
-            )
-            db.execute(stmt)
-            success_cnt += 1
-
-            # Log success event
-            event = IngestionEvent(
-                run_id=run.id,
-                external_post_id=rec.external_post_id,
-                status="success",
-            )
-            db.add(event)
+                # Log success event
+                event = IngestionEvent(
+                    run_id=run.id,
+                    external_post_id=rec.external_post_id,
+                    status="success",
+                )
+                db.add(event)
 
         except Exception as e:
             error_cnt += 1
             logger.error(f"Error ingesting record {rec.external_post_id}: {e}")
-            event = IngestionEvent(
-                run_id=run.id,
-                external_post_id=rec.external_post_id,
-                status="error",
-                error_message=str(e),
-            )
-            db.add(event)
+            try:
+                event = IngestionEvent(
+                    run_id=run.id,
+                    external_post_id=rec.external_post_id,
+                    status="error",
+                    error_message=str(e),
+                )
+                db.add(event)
+            except Exception:
+                pass
 
     run.status = "success" if error_cnt == 0 else "partial" if success_cnt > 0 else "failed"
     run.success_count = success_cnt
@@ -469,11 +557,17 @@ def get_active_posts_for_sync(
     if workspace_id:
         query = query.where(Post.workspace_id == workspace_id)
 
-    query = query.order_by(Post.created_at.desc()).limit(limit)
+    query = query.order_by(Post.created_at.desc())
     rows = db.execute(query).all()
 
+    seen_pairs = set()
     items = []
     for post, dist, channel in rows:
+        pair_key = (post.id, channel.id)
+        if pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
+
         ext_id = dist.external_post_id or ""
         if not ext_id and dist.published_url:
             if "urn:li:share:" in dist.published_url:
@@ -496,9 +590,125 @@ def get_active_posts_for_sync(
             "published_url": dist.published_url,
             "published_at": post.published_at or post.created_at,
         })
+        if len(items) >= limit:
+            break
 
     return {
         "total_posts": len(items),
         "posts": items,
     }
+
+
+def get_monthly_interactions(db: Session, workspace_id: str, month_year: str) -> int:
+    """
+    Computes total engagements across all platforms for a given workspace in a specific month (YYYY-MM).
+    Uses the latest metric snapshot per post/channel within the month.
+    """
+    try:
+        year, month = map(int, month_year.split("-"))
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, month + 1, 1)
+    except Exception:
+        start_date = date.today().replace(day=1)
+        end_date = date.today()
+
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where(
+            EngagementMetric.workspace_id == workspace_id,
+            EngagementMetric.metric_date >= start_date,
+            EngagementMetric.metric_date < end_date,
+        )
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
+    latest_metrics = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
+    ).all()
+    return sum(m.engagements for m in latest_metrics)
+
+
+def get_kpi_goal(db: Session, workspace_id: str, month_year: str | None = None) -> KpiGoalResponse:
+    """
+    Retrieves the KPI goal for a workspace for a specific month and calculates the progress percentage.
+    """
+    if not month_year:
+        month_year = datetime.now(timezone.utc).strftime("%Y-%m")
+
+    goal_record = db.scalar(
+        select(WorkspaceKpiGoal).where(
+            WorkspaceKpiGoal.workspace_id == workspace_id,
+            WorkspaceKpiGoal.month_year == month_year,
+        )
+    )
+    target = goal_record.target_interactions if goal_record else 500
+    current_interactions = get_monthly_interactions(db, workspace_id, month_year)
+    progress_percentage = (
+        min(100, round((current_interactions / target) * 100)) if target > 0 else 0
+    )
+
+    return KpiGoalResponse(
+        workspace_id=workspace_id,
+        month_year=month_year,
+        target_interactions=target,
+        current_interactions=current_interactions,
+        progress_percentage=progress_percentage,
+    )
+
+
+def update_kpi_goal(db: Session, workspace_id: str, payload: KpiGoalRequest) -> KpiGoalResponse:
+    """
+    Updates or inserts a target KPI goal for a workspace for the specified month.
+    """
+    month_year = payload.month_year or datetime.now(timezone.utc).strftime("%Y-%m")
+    goal_record = db.scalar(
+        select(WorkspaceKpiGoal).where(
+            WorkspaceKpiGoal.workspace_id == workspace_id,
+            WorkspaceKpiGoal.month_year == month_year,
+        )
+    )
+    if goal_record:
+        goal_record.target_interactions = payload.target_interactions
+    else:
+        goal_record = WorkspaceKpiGoal(
+            workspace_id=workspace_id,
+            month_year=month_year,
+            target_interactions=payload.target_interactions,
+        )
+        db.add(goal_record)
+
+    db.commit()
+    db.refresh(goal_record)
+
+    current_interactions = get_monthly_interactions(db, workspace_id, month_year)
+    progress_percentage = (
+        min(100, round((current_interactions / goal_record.target_interactions) * 100))
+        if goal_record.target_interactions > 0
+        else 0
+    )
+
+    return KpiGoalResponse(
+        workspace_id=workspace_id,
+        month_year=month_year,
+        target_interactions=goal_record.target_interactions,
+        current_interactions=current_interactions,
+        progress_percentage=progress_percentage,
+        message="KPI Goal updated successfully",
+    )
+
 

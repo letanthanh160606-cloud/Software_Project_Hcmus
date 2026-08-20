@@ -84,7 +84,7 @@ class GeminiReportProvider(BaseAIProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.endpoint = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.api_key}"
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}"
         )
 
     async def generate_statistical_report(self, context: dict[str, Any]) -> dict[str, Any]:

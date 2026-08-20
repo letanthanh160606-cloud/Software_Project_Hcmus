@@ -100,7 +100,7 @@ def create_member_for_workspace(
     membership = WorkspaceMember(
         user_id=user.users_uuid,
         workspace_id=workspace.workspace_uuid,
-        status="pending",
+        status="active",
     )
     db.add(membership)
 
@@ -174,6 +174,49 @@ def list_posts_for_user(db: Session, user_id) -> list[Post]:
         .options(selectinload(Post.attachment))
         .order_by(Post.created_at.desc())
     ).all()
+
+
+def attach_engagements_to_posts(db: Session, posts: list[Post]) -> list[any]:
+    if not posts:
+        return []
+    from app.analytics.models import EngagementMetric
+    from app.schemas import PostResponse
+
+    post_ids = [p.id for p in posts]
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where(EngagementMetric.post_id.in_(post_ids))
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
+    latest_metrics = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
+    ).all()
+
+    eng_by_post = {}
+    for m in latest_metrics:
+        eng_by_post[m.post_id] = eng_by_post.get(m.post_id, 0) + m.engagements
+
+    response_list = []
+    for p in posts:
+        res = PostResponse.model_validate(p)
+        eng_count = int(eng_by_post.get(p.id, 0))
+        res.engagement = eng_count
+        res.total_engagements = eng_count
+        response_list.append(res)
+    return response_list
 
 def list_tasks_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Task]:
     query = select(Task).where(Task.workspace_id == workspace_id)

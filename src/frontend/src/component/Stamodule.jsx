@@ -106,7 +106,11 @@ function MultiLineChart({ timeframe, seriesData, labelsData }) {
 export default function Stamodule({ user }) {
   const isManager = user?.role === 'manager';
   const token = localStorage.getItem('token');
-  const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || 'default_ws';
+  const workspaceId =
+    user?.workspace_id ||
+    user?.workspace?.workspace_id ||
+    user?.workspace?.workspace_uuid ||
+    (typeof user?.workspace === 'string' ? user.workspace : null);
 
   const [graphTimeframe, setGraphTimeframe] = useState('Weekly');
   const [timelineSeries, setTimelineSeries] = useState(null);
@@ -252,6 +256,14 @@ export default function Stamodule({ user }) {
   };
 
   useEffect(() => {
+    if (!workspaceId) {
+      setTimelineSeries(null);
+      setOverviewStats({ fb_pct: 0, fb_attraction: 0, li_pct: 0, li_attraction: 0 });
+      setTodayData({ total_interactions: 0, user_contribution: 0 });
+      setTopPosts([]);
+      setReportHistoryList([]);
+      return;
+    }
     fetchTimeline(graphTimeframe);
     fetchOverview();
     fetchTodayStats();
@@ -260,12 +272,14 @@ export default function Stamodule({ user }) {
   }, [workspaceId]);
 
   useEffect(() => {
+    if (!workspaceId) return;
     fetchTimeline(graphTimeframe);
-  }, [graphTimeframe]);
+  }, [graphTimeframe, workspaceId]);
 
   useEffect(() => {
+    if (!workspaceId) return;
     fetchAIReport(reportTimeframe);
-  }, [reportTimeframe]);
+  }, [reportTimeframe, workspaceId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -289,7 +303,9 @@ export default function Stamodule({ user }) {
 
   const filteredHistory = reportHistoryList.filter((item) => {
     if (!startDate && !endDate) return true;
-    const itemTime = new Date(item.savedDate).getTime();
+    const dateVal = item.saved_date || item.savedDate;
+    if (!dateVal) return true;
+    const itemTime = new Date(dateVal).getTime();
     const startTime = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
     const endTime = endDate ? new Date(endDate + 'T23:59:59').getTime() : Infinity;
     return itemTime >= startTime && itemTime <= endTime;
@@ -329,7 +345,7 @@ export default function Stamodule({ user }) {
   };
 
   const handleSaveReport = async () => {
-    const newTitle = reportTitle || `[${reportTimeframe} report saved]`;
+    const newTitle = reportTitle || `[${reportTimeframe} report for ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}]`;
 
     try {
       const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}`, {
@@ -356,14 +372,33 @@ export default function Stamodule({ user }) {
 
   const handleDownloadReport = async (item) => {
     try {
-      if (item.id && typeof item.id === 'string') {
-        window.open(`http://localhost:8000/api/v1/reports/${workspaceId}/${item.id}/download`, '_blank');
+      const reportId = item.id;
+      if (!reportId) {
+        toast.error('Invalid report ID');
         return;
       }
+      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/${reportId}/download`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        throw new Error(`Download error: ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const rawTitle = item.title || item.name || 'Statistical_Report';
+      const safeTitle = rawTitle.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      a.download = `${safeTitle}.md`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success(`Downloaded ${item.title || item.name || 'Report'}`);
     } catch (e) {
       console.warn('Download error:', e);
+      toast.error('Failed to download report document.');
     }
-    toast(`Downloading ${item.name}`, { icon: '📄' });
   };
 
   const handleViewPost = (post) => {
@@ -1025,8 +1060,8 @@ export default function Stamodule({ user }) {
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  <div style={{ color: '#7E7A72', fontWeight: '500' }}>{item.name}</div>
-                  <div>{item.savedDate}</div>
+                  <div style={{ color: '#1E1E1E', fontWeight: '600' }}>{item.title || item.name}</div>
+                  <div>{item.saved_date || item.savedDate || 'Recently'}</div>
                   <div>
                     <span
                       onClick={() => handleDownloadReport(item)}
@@ -1034,9 +1069,13 @@ export default function Stamodule({ user }) {
                         color: '#7E7A72',
                         cursor: 'pointer',
                         textDecoration: 'underline',
+                        fontWeight: '600',
+                        transition: 'color 0.15s ease',
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#FE7216')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#7E7A72')}
                     >
-                      {item.data}
+                      {item.data || 'Document'}
                     </span>
                   </div>
                 </div>

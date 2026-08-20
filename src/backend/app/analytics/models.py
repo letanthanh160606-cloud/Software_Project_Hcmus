@@ -210,3 +210,24 @@ class ReportExport(Base):
     )
 
     report: Mapped["Report"] = relationship(back_populates="exports")
+
+
+class WorkspaceKpiGoal(Base):
+    __tablename__ = "workspace_kpi_goals"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "month_year", name="uq_workspace_kpi_month"),
+        {"schema": "analytics"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()")
+    )
+    workspace_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    month_year: Mapped[str] = mapped_column(String(7), nullable=False)  # e.g. '2026-08'
+    target_interactions: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

@@ -74,12 +74,14 @@ class DistributionService:
         # Explicit workspace_id provided
         ws = crud.get_workspace_by_id(self.db, workspace_id)
         if not ws:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+            ws = self.db.query(Workspace).filter(Workspace.manager_id == user.users_uuid).first()
+            if not ws:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
 
         if ws.manager_id == user.users_uuid:
             return "workspace", ws.workspace_uuid, "manager"
 
-        if crud.user_can_access_workspace(self.db, user=user, workspace_id=workspace_id):
+        if crud.user_can_access_workspace(self.db, user=user, workspace_id=ws.workspace_uuid):
             return "workspace", ws.workspace_uuid, "member"
 
         raise HTTPException(

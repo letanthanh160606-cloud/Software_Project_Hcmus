@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     facebook_page_access_token: str = ""
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
+    linkedin_analytics_client_id: str = ""
+    linkedin_analytics_client_secret: str = ""
     oauth_redirect_uri: str = "http://localhost:8000/api/v1/distribution/channels/connect/callback"
     oauth_state_expire_seconds: int = 300  # 5 minutes
 

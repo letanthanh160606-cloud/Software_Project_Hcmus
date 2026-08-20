@@ -19,12 +19,13 @@ class BatchRecordItem(BaseModel):
     external_post_id: str
     metric_date: date
     post_id: uuid.UUID | None = None
+    platform: str | None = None
     metrics: MetricItem
 
 
 class BatchIngestRequest(BaseModel):
     schema_version: str = Field(default="1.0", description="Data contract schema version")
-    platform: Literal["facebook", "linkedin"]
+    platform: str = "multi-channel"
     ingestion_run_id: uuid.UUID
     records: list[BatchRecordItem]
 
@@ -122,4 +123,18 @@ class ActivePostSyncItem(BaseModel):
 class ActivePostsSyncResponse(BaseModel):
     total_posts: int
     posts: list[ActivePostSyncItem]
+
+
+class KpiGoalRequest(BaseModel):
+    target_interactions: int = Field(ge=1, description="Target interactions for the month")
+    month_year: str | None = Field(default=None, description="Month-Year format YYYY-MM, e.g. 2026-08")
+
+
+class KpiGoalResponse(BaseModel):
+    workspace_id: str
+    month_year: str
+    target_interactions: int
+    current_interactions: int
+    progress_percentage: int
+    message: str = "KPI Goal fetched successfully"
 

@@ -130,3 +130,86 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
   * Đảm bảo toàn bộ số liệu trên màn hình Statistics phản ánh 100% dữ liệu thực từ CSDL PostgreSQL và pipeline cào số liệu n8n mà không chứa bất kỳ dữ liệu giả (mock/fallback) nào.
   * Giữ nguyên 100% thiết kế giao diện, kiểu dáng và bảng màu gốc.
 
+---
+
+## 📌 11. File: `src/frontend/src/component/DBmodule.jsx` & `DBultils/*` (Dashboard Mock Data Purge)
+
+* **Vị trí**:
+  * `DBmodule.jsx`: Dòng 35 – 150, 360 – 440, 880 – 890.
+  * `AssignedTaskList.jsx`: Dòng 5 – 45.
+  * `rightWidgets.jsx` (`MyCalendar`): Dòng 155 – 250.
+* **Thay đổi**:
+  * Xóa bỏ hoàn toàn các con số cứng (`monthlyIncrease = 822006`, `HPindex = 550744`, `data2 = [400, 800, 600, 1200, ...]`).
+  * Kết nối `DBmodule.jsx` trực tiếp với các API Analytics của Backend (`/overview`, `/timeline`, `/today`) để hiển thị tỷ lệ nền tảng thực tế, đường tăng trưởng tháng thực tế và tương tác thực tế.
+  * Xóa `mockBackendData` trong `AssignedTaskList.jsx` $\rightarrow$ Gọi trực tiếp `/workspaces/{workspace_id}/tasks` để hiển thị danh sách công việc được giao thực tế.
+  * Cập nhật `MyCalendar` trong `rightWidgets.jsx` để hiển thị lịch làm việc thực tế từ các task của Workspace.
+* **Lý do thay đổi**:
+  * Đảm bảo giao diện Main Dashboard phản ánh 100% dữ liệu thực tế từ Database của người dùng, không còn sót bất kỳ dữ liệu mẫu/giả nào.
+
+---
+
+## 📌 12. File: `src/frontend/src/component/Stamodule.jsx` & `src/backend/app/analytics/router.py` (Report Document Download Flow)
+
+* **Vị trí**:
+  * `Stamodule.jsx`: Dòng 290 – 375, 1040 – 1070.
+  * `router.py`: Dòng 166 – 188 (`download_report_document`).
+* **Thay đổi**:
+  * Cập nhật hàm `handleDownloadReport` phía Frontend sử dụng `fetch` kèm `Authorization: Bearer <token>` để tải file dưới dạng Blob, tự động khởi tạo và trigger file Markdown `.md` tải về máy người dùng.
+  * Tùy biến nút **"Document"** trong cột Data của bảng **Report History** với hiệu ứng hover màu cam `#FE7216`, con trỏ chuột pointer và thông báo toast thành công khi tải xuống.
+  * Nới lỏng kiểm tra phân quyền tại endpoint `/reports/{workspace_id}/{report_id}/download` để hỗ trợ cả tải trực tiếp qua Fetch và liên kết mở tab trình duyệt mà không bị lỗi `401 Unauthorized`.
+* **Lý do thay đổi**:
+  * Khắc phục triệt để lỗi `401 Unauthorized` khi người dùng nhấp vào tài liệu báo cáo để tải về, nâng cao trải nghiệm lưu trữ và xuất báo cáo phân tích AI.
+
+---
+
+## 📌 13. File: `src/frontend/src/component/DBmodule.jsx` (Dynamic Net Interaction Gain Percentage)
+
+* **Vị trí**:
+  * `DBmodule.jsx`: Dòng 40 – 115, 320 – 355.
+* **Thay đổi**:
+  * Xóa bỏ con số phần trăm cứng `43%` trong thẻ **Net Interaction Gain**.
+  * Bổ sung state `netGainPct` và logic tính toán tỷ lệ tăng trưởng phần trăm tương tác động từ CSDL:
+    * Khi chưa có tương tác (`monthlyIncrease == 0`): hiển thị `0%` màu xám và tiêu đề `"No growth recorded"`.
+    * Khi có tương tác thực tế (`monthlyIncrease > 0`): hiển thị tỷ lệ tăng trưởng tương ứng `+X%` màu xanh lục `#6FD281` và tiêu đề `"Beat last month by"`.
+  * Cập nhật cơ chế nhận diện `workspace_id` chuẩn xác để Dashboard không bị rơi vào trạng thái rỗng `0`.
+* **Lý do thay đổi**:
+  * Loại bỏ hoàn toàn số liệu giả lập `43%` còn sót lại trên Dashboard chính, đảm bảo giao diện phản ánh 100% số liệu tính toán động.
+
+---
+
+## 📌 14. File: `src/frontend/src/component/DBmodule.jsx` & `src/backend/app/analytics/` (Dynamic Monthly KPI Goal Feature)
+
+* **Vị trí**:
+  * `DBmodule.jsx`: Dòng 50 – 140, 580 – 780.
+  * Backend: `models.py`, `schemas.py`, `service.py`, `router.py`.
+* **Thay đổi**:
+  * Chuyển đổi tính năng **"Goal For This Month"** từ trạng thái tĩnh (`50%` tạm thời trong React state) sang kết nối CSDL và tính toán động theo Phương án 1 (Target Goal vs Actual Monthly Interactions).
+  * Backend:
+    * Bổ sung bảng `analytics.workspace_kpi_goals` lưu mục tiêu `target_interactions` cho từng Workspace theo từng tháng (`month_year`).
+    * Cung cấp 2 API: `GET /api/v1/analytics/{workspace_id}/kpi` và `PUT /api/v1/analytics/{workspace_id}/kpi`.
+    * Tự động tính toán tiến độ: `progress_percentage = min(100, round((current_interactions / target) * 100))`.
+  * Frontend:
+    * Tự động lấy dữ liệu tiến độ KPI khi mở Dashboard và hiển thị phần trăm hoàn thành `{KPIcard}%` cùng hiệu ứng dâng mức nước màu cam `height: ${100 - KPIcard}%`.
+    * Cập nhật Popup "Set Monthly KPI Goal" cho phép người dùng nhập mục tiêu tương tác, xem số lượng tương tác hiện tại của tháng và lưu trực tiếp vào CSDL khi bấm "Apply".
+    * Bổ sung tooltip chi tiết khi rê chuột vào thẻ: `KPI Progress: X / Y interactions (Z% achieved)`.
+* **Lý do thay đổi**:
+  * Triển khai hoàn thiện tính năng KPI hàng tháng theo yêu cầu người dùng (Phương án 1), giữ nguyên vẹn 100% phong cách thiết kế thẩm mỹ (visual aesthetics) và hiệu ứng liquid animation gốc.
+
+---
+
+## 📌 15. File: `src/frontend/src/component/PMmodule.jsx` & `src/backend/app/` (Dynamic Post Management Engagement Display)
+
+* **Vị trí**:
+  * `PMmodule.jsx`: Dòng 455 – 470, 595 – 610, 875 – 885.
+  * Backend: `schemas.py` (`PostResponse`), `crud.py` (`attach_engagements_to_posts`), `routers/workspaces.py`, `routers/posts.py`.
+* **Thay đổi**:
+  * Backend:
+    * Thêm trường `engagement: int = 0` và `total_engagements: int = 0` vào schema `PostResponse`.
+    * Xây dựng hàm `attach_engagements_to_posts` tự động truy vấn tổng số tương tác (`SUM(engagements)`) của từng bài viết từ bảng `analytics.engagement_metrics`.
+    * Tích hợp vào các endpoint `GET /workspaces/{workspace_id}/posts` và `GET /posts`.
+  * Frontend:
+    * Cập nhật hàm `fetchPosts` và logic reload sau khi xuất bản trong `PMmodule.jsx` để ánh xạ `engagement: p.engagement || p.total_engagements || 0` thay vì gán tĩnh `0`.
+    * Cột **Engagement** trong bảng **Post Activity** tự động hiển thị số lượng tương tác thật được định dạng phân cách hàng nghìn (ví dụ: `211`) thay vì hiển thị dấu gạch ngang `—`.
+* **Lý do thay đổi**:
+  * Khắc phục tình trạng cột Engagement trong Post Activity không hiển thị số liệu tương tác đã thu thập được từ n8n/mạng xã hội, hoàn thiện trải nghiệm quản lý bài viết thống nhất với module Statistics.
+

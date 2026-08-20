@@ -89,7 +89,8 @@ def get_posts(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[PostResponse]:
-    return crud.list_posts_for_role(db, ctx.workspace.workspace_uuid, current_user.users_uuid, ctx.role)
+    posts = crud.list_posts_for_role(db, ctx.workspace.workspace_uuid, current_user.users_uuid, ctx.role)
+    return crud.attach_engagements_to_posts(db, posts)
 
 
 @router.get("/{workspace_id}/tasks", response_model=list[TaskResponse])

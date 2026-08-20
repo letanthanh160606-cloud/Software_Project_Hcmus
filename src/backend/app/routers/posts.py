@@ -97,5 +97,6 @@ def create_post(
 def list_posts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[Post]:
-    return crud.list_posts_for_user(db, current_user.users_uuid)
+) -> list[PostResponse]:
+    posts = crud.list_posts_for_user(db, current_user.users_uuid)
+    return crud.attach_engagements_to_posts(db, posts)
