@@ -64,7 +64,6 @@ export default function DBmodule({ user }) {
   const [tempGoal, setTempGoal] = useState(500);
   const [tempPeriodStart, setTempPeriodStart] = useState('');
   const [tempPeriodEnd, setTempPeriodEnd] = useState('');
-  const [kpiPeriodLabel, setKpiPeriodLabel] = useState('For this month');
 
   useEffect(() => {
     const fetchDashboardAnalytics = async () => {
@@ -592,7 +591,7 @@ export default function DBmodule({ user }) {
                 height: '260px',
                 borderRadius: '15px',
                 overflow: 'hidden',
-                position: 'relative'
+                position: 'relative',
               }}>
                 {/* Gradient background layer */}
                 <div style={{
@@ -793,19 +792,57 @@ export default function DBmodule({ user }) {
                   left: 0,
                   overflow: 'hidden' 
                 }}>
-                  {/* Content Layer */}
-                  <h1 style={{
+                  {/* Content Layer inheriting KPI card container height (260px) */}
+                  <div style={{
                     position: 'absolute',
-                    top: '105px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    margin: 0,
-                    padding: 0,
-                    whiteSpace: 'nowrap',
-                    fontFamily: 'Satoshi'
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '260px'
                   }}>
-                    {KPIcard}%
-                  </h1>
+                    <h1 style={{
+                      position: 'absolute',
+                      top: '105px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      margin: 0,
+                      padding: 0,
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'Satoshi'
+                    }}>
+                      {KPIcard}%
+                    </h1>
+
+                    <h1 style={{
+                      position: 'absolute',
+                      bottom: '12px',
+                      right: '0px',
+                      margin: 0,
+                      padding: '15px',
+                      whiteSpace: 'nowrap',
+                      color: 'black',
+                      fontFamily: 'Satoshi',
+                      fontSize: '22px',
+                      fontWeight: '400'
+                    }}>
+                      Goal
+                    </h1>
+
+                    <h1 style={{
+                      position: 'absolute',
+                      bottom: '0px',
+                      right: '0px',
+                      margin: 0,
+                      padding: '15px',
+                      whiteSpace: 'nowrap',
+                      color: 'black',
+                      fontFamily: 'Satoshi',
+                      fontSize: '14px',
+                      fontWeight: '400'
+                    }}>
+                      For this month
+                    </h1>
+                  </div>
                 </div>
 
                 {/* Bot */}
@@ -861,7 +898,7 @@ export default function DBmodule({ user }) {
                     fontSize: '14px',
                     fontWeight: '400'
                   }}>
-                    {kpiPeriodLabel}
+                    For this month
                   </h1>
                 </div>
 
