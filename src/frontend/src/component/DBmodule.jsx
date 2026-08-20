@@ -84,18 +84,29 @@ export default function DBmodule({ user }) {
         const ovRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/overview`, { headers });
         if (ovRes.ok) {
           const ovData = await ovRes.json();
-          const fbAttr = ovData.facebook?.total_attraction || 0;
-          const liAttr = ovData.linkedin?.total_attraction || 0;
-          setDoughnutDataValues([fbAttr, liAttr]);
+          const fbEng = ovData.facebook?.total_engagements || 0;
+          const liEng = ovData.linkedin?.total_engagements || 0;
+          const totalEng = fbEng + liEng;
 
-          if (fbAttr >= liAttr) {
+          // Doughnut chart displays real interaction distribution
+          setDoughnutDataValues([fbEng, liEng]);
+
+          if (fbEng >= liEng) {
             setHPplatform('Facebook');
-            setHPpercent(ovData.facebook?.percentage || 0);
-            setHPindex(fbAttr);
+            setHPpercent(ovData.facebook?.engagement_percentage || (totalEng > 0 ? Math.round((fbEng / totalEng) * 100) : 0));
+            setHPindex(fbEng);
           } else {
             setHPplatform('LinkedIn');
-            setHPpercent(ovData.linkedin?.percentage || 0);
-            setHPindex(liAttr);
+            setHPpercent(ovData.linkedin?.engagement_percentage || (totalEng > 0 ? Math.round((liEng / totalEng) * 100) : 0));
+            setHPindex(liEng);
+          }
+
+          // Net Interaction Gain: Month-over-Month Growth
+          if (ovData.monthly_gain) {
+            const mg = ovData.monthly_gain;
+            setNetGainPct(Math.abs(mg.gain_percentage));
+            setNIGincrease(mg.is_increase);
+            setMonthlyIncrease(mg.current_month_engagements);
           }
         }
 
@@ -110,16 +121,6 @@ export default function DBmodule({ user }) {
           setMonthlyGraphData(combined);
           const totalMonthly = combined.reduce((acc, curr) => acc + curr, 0);
           setGraphSta(totalMonthly);
-          setMonthlyIncrease(totalMonthly);
-
-          if (totalMonthly > 0) {
-            const calculatedGain = Math.min(Math.round((totalMonthly / 1000) * 100), 100);
-            setNetGainPct(calculatedGain > 0 ? calculatedGain : 100);
-            setNIGincrease(true);
-          } else {
-            setNetGainPct(0);
-            setNIGincrease(false);
-          }
         }
 
         // 3. Today stats
@@ -352,7 +353,7 @@ export default function DBmodule({ user }) {
                   color: '#7E7A72',
                   fontWeight: '400',
                   fontFamily: 'Satoshi'
-                }}>{monthlyIncrease > 0 ? 'Beat last month by' : 'No growth recorded'}</h1>
+                }}>{monthlyIncrease > 0 ? (NIGincrease ? 'Beat last month by' : 'Decreased vs last month') : 'No growth recorded'}</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -361,10 +362,10 @@ export default function DBmodule({ user }) {
                   position: 'absolute', 
                   top: '78px', left: '15px',
                   fontSize: '32px',
-                  color: monthlyIncrease > 0 ? 'rgba(111, 210, 129, 1)' : '#7E7A72',
+                  color: monthlyIncrease > 0 ? (NIGincrease ? 'rgba(111, 210, 129, 1)' : 'rgba(249, 64, 0, 1)') : '#7E7A72',
                   fontWeight: '700',
                   fontFamily: 'Satoshi'
-                }}>{monthlyIncrease > 0 ? `+${netGainPct}%` : '0%'}</h1>
+                }}>{monthlyIncrease > 0 ? `${NIGincrease ? '+' : '-'}${netGainPct}%` : '0%'}</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -430,7 +431,7 @@ export default function DBmodule({ user }) {
                   fontWeight: '400',
                   color: '#7E7A72',
                   fontFamily: 'Satoshi'
-                }}>{HPpercent > 0 ? `${HPplatform} got the attention!` : 'No platform activity yet'}</h1>
+                }}>{HPpercent > 0 ? `${HPplatform} got the engagement!` : 'No platform activity yet'}</h1>
 
                 <h1 style={{
                   margin: '0px', 

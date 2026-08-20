@@ -49,11 +49,22 @@ class PlatformOverview(BaseModel):
     total_attraction: int
     percentage: int
     total_engagements: int
+    engagement_percentage: int = 0
+
+
+class MonthlyGainOverview(BaseModel):
+    current_month: str
+    current_month_engagements: int
+    prev_month: str
+    prev_month_engagements: int
+    gain_percentage: int
+    is_increase: bool
 
 
 class OverviewResponse(BaseModel):
     facebook: PlatformOverview
     linkedin: PlatformOverview
+    monthly_gain: MonthlyGainOverview | None = None
 
 
 class TodayStatsResponse(BaseModel):

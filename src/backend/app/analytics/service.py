@@ -50,15 +50,47 @@ def get_timeline(db: Session, workspace_id: str, timeframe: str = "Weekly") -> T
     }
     labels = labels_map.get(timeframe_clean, labels_map["Weekly"])
 
-    # Query metrics from DB
     now = datetime.now(timezone.utc)
-    days_back = 7 if timeframe_clean == "Weekly" else 30 if timeframe_clean == "Monthly" else 365
-    start_date = (now - timedelta(days=days_back)).date()
+    if timeframe_clean == "Weekly":
+        # Monday of current week to end of current week
+        start_date = (now - timedelta(days=now.weekday())).date()
+        end_date = start_date + timedelta(days=7)
+    elif timeframe_clean == "Monthly":
+        # First day of current month to first day of next month
+        start_date = date(now.year, now.month, 1)
+        end_date = date(now.year + 1, 1, 1) if now.month == 12 else date(now.year, now.month + 1, 1)
+    else:
+        # First day of current year to first day of next year
+        start_date = date(now.year, 1, 1)
+        end_date = date(now.year + 1, 1, 1)
 
-    rows = db.scalars(
-        select(EngagementMetric).where(
+    # Subquery to ensure we take latest metric snapshot per post & channel per date
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            EngagementMetric.metric_date,
+            func.max(EngagementMetric.snapshot_time).label("max_snapshot"),
+        )
+        .where(
             EngagementMetric.workspace_id == workspace_id,
             EngagementMetric.metric_date >= start_date,
+            EngagementMetric.metric_date < end_date,
+        )
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id, EngagementMetric.metric_date)
+        .subquery()
+    )
+
+    rows = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.metric_date,
+                EngagementMetric.snapshot_time == subq.c.max_snapshot,
+            ),
         )
     ).all()
 
@@ -155,17 +187,55 @@ def get_overview(db: Session, workspace_id: str) -> OverviewResponse:
     fb_pct = round((fb_attraction / total_attraction) * 100) if total_attraction > 0 else 0
     li_pct = round((li_attraction / total_attraction) * 100) if total_attraction > 0 else 0
 
+    total_engagements = fb_engagements + li_engagements
+    fb_eng_pct = round((fb_engagements / total_engagements) * 100) if total_engagements > 0 else 0
+    li_eng_pct = round((li_engagements / total_engagements) * 100) if total_engagements > 0 else 0
+
+    # Calculate Month-over-Month Gain
+    now = datetime.now(timezone.utc)
+    current_month_str = now.strftime("%Y-%m")
+    first_day_current = now.replace(day=1)
+    prev_month_date = (first_day_current - timedelta(days=1))
+    prev_month_str = prev_month_date.strftime("%Y-%m")
+
+    cur_month_eng = get_monthly_interactions(db, workspace_id, current_month_str)
+    prev_month_eng = get_monthly_interactions(db, workspace_id, prev_month_str)
+
+    if prev_month_eng > 0:
+        gain_percentage = round(((cur_month_eng - prev_month_eng) / prev_month_eng) * 100)
+        is_increase = gain_percentage >= 0
+    elif cur_month_eng > 0:
+        gain_percentage = 100
+        is_increase = True
+    else:
+        gain_percentage = 0
+        is_increase = False
+
+    from app.analytics.schemas import MonthlyGainOverview
+
+    monthly_gain = MonthlyGainOverview(
+        current_month=current_month_str,
+        current_month_engagements=cur_month_eng,
+        prev_month=prev_month_str,
+        prev_month_engagements=prev_month_eng,
+        gain_percentage=gain_percentage,
+        is_increase=is_increase,
+    )
+
     return OverviewResponse(
         facebook=PlatformOverview(
             total_attraction=fb_attraction,
             percentage=fb_pct,
             total_engagements=fb_engagements,
+            engagement_percentage=fb_eng_pct,
         ),
         linkedin=PlatformOverview(
             total_attraction=li_attraction,
             percentage=li_pct,
             total_engagements=li_engagements,
+            engagement_percentage=li_eng_pct,
         ),
+        monthly_gain=monthly_gain,
     )
 
 

@@ -277,3 +277,23 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 * **Lý do thay đổi**:
   * Backend endpoint bắt buộc để frontend có thể đổi mật khẩu người dùng an toàn.
 
+---
+
+## 📌 21. File: `src/frontend/src/component/DBmodule.jsx` & `src/backend/app/analytics/` (Real Interaction Comparison & Month-over-Month Gain)
+
+* **Vị trí**:
+  * `DBmodule.jsx`: Dòng 80 – 125, 345 – 375, 425 – 440.
+  * Backend: `schemas.py` (`MonthlyGainOverview`, `PlatformOverview`), `service.py` (`get_overview`).
+* **Thay đổi**:
+  * **Highest-engaging Platform**:
+    * Chuyển đổi tiêu chí so sánh từ **Lượt xem (Attraction/Impressions)** sang **Lượt tương tác thực tế (Total Engagements: Likes + Comments + Shares + Clicks)**.
+    * Thẻ hiển thị số lượng tương tác thật của nền tảng dẫn đầu (ví dụ: `133` thay vì `10,000`), tỷ trọng tương tác `{HPpercent}%` (ví dụ: `63%`) và biểu đồ Doughnut chart phân bổ tương tác thực tế giữa Facebook và LinkedIn.
+    * Cập nhật subtitle: `${HPplatform} got the engagement!`.
+  * **Net Interaction Gain**:
+    * Tính toán tỷ lệ tăng trưởng phần trăm tương tác của **Tháng này so với Tháng trước (Month-over-Month Growth Rate)**:
+      $$\text{Tăng trưởng (\%)} = \text{round}\left(\frac{\text{Tương tác Tháng này} - \text{Tương tác Tháng trước}}{\text{Tương tác Tháng trước}} \times 100\right)$$
+    * Khi tăng trưởng: Hiển thị `+X%` màu xanh `#6FD281` cùng tiêu đề `"Beat last month by"`.
+    * Khi giảm: Hiển thị `-X%` màu đỏ/cam `#F94000` cùng tiêu đề `"Decreased vs last month"`.
+    * Hiển thị tổng tương tác tháng này (ví dụ: `211`).
+* **Lý do thay đổi**:
+  * Đáp ứng đúng nhu cầu phân tích tương tác thực tế giữa các kênh và đo lường tỷ lệ tăng trưởng theo tháng của người dùng, giữ nguyên vẹn 100% phong cách thiết kế thẩm mỹ gốc.
