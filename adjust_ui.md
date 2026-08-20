@@ -38,6 +38,7 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 
 ---
 
+<<<<<<< HEAD
 ## 📌 4. File: `src/frontend/src/component/Stamodule.jsx`
 
 * **Vị trí**: Dòng 30 – 250, 560 – 1140.
@@ -212,4 +213,67 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
     * Cột **Engagement** trong bảng **Post Activity** tự động hiển thị số lượng tương tác thật được định dạng phân cách hàng nghìn (ví dụ: `211`) thay vì hiển thị dấu gạch ngang `—`.
 * **Lý do thay đổi**:
   * Khắc phục tình trạng cột Engagement trong Post Activity không hiển thị số liệu tương tác đã thu thập được từ n8n/mạng xã hội, hoàn thiện trải nghiệm quản lý bài viết thống nhất với module Statistics.
+
+---
+
+## 📌 16. File: `src/frontend/src/page/PendingPage.jsx` — [NEW]
+
+* **Vị trí**: File mới hoàn toàn.
+* **Thay đổi**:
+  * Tạo trang full-screen hiển thị cho các thành viên (business member) chưa được workspace owner chấp thuận.
+  * Trang hiển thị: lock icon, tiêu đề "Workspace Access Pending", thông báo "Workspace Access Denied. Please contact the owner via [owner email]", và nút "Log Out".
+  * Email của workspace owner được đọc từ `localStorage.getItem('user')` (trường `workspace.manager_email` nếu có), hoặc fallback thành "your workspace administrator".
+* **Lý do thay đổi**:
+  * Yêu cầu từ người dùng: chặn access vào dashboard cho member có `workspace_id = null` (tức là chưa được approved).
+
+---
+
+## 📌 17. File: `src/frontend/src/App.jsx`
+
+* **Vị trí**: Toàn bộ file — thêm `PendingRoute` guard và import `PendingPage`.
+* **Thay đổi**:
+  * Import `PendingPage` component mới.
+  * Thêm component `PendingRoute`: kiểm tra `user.account_type === 'business'` AND `user.role === 'individual'` từ localStorage — nếu đúng, render `<PendingPage />` thay vì dashboard.
+  * Bọc route `/dashboard` bằng `<PendingRoute>` (bên trong `<ProtectedRoute>`).
+* **Lý do thay đổi**:
+  * Triển khai logic chặn pending member truy cập dashboard. Logic phát hiện dựa trên behavior của backend: `derive_role()` trả về `"individual"` cho business member chưa được active.
+
+---
+
+## 📌 18. File: `src/frontend/src/page/MainDashboard.jsx`
+
+* **Vị trí**: Lines 22–40 (state variables), lines 72–130 (handler functions), lines 483–660 (Account Details modal).
+* **Thay đổi**:
+  * Thêm state: `pwState`, `pwError`, `pwSuccess`, `pwLoading`, `showPwSection`.
+  * Thêm hàm `resetAccountModal()` để reset toàn bộ trạng thái modal khi đóng.
+  * Thêm hàm `handleChangePassword()`: validate client-side (required fields, match, min length), gọi `POST /auth/change-password`, hiển thị toast và inline feedback.
+  * Nâng cấp Account Details modal:
+    * Thêm các ô info riêng biệt: USERNAME, EMAIL (trước đây chỉ hiển thị ở avatar header).
+    * Giữ nguyên ROLE + ACCOUNT TYPE grid.
+    * Thêm nút toggle "Change Password" (collapsible section).
+    * Section mật khẩu gồm: Current Password, New Password, Confirm New Password, error/success inline, nút "Update Password".
+* **Lý do thay đổi**:
+  * Yêu cầu từ người dùng: account configuration page hiển thị đầy đủ thông tin và cho phép đổi mật khẩu.
+
+---
+
+## 📌 19. File: `src/backend/app/schemas.py`
+
+* **Vị trí**: Cuối file — thêm class `ChangePasswordRequest`.
+* **Thay đổi**:
+  * Thêm Pydantic schema `ChangePasswordRequest` với `current_password: str` và `new_password: str = Field(min_length=8, max_length=128)`.
+* **Lý do thay đổi**:
+  * Cần schema để validate request body cho endpoint đổi mật khẩu mới.
+
+---
+
+## 📌 20. File: `src/backend/app/routers/auth.py`
+
+* **Vị trí**: Imports (thêm `ChangePasswordRequest`, `hash_password`) và cuối file (thêm endpoint).
+* **Thay đổi**:
+  * Thêm `POST /auth/change-password` endpoint (protected bởi JWT).
+  * Xác thực `current_password` bằng `verify_password()`, sau đó hash và lưu `new_password`.
+  * Trả về `{"message": "Password changed successfully"}` khi thành công.
+* **Lý do thay đổi**:
+  * Backend endpoint bắt buộc để frontend có thể đổi mật khẩu người dùng an toàn.
 

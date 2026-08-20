@@ -9,6 +9,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import User
 from app.schemas import (
+    ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
     RegisterResponse,
@@ -19,7 +20,7 @@ from app.schemas import (
     VerifyOTPResponse,
     WorkspaceInfo,
 )
-from app.security import create_access_token, verify_password, verify_pin
+from app.security import create_access_token, hash_password, verify_password, verify_pin
 from app.services.email_service import send_otp_email
 from app.services.otp_service import (
     consume_verification_session,
@@ -182,3 +183,21 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 @router.get("/me", response_model=UserResponse)
 def read_current_user(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/change-password", status_code=200)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
+
+    return {"message": "Password changed successfully"}
