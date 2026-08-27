@@ -99,7 +99,7 @@ class UserResponse(BaseModel):
 
 
 class WorkspaceInfo(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     workspace_id: str = Field(validation_alias="workspace_uuid")
     workspace_name: str = Field(validation_alias="workspacename")
