@@ -90,8 +90,9 @@ def create_member_for_workspace(
     workspace: Workspace,
 ) -> User:
     """
-    Business account, role=member: creates the user AND attaches them as an
-    active member of an already-validated workspace, in the same transaction.
+    Business account, role=member: creates the user AND attaches them as a
+    PENDING member of an already-validated workspace, in the same transaction.
+    The workspace manager must approve this join request before member gets full workspace access.
     """
     user = _build_user(username=username, email=email, password=password, account_type="business")
     db.add(user)
@@ -100,7 +101,7 @@ def create_member_for_workspace(
     membership = WorkspaceMember(
         user_id=user.users_uuid,
         workspace_id=workspace.workspace_uuid,
-        status="active",
+        status="pending",
     )
     db.add(membership)
 

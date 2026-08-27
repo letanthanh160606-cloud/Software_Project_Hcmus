@@ -149,9 +149,14 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> Registe
             password=payload.password,
             workspace=workspace,
         )
+        ws_info = WorkspaceInfo(
+            workspace_id=workspace.workspace_uuid,
+            workspace_name=workspace.workspacename,
+            manager_email=workspace.manager.email if workspace.manager else None,
+        )
         response = RegisterResponse(
             user=UserResponse.model_validate(user),
-            workspace=WorkspaceInfo.model_validate(workspace),
+            workspace=ws_info,
         )
 
     # 4. Consume verification session token
@@ -169,6 +174,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
     role = crud.derive_role(db, user)
     workspace = crud.get_workspace_for_user(db, user)
+
+    # If the user is a pending business member, find their target workspace
+    if workspace is None and user.account_type == "business":
+        from app.models import WorkspaceMember, Workspace
+        pending_membership = db.scalar(
+            select(WorkspaceMember).where(
+                WorkspaceMember.user_id == user.users_uuid,
+                WorkspaceMember.status == "pending",
+            )
+        )
+        if pending_membership:
+            workspace = db.get(Workspace, pending_membership.workspace_id)
+
     access_token, expires_in = create_access_token(
         subject=str(user.users_uuid),
         extra_claims={"role": role, "account_type": user.account_type},
@@ -176,7 +194,14 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
     user_response = UserResponse.model_validate(user)
     user_response.role = role
 
-    workspace_info = WorkspaceInfo.model_validate(workspace) if workspace else None
+    workspace_info = None
+    if workspace:
+        workspace_info = WorkspaceInfo(
+            workspace_id=workspace.workspace_uuid,
+            workspace_name=workspace.workspacename,
+            manager_email=workspace.manager.email if workspace.manager else None,
+        )
+
     return TokenResponse(access_token=access_token, expires_in=expires_in, user=user_response, workspace=workspace_info)
 
 

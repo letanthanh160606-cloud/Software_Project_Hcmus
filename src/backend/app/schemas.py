@@ -103,6 +103,7 @@ class WorkspaceInfo(BaseModel):
 
     workspace_id: str = Field(validation_alias="workspace_uuid")
     workspace_name: str = Field(validation_alias="workspacename")
+    manager_email: str | None = None
 
 
 class RegisterResponse(BaseModel):
