@@ -3,17 +3,39 @@ import { Toaster } from 'react-hot-toast';
 import SignUp from './page/SignUp';
 import SignIn from './page/SignIn';
 import MainDB from './page/MainDashboard';
+import PendingPage from './page/PendingPage';
 
 // PublicRoute: Prevents logged-in users from seeing SignUp/SignIn
 const PublicRoute = ({ children }) => {
-  const token = localStorage.getItem('token'); // Check your auth state
+  const token = localStorage.getItem('access_token'); // Check your auth state
   return token ? <Navigate to="/dashboard" replace /> : children;
 };
 
 // ProtectedRoute: Prevents logged-out users from accessing Dashboard
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token');
   return token ? children : <Navigate to="/signin" replace />;
+};
+
+/**
+ * PendingRoute: Intercepts business members who are still pending approval.
+ *
+ * Detection: A pending member has account_type === 'business' AND role === 'individual'.
+ * This happens because derive_role() on the backend returns 'individual' when no active
+ * membership or manager role exists — which is exactly the case for pending members.
+ * If pending, render <PendingPage /> instead of the normal children.
+ */
+const PendingRoute = ({ children }) => {
+  const raw = localStorage.getItem('user');
+  if (raw) {
+    try {
+      const user = JSON.parse(raw);
+      if (user?.account_type === 'business' && user?.role === 'individual') {
+        return <PendingPage />;
+      }
+    } catch (_) { /* ignore parse errors */ }
+  }
+  return children;
 };
 
 export default function App() {
@@ -51,12 +73,14 @@ export default function App() {
           } 
         />
 
-        {/* Dashboard wrapped in ProtectedRoute */}
+        {/* Dashboard wrapped in ProtectedRoute + PendingRoute */}
         <Route 
           path="/dashboard" 
           element={
             <ProtectedRoute>
-              <MainDB />
+              <PendingRoute>
+                <MainDB />
+              </PendingRoute>
             </ProtectedRoute>
           } 
         />
@@ -65,7 +89,7 @@ export default function App() {
         <Route 
           path="*" 
           element={
-            localStorage.getItem('token') 
+            localStorage.getItem('access_token') 
               ? <Navigate to="/dashboard" replace /> 
               : <Navigate to="/signin" replace />
           } 

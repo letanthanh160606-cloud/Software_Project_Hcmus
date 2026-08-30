@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import User
+from app.models import User, Notifications
 from app.schemas import NotificationResponse, NotificationCountUnreadResponse
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import facebook from '../assets/fblg.png';
 import linkedin from '../assets/linkedinlg.png';
+import TargetAccountSelector from './TargetAccountSelector.jsx';
 
 // Dynamic Posts Data from Backend API
 const businessPosts = [];
@@ -285,9 +286,32 @@ export default function PMmodule({ user }) {
   const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
   const [connectedChannelsList, setConnectedChannelsList] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState('');
+  const [selectedAccountIds, setSelectedAccountIds] = useState([]);
+  const [targetAccountsMode, setTargetAccountsMode] = useState('ALL_SELECTED_PLATFORMS');
+  const [showRejectInput, setShowRejectInput] = useState(false);
   const [publishedUrlsList, setPublishedUrlsList] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
+
+  // Initialize selectedAccountIds whenever selectedPost changes
+  useEffect(() => {
+    setShowRejectInput(false);
+    setNewCommentText('');
+    if (!selectedPost) {
+      setSelectedAccountIds([]);
+      setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
+      return;
+    }
+    const postPlatforms = (selectedPost.platforms || ['facebook']).map(p => p.toLowerCase().trim());
+    const scoped = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
+    if (selectedPost.target_account_ids && Array.isArray(selectedPost.target_account_ids) && selectedPost.target_account_ids.length > 0) {
+      setSelectedAccountIds(selectedPost.target_account_ids);
+      setTargetAccountsMode(selectedPost.target_accounts_mode || 'SELECTED');
+    } else {
+      setSelectedAccountIds(scoped.map(c => c.id));
+      setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
+    }
+  }, [selectedPost, connectedChannelsList]);
 
   useEffect(() => {
     const fetchPublishedUrls = async () => {
@@ -350,7 +374,7 @@ export default function PMmodule({ user }) {
             const pList = channels.map(c => c.platform);
             setConnectedPlatforms(pList);
             setPrimaryPlatform(pList[0]);
-            setSelectedChannelId(channels[0].id);
+            setSelectedChannelId(channels.length > 1 ? 'all' : channels[0].id);
           }
         }
       } catch (err) {
@@ -412,16 +436,32 @@ export default function PMmodule({ user }) {
                 })
               : '—';
 
+            let comments = [];
+            if (p.reject_reason) {
+              comments.push({
+                id: 'mgr-reject',
+                author: 'Manager',
+                text: p.reject_reason,
+                timestamp: p.reviewed_at
+                  ? new Date(p.reviewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'Recently'
+              });
+            }
+
             return {
               id: p.id,
               title: p.title || 'Untitled Post',
               content: p.content || '',
               thumbnail: null,
-              platforms: connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook'],
+              platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
+                ? p.target_platforms
+                : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
               status: statusLabel,
               publishedDate: p.published_at || createdDate,
-              engagement: 0,
+              engagement: p.engagement || p.total_engagements || 0,
               belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+              comments: comments,
+              reject_reason: p.reject_reason || null,
             };
           });
           setRealPosts(mapped);
@@ -438,26 +478,32 @@ export default function PMmodule({ user }) {
 
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const handlePublishToFacebook = async (postId, targetChannelId = selectedChannelId) => {
+  const handlePublishToFacebook = async (postId) => {
     setIsPublishing(true);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const token = localStorage.getItem('token');
-      const channelsToPublish = (targetChannelId === 'all' && connectedChannelsList.length > 0)
-        ? connectedChannelsList
-        : connectedChannelsList.filter(c => c.id === targetChannelId);
+      // 1. Strictly scope to selectedPost.platforms
+      const postPlatforms = (selectedPost?.platforms || ['facebook']).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
+      const scopedChannels = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
 
-      const targetList = channelsToPublish.length > 0 
-        ? channelsToPublish 
-        : [{ id: targetChannelId, platform: primaryPlatform || 'facebook' }];
+      let targetList = [];
+      if (targetAccountsMode === 'ALL_SELECTED_PLATFORMS' || selectedAccountIds.length === 0) {
+        targetList = scopedChannels;
+      } else {
+        targetList = scopedChannels.filter(c => selectedAccountIds.includes(c.id));
+      }
+
+      if (targetList.length === 0) {
+        toast.error('Vui lòng chọn ít nhất 1 tài khoản đích thuộc nền tảng đã chọn!');
+        setIsPublishing(false);
+        return;
+      }
 
       const results = await Promise.all(
         targetList.map(async (ch) => {
-          let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${ch.platform || 'facebook'}`;
-          if (ch.id && ch.id !== 'all') {
-            publishUrl += `&channel_id=${ch.id}`;
-          }
+          let publishUrl = `http://localhost:8000/api/v1/distribution/channels/publish/${postId}?platform=${ch.platform}&channel_id=${ch.id}`;
           const res = await fetch(publishUrl, {
             method: 'POST',
             headers: {
@@ -510,17 +556,53 @@ export default function PMmodule({ user }) {
       const reloadRes = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
       if (reloadRes.ok) {
         const reloadData = await reloadRes.json();
-        setRealPosts((Array.isArray(reloadData) ? reloadData : []).map(p => ({
-          id: p.id,
-          title: p.title || 'Untitled Post',
-          content: p.content || '',
-          thumbnail: null,
-          platforms: ['facebook'],
-          status: p.status === 'ready_for_distribution' ? 'Published' : 'Drafts',
-          publishedDate: p.published_at ? new Date(p.published_at).toLocaleString() : '—',
-          engagement: 0,
-          belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
-        })));
+        setRealPosts((Array.isArray(reloadData) ? reloadData : []).map(p => {
+          let statusLabel = 'Drafts';
+          if (p.status === 'draft') statusLabel = 'Drafts';
+          else if (p.status === 'pending_review') statusLabel = 'Pending';
+          else if (p.status === 'rejected') statusLabel = 'Rejected';
+          else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
+          else if (p.status === 'failed') statusLabel = 'Failed';
+
+          const createdDate = p.created_at
+            ? new Date(p.created_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              }) + ' - ' + new Date(p.created_at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '—';
+
+          let comments = [];
+          if (p.reject_reason) {
+            comments.push({
+              id: 'mgr-reject',
+              author: 'Manager',
+              text: p.reject_reason,
+              timestamp: p.reviewed_at
+                ? new Date(p.reviewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : 'Recently'
+            });
+          }
+
+          return {
+            id: p.id,
+            title: p.title || 'Untitled Post',
+            content: p.content || '',
+            thumbnail: null,
+            platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
+              ? p.target_platforms
+              : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
+            status: statusLabel,
+            publishedDate: p.published_at || createdDate,
+            engagement: p.engagement || p.total_engagements || 0,
+            belongto: p.author_id === user?.users_uuid ? user?.role : 'member',
+            comments: comments,
+            reject_reason: p.reject_reason || null,
+          };
+        }));
       }
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -1096,35 +1178,25 @@ export default function PMmodule({ user }) {
 
             {selectedPost.status === 'Drafts' && (isIndividual || role === 'manager') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                {connectedChannelsList.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Target Account:</span>
-                    <select
-                      value={selectedChannelId}
-                      onChange={(e) => setSelectedChannelId(e.target.value)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '12px',
-                        backgroundColor: '#ffffff',
-                        color: '#1e293b',
-                        fontWeight: '600',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {connectedChannelsList.length > 1 && (
-                        <option value="all">🌐 All Connected Accounts ({connectedChannelsList.length} accounts)</option>
-                      )}
-                      {connectedChannelsList.map((ch) => (
-                        <option key={ch.id} value={ch.id}>
-                          {ch.platform === 'linkedin' ? '🔗 LinkedIn' : '📘 Facebook'} — {ch.display_name}
-                        </option>
-                      ))}
-                    </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.5px' }}>
+                      Target Accounts
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      Filter: {selectedPost.platforms?.join(', ') || 'None'}
+                    </span>
                   </div>
-                )}
+                  <TargetAccountSelector
+                    selectedPlatforms={selectedPost.platforms || []}
+                    connectedChannels={connectedChannelsList}
+                    selectedAccountIds={selectedAccountIds}
+                    onChange={(newIds, newMode) => {
+                      setSelectedAccountIds(newIds);
+                      setTargetAccountsMode(newMode);
+                    }}
+                  />
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                   <button
                     type="button"
@@ -1148,7 +1220,7 @@ export default function PMmodule({ user }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handlePublishToFacebook(selectedPost.id, selectedChannelId)}
+                    onClick={() => handlePublishToFacebook(selectedPost.id)}
                     disabled={isPublishing}
                     style={{
                       padding: '8px 16px',
@@ -1246,93 +1318,184 @@ export default function PMmodule({ user }) {
 
             {selectedPost.status === 'Pending' && role === 'manager' && !isIndividual && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
-                    Rejection Comment (Required to Reject)
-                  </label>
-                  <textarea
-                    placeholder="Provide a reason for rejection..."
-                    value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                    rows={2}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '12px',
-                      outline: 'none',
-                      fontFamily: 'Satoshi, system-ui, sans-serif',
-                      resize: 'vertical'
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#475569', letterSpacing: '0.5px' }}>
+                      Target Accounts
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      Filter: {selectedPost.platforms?.join(', ') || 'None'}
+                    </span>
+                  </div>
+                  <TargetAccountSelector
+                    selectedPlatforms={selectedPost.platforms || []}
+                    connectedChannels={connectedChannelsList}
+                    selectedAccountIds={selectedAccountIds}
+                    onChange={(newIds, newMode) => {
+                      setSelectedAccountIds(newIds);
+                      setTargetAccountsMode(newMode);
                     }}
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handlePublishToFacebook(selectedPost.id, selectedChannelId)}
-                    disabled={isPublishing}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      backgroundColor: '#22c55e',
-                      color: '#ffffff',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Approve & Publish
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditModal(selectedPost)}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: '1px solid #d1d5db',
-                      backgroundColor: '#ffffff',
-                      color: '#374151',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newCommentText.trim()) {
-                        alert('A comment explaining the rejection is required.');
-                        return;
-                      }
-                      const newComment = {
-                        id: Date.now(),
-                        author: 'Manager',
-                        text: newCommentText,
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      };
-                      const updatedComments = [...(selectedPost.comments || []), newComment];
-                      setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments } : p));
-                      setSelectedPost(null);
-                      setNewCommentText('');
-                      toast.error('Post rejected');
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      border: '1px solid #ef4444',
-                      backgroundColor: 'transparent',
-                      color: '#ef4444',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
+                {/* Rejection comment section - only shown when Manager clicks Reject */}
+                {showRejectInput ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '12px 14px', borderRadius: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#b91c1c', letterSpacing: '0.5px' }}>
+                      Rejection Reason (Required to Reject)
+                    </label>
+                    <textarea
+                      placeholder="Explain why this post is being rejected..."
+                      value={newCommentText}
+                      onChange={(e) => setNewCommentText(e.target.value)}
+                      rows={2}
+                      autoFocus
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #fca5a5',
+                        fontSize: '12px',
+                        outline: 'none',
+                        fontFamily: 'Satoshi, system-ui, sans-serif',
+                        resize: 'vertical',
+                        backgroundColor: '#ffffff'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRejectInput(false);
+                          setNewCommentText('');
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#ffffff',
+                          color: '#475569',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!newCommentText.trim()) {
+                            alert('A comment explaining the rejection is required.');
+                            return;
+                          }
+                          const reasonText = newCommentText.trim();
+                          try {
+                            const token = localStorage.getItem('token');
+                            const savedUserStr = localStorage.getItem('user');
+                            const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+                            const workspaceId = user?.workspace_id || parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid;
+
+                            if (workspaceId && selectedPost?.id) {
+                              const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts/${selectedPost.id}`, {
+                                method: 'PATCH',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                  status: 'rejected',
+                                  reject_reason: reasonText
+                                })
+                              });
+                              if (!res.ok) {
+                                const data = await res.json();
+                                throw new Error(data.detail || 'Failed to reject post on server');
+                              }
+                            }
+
+                            const newComment = {
+                              id: Date.now(),
+                              author: 'Manager',
+                              text: reasonText,
+                              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            };
+                            const updatedComments = [...(selectedPost.comments || []), newComment];
+                            setRealPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, status: 'Rejected', comments: updatedComments, reject_reason: reasonText } : p));
+                            setSelectedPost(null);
+                            setNewCommentText('');
+                            setShowRejectInput(false);
+                            toast.success('Post rejected successfully');
+                          } catch (err) {
+                            toast.error(err.message || 'Error rejecting post');
+                          }
+                        }}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          backgroundColor: '#ef4444',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Confirm Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handlePublishToFacebook(selectedPost.id)}
+                      disabled={isPublishing}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: '#22c55e',
+                        color: '#ffffff',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Approve & Publish
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(selectedPost)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid #d1d5db',
+                        backgroundColor: '#ffffff',
+                        color: '#374151',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRejectInput(true)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid #ef4444',
+                        backgroundColor: 'transparent',
+                        color: '#ef4444',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

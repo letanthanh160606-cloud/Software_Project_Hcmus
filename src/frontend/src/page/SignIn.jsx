@@ -37,7 +37,7 @@ export default function SignIn() {
                 throw new Error(errMsg);
             }
 
-            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('user', JSON.stringify({
                 ...data.user,
                 workspace_id: data.workspace?.workspace_id || null,

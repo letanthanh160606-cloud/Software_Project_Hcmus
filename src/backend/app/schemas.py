@@ -310,4 +310,56 @@ class PostReviewReponse(BaseModel):
     action: Literal["approve", "reject"]
     created_at: datetime
 
+class PromptTemplateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    content: str
+    tag: str | None = None
+    created_at: datetime
+
+class PromptTemplateCreateRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    owner_workspace_id: uuid.UUID | None = None
+    owner_user_id: uuid.UUID | None = None
+    title: str
+    content: str
+    tag: str | None = None
+    created_by: uuid.UUID
+
+class KnowledgeBaseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    file_path: str | None = None
+    file_name: str | None = None
+    file_size_bytes: int | None = None
+    mime_type: str | None = None
+    tag: str | None = None
+    created_at: datetime
+
+class KnowledgeBaseCreateRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    owner_workspace_id: uuid.UUID | None = None
+    owner_user_id: uuid.UUID | None = None
+    title: str
+    file_path: str | None = None
+    file_size_bytes: int | None = None
+    mime_type: str | None = None
+    created_by: uuid.UUID
+    file_name: str | None = None
+    tag: str | None = None 
+
+
+class KnowledgeBaseCreateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    knowledge_base: KnowledgeBaseResponse
+    upload_url: str | None = None
+
+
 

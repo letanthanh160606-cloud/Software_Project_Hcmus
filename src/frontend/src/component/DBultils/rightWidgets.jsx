@@ -154,15 +154,37 @@ export function ApprovalRequests({ user }) {
 }
 
 // 2. My Calendar Widget
-export function MyCalendar() {
-  const events = [
-    { id: 1, title: 'Writing content for PA01', date: '14 Jul, 2026', color: '#2ECC71' },
-    { id: 2, title: 'Writing content for PA02', date: '28 Jul, 2026', color: '#3498DB' },
-    { id: 3, title: 'Congregation speech', date: '14 Aug, 2026', color: '#FE7216' },
-    { id: 4, title: 'Translation', date: '11 July, 2026', color: '#D35400' },
-    { id: 5, title: 'Writing content for PA01', date: '14 July, 2026', color: '#2ECC71' },
-    { id: 6, title: 'Writing content for PA02', date: '28 July, 2026', color: '#3498DB' }
-  ];
+export function MyCalendar({ user }) {
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    const fetchRealEvents = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+        if (!workspaceId) return;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const colorMap = { high: '#E74C3C', medium: '#3498DB', low: '#2ECC71' };
+          const list = (Array.isArray(data) ? data : []).map(t => ({
+            id: t.id,
+            title: t.title || 'Untitled Task',
+            date: t.due_date ? new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Ongoing',
+            color: colorMap[t.priority?.toLowerCase()] || '#FE7216',
+          }));
+          setEvents(list);
+        }
+      } catch (err) {
+        console.error('Error fetching calendar events:', err);
+      }
+    };
+    fetchRealEvents();
+  }, [user]);
 
   return (
     <div style={{
@@ -194,52 +216,58 @@ export function MyCalendar() {
           minHeight: 0
         }}
       >
-        {events.map((event) => (
-          <div
-            key={event.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.5)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              marginBottom: '8px',
-              position: 'relative',
-              overflow: 'hidden',
-              height: '25px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-            }}
-          >
-            <div style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: '4px',
-              backgroundColor: event.color
-            }} />
-            <span style={{
-              fontSize: '13px',
-              color: '#554E43',
-              fontWeight: '500',
-              marginLeft: '4px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '160px'
-            }}>
-              {event.title}
-            </span>
-            <span style={{
-              fontSize: '12px',
-              color: '#7E7A72',
-              marginLeft: 'auto',
-              whiteSpace: 'nowrap'
-            }}>
-              {event.date}
-            </span>
+        {events.length > 0 ? (
+          events.map((event) => (
+            <div
+              key={event.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                marginBottom: '8px',
+                position: 'relative',
+                overflow: 'hidden',
+                height: '25px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '4px',
+                backgroundColor: event.color
+              }} />
+              <span style={{
+                fontSize: '13px',
+                color: '#554E43',
+                fontWeight: '500',
+                marginLeft: '4px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '160px'
+              }}>
+                {event.title}
+              </span>
+              <span style={{
+                fontSize: '12px',
+                color: '#7E7A72',
+                marginLeft: 'auto',
+                whiteSpace: 'nowrap'
+              }}>
+                {event.date}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: '20px 0', textAlign: 'center', color: '#7E7A72', fontSize: '12px', fontWeight: '500' }}>
+            No calendar tasks scheduled.
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

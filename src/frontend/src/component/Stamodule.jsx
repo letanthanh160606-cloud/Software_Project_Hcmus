@@ -30,37 +30,23 @@ ChartJS.register(
   Filler
 );
 
-function MultiLineChart({ timeframe }) {
+function MultiLineChart({ timeframe, seriesData, labelsData }) {
   const labelsMap = {
     Weekly: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
     Monthly: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
     Yearly: ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov'],
   };
 
-  const dataMap = {
-    Weekly: {
-      fb: [210, 150, 240, 160, 220, 110, 280],
-      li: [130, 220, 180, 170, 190, 250, 120],
-    },
-    Monthly: {
-      fb: [850, 1120, 980, 1340],
-      li: [620, 780, 890, 950],
-    },
-    Yearly: {
-      fb: [4200, 5800, 6100, 7500, 8200, 9400],
-      li: [3100, 4200, 4900, 5600, 6300, 7100],
-    },
-  };
-
-  const currentLabels = labelsMap[timeframe] || labelsMap.Weekly;
-  const currentData = dataMap[timeframe] || dataMap.Weekly;
+  const currentLabels = labelsData || labelsMap[timeframe] || labelsMap.Weekly;
+  const currentFbData = seriesData?.facebook || new Array(currentLabels.length).fill(0);
+  const currentLiData = seriesData?.linkedin || new Array(currentLabels.length).fill(0);
 
   const chartData = {
     labels: currentLabels,
     datasets: [
       {
         label: 'Facebook',
-        data: currentData.fb,
+        data: currentFbData,
         borderColor: '#FE7216',
         backgroundColor: 'rgba(254, 114, 22, 0.1)',
         tension: 0.4,
@@ -71,7 +57,7 @@ function MultiLineChart({ timeframe }) {
       },
       {
         label: 'LinkedIn',
-        data: currentData.li,
+        data: currentLiData,
         borderColor: '#FFC097',
         backgroundColor: 'rgba(255, 192, 151, 0.15)',
         tension: 0.4,
@@ -119,28 +105,181 @@ function MultiLineChart({ timeframe }) {
 
 export default function Stamodule({ user }) {
   const isManager = user?.role === 'manager';
+  const token = localStorage.getItem('token');
+  const workspaceId =
+    user?.workspace_id ||
+    user?.workspace?.workspace_id ||
+    user?.workspace?.workspace_uuid ||
+    (typeof user?.workspace === 'string' ? user.workspace : null);
 
   const [graphTimeframe, setGraphTimeframe] = useState('Weekly');
-  const [reportTimeframe, setReportTimeframe] = useState('Monthly');
-  const [reportText, setReportText] = useState(
-    "The provided data reveals that Facebook is the dominant platform for overall audience attraction, securing the vast majority of visibility with 450,000 total impressions compared to LinkedIn's 180,000. However, the critical joining point - where exposure successfully translates into meaningful user interaction - unveils a clear divergence in platform efficiency. While Facebook achieves a massive raw volume of 25,200 engagements through broad-appeal short-form videos and reactions, LinkedIn exhibits a superior conversion of views into meaningful user interaction."
-  );
+  const [timelineSeries, setTimelineSeries] = useState(null);
+  const [timelineLabels, setTimelineLabels] = useState(null);
 
-  const [reportHistoryList, setReportHistoryList] = useState([
-    { id: 1, name: '[Monthly report for July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 2, name: '[Weekly report for 6 - 12 July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 3, name: '[Yearly report for 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 4, name: '[Weekly report for 6 - 12 July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 5, name: '[Weekly report for 6 - 12 July 2026]', savedDate: 'May 18, 2026', data: 'Document' },
-    { id: 6, name: '[Monthly report for June 2026]', savedDate: 'May 10, 2026', data: 'Document' },
-    { id: 7, name: '[Weekly report for 29 May - 4 June 2026]', savedDate: 'May 04, 2026', data: 'Document' },
-  ]);
+  const [overviewStats, setOverviewStats] = useState({
+    fb_pct: 0,
+    fb_attraction: 0,
+    li_pct: 0,
+    li_attraction: 0,
+  });
+
+  const [todayData, setTodayData] = useState({
+    total_interactions: 0,
+    user_contribution: 0,
+  });
+
+  const [reportTimeframe, setReportTimeframe] = useState('Monthly');
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportText, setReportText] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  const [reportHistoryList, setReportHistoryList] = useState([]);
+  const [topPosts, setTopPosts] = useState([]);
 
   // Interactive Date Range Filter state
-  const [startDate, setStartDate] = useState('2024-01-01');
-  const [endDate, setEndDate] = useState('2026-06-30');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef(null);
+
+  // Common Headers helper
+  const getAuthHeaders = () => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
+  // 1. Fetch Timeline Analytics
+  const fetchTimeline = async (tf) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=${tf}`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTimelineSeries(data.series);
+        setTimelineLabels(data.labels);
+      }
+    } catch (err) {
+      console.warn('Error fetching timeline:', err);
+    }
+  };
+
+  // 2. Fetch Overview Analytics
+  const fetchOverview = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/overview`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOverviewStats({
+          fb_pct: data.facebook.percentage,
+          fb_attraction: data.facebook.total_attraction,
+          li_pct: data.linkedin.percentage,
+          li_attraction: data.linkedin.total_attraction,
+        });
+      }
+    } catch (err) {
+      console.warn('Error fetching overview:', err);
+    }
+  };
+
+  // 3. Fetch Today Interactions
+  const fetchTodayStats = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/today`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTodayData({
+          total_interactions: data.total_interactions_today,
+          user_contribution: data.user_contribution_today,
+        });
+      }
+    } catch (err) {
+      console.warn('Error fetching today stats:', err);
+    }
+  };
+
+  // 4. Fetch Top Posts
+  const fetchTopPosts = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/top-posts?limit=7`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTopPosts(data.posts || []);
+      }
+    } catch (err) {
+      console.warn('Error fetching top posts:', err);
+    }
+  };
+
+  // 5. Fetch Reports History
+  const fetchReports = async () => {
+    try {
+      let url = `http://localhost:8000/api/v1/reports/${workspaceId}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setReportHistoryList(data.reports || []);
+      }
+    } catch (err) {
+      console.warn('Error fetching reports history:', err);
+    }
+  };
+
+  // 6. Generate AI Report on Timeframe Change
+  const fetchAIReport = async (tf) => {
+    setIsGeneratingReport(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/generate`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ timeframe: tf }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReportTitle(data.title);
+        setReportText(data.summary);
+      }
+    } catch (err) {
+      console.warn('Using default report summary:', err);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setTimelineSeries(null);
+      setOverviewStats({ fb_pct: 0, fb_attraction: 0, li_pct: 0, li_attraction: 0 });
+      setTodayData({ total_interactions: 0, user_contribution: 0 });
+      setTopPosts([]);
+      setReportHistoryList([]);
+      return;
+    }
+    fetchTimeline(graphTimeframe);
+    fetchOverview();
+    fetchTodayStats();
+    fetchTopPosts();
+    fetchReports();
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetchTimeline(graphTimeframe);
+  }, [graphTimeframe, workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    fetchAIReport(reportTimeframe);
+  }, [reportTimeframe, workspaceId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -164,28 +303,20 @@ export default function Stamodule({ user }) {
 
   const filteredHistory = reportHistoryList.filter((item) => {
     if (!startDate && !endDate) return true;
-    const itemTime = new Date(item.savedDate).getTime();
+    const dateVal = item.saved_date || item.savedDate;
+    if (!dateVal) return true;
+    const itemTime = new Date(dateVal).getTime();
     const startTime = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
     const endTime = endDate ? new Date(endDate + 'T23:59:59').getTime() : Infinity;
     return itemTime >= startTime && itemTime <= endTime;
   });
 
-  const topPosts = [
-    { id: 1, title: '[TA - P1] Archeology' },
-    { id: 2, title: 'Ecology' },
-    { id: 3, title: 'HR - IT dep.' },
-    { id: 4, title: 'HR - FI dep.' },
-    { id: 5, title: 'HR - IT dep.' },
-    { id: 6, title: '[TA - P1] Archeology' },
-    { id: 7, title: 'Ecology' },
-  ];
-
-  // Pie chart datasets matching DBmodule format
+  // Pie chart datasets matching overviewStats
   const fbPieData = {
     labels: ['Facebook', 'Other'],
     datasets: [
       {
-        data: [75, 25],
+        data: [overviewStats.fb_pct, 100 - overviewStats.fb_pct],
         backgroundColor: ['#FE7216', '#FFE3D1'],
         borderWidth: 0,
       },
@@ -196,7 +327,7 @@ export default function Stamodule({ user }) {
     labels: ['LinkedIn', 'Other'],
     datasets: [
       {
-        data: [25, 75],
+        data: [overviewStats.li_pct, 100 - overviewStats.li_pct],
         backgroundColor: ['#FE7216', '#FFE3D1'],
         borderWidth: 0,
       },
@@ -213,22 +344,69 @@ export default function Stamodule({ user }) {
     },
   };
 
-  const handleSaveReport = () => {
-    const todayStr = new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-    });
-    const newTitle = `[${reportTimeframe} report saved]`;
-    setReportHistoryList((prev) => [
-      { id: Date.now(), name: newTitle, savedDate: todayStr, data: 'Document' },
-      ...prev,
-    ]);
-    toast.success('Statistical report saved successfully!');
+  const handleSaveReport = async () => {
+    const newTitle = reportTitle || `[${reportTimeframe} report for ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}]`;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title: newTitle,
+          timeframe: reportTimeframe,
+          summary: reportText,
+        }),
+      });
+
+      if (res.ok) {
+        const savedItem = await res.json();
+        setReportHistoryList((prev) => [savedItem, ...prev]);
+        toast.success('Statistical report saved successfully!');
+        return;
+      }
+    } catch (err) {
+      console.warn('Save report error:', err);
+    }
+    toast.error('Failed to save report to server.');
   };
 
-  const handleViewPost = (postTitle) => {
-    toast(`Viewing analytics for: ${postTitle}`, { icon: '📊' });
+  const handleDownloadReport = async (item) => {
+    try {
+      const reportId = item.id;
+      if (!reportId) {
+        toast.error('Invalid report ID');
+        return;
+      }
+      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/${reportId}/download`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        throw new Error(`Download error: ${res.statusText}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const rawTitle = item.title || item.name || 'Statistical_Report';
+      const safeTitle = rawTitle.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      a.download = `${safeTitle}.md`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success(`Downloaded ${item.title || item.name || 'Report'}`);
+    } catch (e) {
+      console.warn('Download error:', e);
+      toast.error('Failed to download report document.');
+    }
+  };
+
+  const handleViewPost = (post) => {
+    if (post.published_url) {
+      window.open(post.published_url, '_blank');
+    } else {
+      toast(`Viewing analytics for: ${post.title}`, { icon: '📊' });
+    }
   };
 
   return (
@@ -375,7 +553,11 @@ export default function Stamodule({ user }) {
 
               {/* Chart Component */}
               <div style={{ flex: 1, minHeight: 0 }}>
-                <MultiLineChart timeframe={graphTimeframe} />
+                <MultiLineChart
+                  timeframe={graphTimeframe}
+                  seriesData={timelineSeries}
+                  labelsData={timelineLabels}
+                />
               </div>
             </div>
 
@@ -433,9 +615,13 @@ export default function Stamodule({ user }) {
 
                 {/* Right side: Facebook Stats */}
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>75%</div>
+                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>
+                    {overviewStats.fb_pct}%
+                  </div>
                   <div style={{ fontSize: '12px', color: '#7E7A72', fontWeight: '500' }}>Facebook attracts</div>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>321,342</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>
+                    {overviewStats.fb_attraction.toLocaleString()}
+                  </div>
                 </div>
               </div>
 
@@ -455,9 +641,13 @@ export default function Stamodule({ user }) {
               >
                 {/* Left side: LinkedIn Stats */}
                 <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>14,345</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#1E1E1E' }}>
+                    {overviewStats.li_attraction.toLocaleString()}
+                  </div>
                   <div style={{ fontSize: '12px', color: '#7E7A72', fontWeight: '500' }}>LinkedIn attracts</div>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>25%</div>
+                  <div style={{ fontSize: '28px', fontWeight: '800', color: '#FE7216', lineHeight: 1 }}>
+                    {overviewStats.li_pct}%
+                  </div>
                 </div>
 
                 {/* Right side: Doughnut with LinkedIn Logo */}
@@ -585,20 +775,28 @@ export default function Stamodule({ user }) {
                 boxSizing: 'border-box',
               }}
             >
-              <div style={{ fontWeight: '700', fontSize: '13px', color: '#1E1E1E', marginBottom: '6px' }}>
-                [{reportTimeframe} report for July 2026]
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '12px',
-                  lineHeight: '1.6',
-                  color: '#4A4A4A',
-                  fontFamily: 'Satoshi',
-                }}
-              >
-                {reportText}
-              </p>
+              {isGeneratingReport ? (
+                <div style={{ color: '#FE7216', fontSize: '13px', fontWeight: '600', padding: '10px 0' }}>
+                  Generating AI Statistical Report with Gemini...
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontWeight: '700', fontSize: '13px', color: '#1E1E1E', marginBottom: '6px' }}>
+                    {reportTitle || (reportText ? `[${reportTimeframe} report]` : 'AI Statistical Report')}
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '12px',
+                      lineHeight: '1.6',
+                      color: '#4A4A4A',
+                      fontFamily: 'Satoshi',
+                    }}
+                  >
+                    {reportText || 'No report generated yet. Select a timeframe or click Save to create an AI report.'}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -643,7 +841,7 @@ export default function Stamodule({ user }) {
 
             <div style={{ position: 'relative', zIndex: 2 }}>
               <div style={{ fontSize: '28px', fontWeight: '800', color: '#1E1E1E', lineHeight: 1.1 }}>
-                149,320
+                {todayData.total_interactions.toLocaleString()}
               </div>
               <div style={{ fontSize: '12px', color: '#7E7A72', fontWeight: '500', marginTop: '3px' }}>
                 Interactions
@@ -654,7 +852,9 @@ export default function Stamodule({ user }) {
               {isManager ? (
                 <div style={{ fontSize: '12px', color: '#1E1E1E', fontWeight: '500', lineHeight: 1.4 }}>
                   With you making up <br />
-                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#1E1E1E' }}>32,433</span>
+                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#1E1E1E' }}>
+                    {todayData.user_contribution.toLocaleString()}
+                  </span>
                 </div>
               ) : (
                 <div style={{ fontSize: '12px', color: '#1E1E1E', fontWeight: '500' }}>
@@ -860,18 +1060,22 @@ export default function Stamodule({ user }) {
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.6)')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  <div style={{ color: '#7E7A72', fontWeight: '500' }}>{item.name}</div>
-                  <div>{item.savedDate}</div>
+                  <div style={{ color: '#1E1E1E', fontWeight: '600' }}>{item.title || item.name}</div>
+                  <div>{item.saved_date || item.savedDate || 'Recently'}</div>
                   <div>
                     <span
-                      onClick={() => toast(`Downloading ${item.name}`, { icon: '📄' })}
+                      onClick={() => handleDownloadReport(item)}
                       style={{
                         color: '#7E7A72',
                         cursor: 'pointer',
                         textDecoration: 'underline',
+                        fontWeight: '600',
+                        transition: 'color 0.15s ease',
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#FE7216')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#7E7A72')}
                     >
-                      {item.data}
+                      {item.data || 'Document'}
                     </span>
                   </div>
                 </div>
@@ -917,37 +1121,43 @@ export default function Stamodule({ user }) {
             flexDirection: 'column',
           }}
         >
-          {topPosts.map((post) => (
-            <div
-              key={post.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '13px 0',
-                borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-                fontSize: '13px',
-              }}
-            >
-              <span style={{ color: '#1E1E1E', fontWeight: '500' }}>{post.title}</span>
-              <button
-                onClick={() => handleViewPost(post.title)}
+          {topPosts.length > 0 ? (
+            topPosts.map((post) => (
+              <div
+                key={post.id}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#FE7216',
-                  fontWeight: '700',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '13px 0',
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
                   fontSize: '13px',
-                  cursor: 'pointer',
-                  padding: 0,
-                  textDecoration: 'underline',
-                  fontFamily: 'Satoshi',
                 }}
               >
-                View
-              </button>
+                <span style={{ color: '#1E1E1E', fontWeight: '500' }}>{post.title}</span>
+                <button
+                  onClick={() => handleViewPost(post)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#FE7216',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline',
+                    fontFamily: 'Satoshi',
+                  }}
+                >
+                  View
+                </button>
+              </div>
+            ))
+          ) : (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: '#7E7A72', fontSize: '13px', fontWeight: '500' }}>
+              No published posts yet.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

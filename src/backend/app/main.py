@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, calendar, health, posts, workspaces, notifications
+from app.routers import auth, calendar, health, posts, workspaces, notifications, prompt_context
 from app.distribution.router import router as distribution_router
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -27,6 +27,7 @@ app.include_router(posts.router)
 app.include_router(calendar.router)
 app.include_router(notifications.router)
 app.include_router(distribution_router)
+app.include_router(prompt_context.router)
 
 scheduler = BackgroundScheduler()
 

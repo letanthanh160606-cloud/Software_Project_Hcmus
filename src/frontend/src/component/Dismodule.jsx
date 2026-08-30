@@ -70,7 +70,11 @@ export default function Dismodule({ user }) {
 
   const token = localStorage.getItem('token');
   const userRole = user?.role || 'individual';
-  const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+  const workspaceId =
+    user?.workspace_id ||
+    user?.workspace?.workspace_id ||
+    user?.workspace?.workspace_uuid ||
+    (typeof user?.workspace === 'string' ? user.workspace : null);
   const isManager = userRole === 'manager';
   const isMember = userRole === 'member';
 

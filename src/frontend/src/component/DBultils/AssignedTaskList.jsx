@@ -1,78 +1,40 @@
 import React, { useState, useEffect } from 'react';
 
-export default function AssignedTasksTable( {user} ) {
+export default function AssignedTasksTable({ user }) {
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
-    const mockBackendData = [
-      {
-        id: 1,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Low',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=1'
-      },
-      {
-        id: 2,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Medium',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=2'
-      },
-      {
-        id: 3,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'High',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=3'
-      },
-      {
-        id: 4,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Low',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=3'
-      },
-      {
-        id: 5,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Low',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=3'
-      },
-      {
-        id: 6,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Low',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=3'
-      },
-      {
-        id: 7,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Low',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=3'
-      },
-      {
-        id: 8,
-        name: '[SE - PAOO] Instructions on how ...',
-        date: 'May 18, 2026 - May 19, 2026',
-        priority: 'Low',
-        attachment: 'Architecture.png',
-        assigneeAvatar: 'https://i.pravatar.cc/100?img=3'
-      }
-    ];
+    const fetchRealTasks = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+        if (!workspaceId) return;
 
-    setTasks(mockBackendData);
-  }, []);
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const taskList = (Array.isArray(data) ? data : []).map((t, idx) => ({
+            id: t.id,
+            name: t.title || 'Untitled Task',
+            date: t.due_date
+              ? new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              : 'Ongoing',
+            priority: t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'Medium',
+            attachment: t.attachment_name || 'Document',
+            assigneeAvatar: `https://i.pravatar.cc/100?img=${(idx % 10) + 1}`,
+          }));
+          setTasks(taskList);
+        }
+      } catch (err) {
+        console.error('Error fetching assigned tasks:', err);
+      }
+    };
+
+    fetchRealTasks();
+  }, [user]);
 
   const getPriorityStyle = (priority) => {
     const p = String(priority || '').toLowerCase();

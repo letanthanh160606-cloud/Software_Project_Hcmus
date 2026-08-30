@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import greetingCard from '../assets/greetingcard.png';
 import NIGbg from '../assets/NIGainbg.png';
 import NIGbg2 from '../assets/NIGainbg2.png';
@@ -37,18 +37,115 @@ ChartJS.register(
 export default function DBmodule({ user }) {
   const componentGap = '20px';
   const userName = user?.username;
+  const workspaceId =
+    user?.workspace_id ||
+    user?.workspace?.workspace_id ||
+    user?.workspace?.workspace_uuid ||
+    (typeof user?.workspace === 'string' ? user.workspace : null);
+  const token = localStorage.getItem('token');
+
   const [NIGincrease, setNIGincrease] = useState(true);
-  const monthlyIncrease = 822006;
-  const HPindex = 550744;
-  const [KPIcard, setKPIcard] = useState(50);
-  const graphSta = 1500;
+  const [netGainPct, setNetGainPct] = useState(0);
+  const [monthlyIncrease, setMonthlyIncrease] = useState(0);
+  const [HPindex, setHPindex] = useState(0);
+  const [HPplatform, setHPplatform] = useState('Facebook');
+  const [HPpercent, setHPpercent] = useState(0);
+  const [KPIcard, setKPIcard] = useState(0);
+  const [kpiTarget, setKpiTarget] = useState(500);
+  const [kpiCurrent, setKpiCurrent] = useState(0);
+  const [graphSta, setGraphSta] = useState(0);
+
+  const [doughnutDataValues, setDoughnutDataValues] = useState([0, 0]);
+  const [monthlyGraphLabels, setMonthlyGraphLabels] = useState(['Week 1', 'Week 2', 'Week 3', 'Week 4']);
+  const [monthlyGraphData, setMonthlyGraphData] = useState([0, 0, 0, 0]);
 
   // KPI popup state
   const [showKPIPopup, setShowKPIPopup] = useState(false);
-  const [tempGoal, setTempGoal] = useState(KPIcard);
+  const [tempGoal, setTempGoal] = useState(500);
   const [tempPeriodStart, setTempPeriodStart] = useState('');
   const [tempPeriodEnd, setTempPeriodEnd] = useState('');
-  const [kpiPeriodLabel, setKpiPeriodLabel] = useState('For this month');
+
+  useEffect(() => {
+    const fetchDashboardAnalytics = async () => {
+      if (!workspaceId) {
+        setDoughnutDataValues([0, 0]);
+        setMonthlyGraphData([0, 0, 0, 0]);
+        setMonthlyIncrease(0);
+        setGraphSta(0);
+        setNetGainPct(0);
+        return;
+      }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      try {
+        // 1. Overview
+        const ovRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/overview`, { headers });
+        if (ovRes.ok) {
+          const ovData = await ovRes.json();
+          const fbAttr = ovData.facebook?.total_attraction || 0;
+          const liAttr = ovData.linkedin?.total_attraction || 0;
+          setDoughnutDataValues([fbAttr, liAttr]);
+
+          if (fbAttr >= liAttr) {
+            setHPplatform('Facebook');
+            setHPpercent(ovData.facebook?.percentage || 0);
+            setHPindex(fbAttr);
+          } else {
+            setHPplatform('LinkedIn');
+            setHPpercent(ovData.linkedin?.percentage || 0);
+            setHPindex(liAttr);
+          }
+        }
+
+        // 2. Timeline (Monthly)
+        const tlRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=Monthly`, { headers });
+        if (tlRes.ok) {
+          const tlData = await tlRes.json();
+          setMonthlyGraphLabels(tlData.labels || ['Week 1', 'Week 2', 'Week 3', 'Week 4']);
+          const fbSeries = tlData.series?.facebook || [0, 0, 0, 0];
+          const liSeries = tlData.series?.linkedin || [0, 0, 0, 0];
+          const combined = fbSeries.map((v, i) => v + (liSeries[i] || 0));
+          setMonthlyGraphData(combined);
+          const totalMonthly = combined.reduce((acc, curr) => acc + curr, 0);
+          setGraphSta(totalMonthly);
+          setMonthlyIncrease(totalMonthly);
+
+          if (totalMonthly > 0) {
+            const calculatedGain = Math.min(Math.round((totalMonthly / 1000) * 100), 100);
+            setNetGainPct(calculatedGain > 0 ? calculatedGain : 100);
+            setNIGincrease(true);
+          } else {
+            setNetGainPct(0);
+            setNIGincrease(false);
+          }
+        }
+
+        // 3. Today stats
+        const tdRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/today`, { headers });
+        if (tdRes.ok) {
+          const tdData = await tdRes.json();
+          if (tdData.total_interactions_today > 0) {
+            setMonthlyIncrease((prev) => prev || tdData.total_interactions_today);
+          }
+        }
+
+        // 4. KPI Goal
+        const kpiRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/kpi`, { headers });
+        if (kpiRes.ok) {
+          const kpiData = await kpiRes.json();
+          setKpiTarget(kpiData.target_interactions || 500);
+          setKpiCurrent(kpiData.current_interactions || 0);
+          setKPIcard(kpiData.progress_percentage || 0);
+          setTempGoal(kpiData.target_interactions || 500);
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard analytics:', err);
+      }
+    };
+
+    fetchDashboardAnalytics();
+  }, [workspaceId, token]);
 
   const AddButton = ({ onClick }) => (
     <button
@@ -87,31 +184,31 @@ export default function DBmodule({ user }) {
   );
 
   const data = {
-    labels: ['Red', 'Blue', 'Yellow'],
+    labels: ['Facebook', 'LinkedIn'],
     datasets: [
       {
-        data: [822006, 550744],
-        backgroundColor: ['#FE7216', '#FFC097'],
+        data: doughnutDataValues[0] === 0 && doughnutDataValues[1] === 0 ? [1, 1] : doughnutDataValues,
+        backgroundColor: doughnutDataValues[0] === 0 && doughnutDataValues[1] === 0 ? ['#EAEAEA', '#F2F2F2'] : ['#FE7216', '#FFC097'],
         borderWidth: 0,
       },
     ],
   };
 
   const data2 = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-  datasets: [
-    {
-      label: 'Monthly Growth',
-      data: [400, 800, 600, 1200, 900, 1500],
-      borderColor: '#FE7216', 
-      backgroundColor: 'rgba(254, 114, 22, 0.1)', 
-      tension: 0.4, 
-      fill: true, 
-      pointRadius: 4,
-      pointHoverRadius: 6,
-    },
-  ],
-};
+    labels: monthlyGraphLabels,
+    datasets: [
+      {
+        label: 'Monthly Growth',
+        data: monthlyGraphData,
+        borderColor: '#FE7216', 
+        backgroundColor: 'rgba(254, 114, 22, 0.1)', 
+        tension: 0.4, 
+        fill: true, 
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      },
+    ],
+  };
 
   const options = {
     responsive: true,
@@ -254,7 +351,7 @@ export default function DBmodule({ user }) {
                   color: '#7E7A72',
                   fontWeight: '400',
                   fontFamily: 'Satoshi'
-                }}>Beat last month by</h1>
+                }}>{monthlyIncrease > 0 ? 'Beat last month by' : 'No growth recorded'}</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -263,10 +360,10 @@ export default function DBmodule({ user }) {
                   position: 'absolute', 
                   top: '78px', left: '15px',
                   fontSize: '32px',
-                  color: 'rgba(111, 210, 129, 1)  ',
+                  color: monthlyIncrease > 0 ? 'rgba(111, 210, 129, 1)' : '#7E7A72',
                   fontWeight: '700',
                   fontFamily: 'Satoshi'
-                }}>43%</h1>
+                }}>{monthlyIncrease > 0 ? `+${netGainPct}%` : '0%'}</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -277,7 +374,7 @@ export default function DBmodule({ user }) {
                   fontSize: '20px',
                   fontWeight: '1000',
                   fontFamily: 'Satoshi'
-                }}>{monthlyIncrease}</h1>
+                }}>{monthlyIncrease.toLocaleString()}</h1>
 
               </div>
 
@@ -311,9 +408,9 @@ export default function DBmodule({ user }) {
                 }}>
                   <Doughnut data={data} options={options} />
 
-                  <img src={linkedin} alt="linkedin logo" 
+                  <img src={HPplatform === 'Facebook' ? facebook : linkedin} alt={`${HPplatform} logo`} 
                   style={{ 
-                    objectFit: 'cover', 
+                    objectFit: 'contain', 
                     width: '30px', 
                     height: '30px',
                     position: 'absolute',
@@ -332,7 +429,7 @@ export default function DBmodule({ user }) {
                   fontWeight: '400',
                   color: '#7E7A72',
                   fontFamily: 'Satoshi'
-                }}>LinkedIn got the attention!</h1>
+                }}>{HPpercent > 0 ? `${HPplatform} got the attention!` : 'No platform activity yet'}</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -356,7 +453,7 @@ export default function DBmodule({ user }) {
                   color: 'rgba(254, 114, 22, 1)',
                   fontWeight: '700',
                   fontFamily: 'Satoshi'
-                }}>67%</h1>
+                }}>{HPpercent}%</h1>
 
                 <h1 style={{
                   margin: '0px', 
@@ -367,7 +464,7 @@ export default function DBmodule({ user }) {
                   fontSize: '20px',
                   fontWeight: '1000',
                   fontFamily: 'Satoshi'
-                }}>{HPindex}</h1>
+                }}>{HPindex.toLocaleString()}</h1>
                 
               </div>
             </div>
@@ -486,12 +583,14 @@ export default function DBmodule({ user }) {
               </div>
 
               {/* KPI Tracking */}
-              <div style={{
+              <div 
+                title={`KPI Progress: ${kpiCurrent} / ${kpiTarget} interactions (${KPIcard}% achieved)`}
+                style={{
                 width: '16%',
                 height: '260px',
                 borderRadius: '15px',
                 overflow: 'hidden',
-                position: 'relative'
+                position: 'relative',
               }}>
                 {/* Gradient background layer */}
                 <div style={{
@@ -511,9 +610,7 @@ export default function DBmodule({ user }) {
                   top: '10px', padding: '0px'
                 }}>
                   <AddButton onClick={() => {
-                    setTempGoal(KPIcard);
-                    setTempPeriodStart('');
-                    setTempPeriodEnd('');
+                    setTempGoal(kpiTarget);
                     setShowKPIPopup(true);
                   }}/>
                 </div>
@@ -541,7 +638,7 @@ export default function DBmodule({ user }) {
                         backgroundColor: 'white',
                         borderRadius: '16px',
                         padding: '28px 32px',
-                        width: '380px',
+                        width: '400px',
                         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
                         fontFamily: 'Satoshi',
                       }}
@@ -552,9 +649,30 @@ export default function DBmodule({ user }) {
                         fontWeight: '700',
                         color: '#1a1a1a',
                         fontFamily: 'Satoshi',
-                      }}>Set KPI Goal</h2>
+                      }}>Set Monthly KPI Goal</h2>
+                      <p style={{
+                        margin: '0 0 16px 0',
+                        fontSize: '13px',
+                        color: '#777',
+                        fontFamily: 'Satoshi',
+                      }}>Set your interaction target for this month across all channels.</p>
 
-                      {/* Goal Index */}
+                      {/* Current Status Badge */}
+                      <div style={{
+                        backgroundColor: 'rgba(254, 114, 22, 0.08)',
+                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        marginBottom: '18px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        border: '1px solid rgba(254, 114, 22, 0.2)'
+                      }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#666' }}>Current This Month</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: '#FE7216' }}>{kpiCurrent} interactions ({KPIcard}%)</span>
+                      </div>
+
+                      {/* Goal Index / Target */}
                       <div style={{ marginBottom: '24px' }}>
                         <label style={{
                           display: 'block',
@@ -563,13 +681,13 @@ export default function DBmodule({ user }) {
                           color: '#444',
                           marginBottom: '8px',
                           fontFamily: 'Satoshi',
-                        }}>Goal Index</label>
+                        }}>Target Interactions Goal</label>
                         <input
                           type="number"
-                          min="0"
+                          min="1"
                           value={tempGoal}
                           onChange={(e) => {
-                            const v = Math.max(0, Number(e.target.value) || 0);
+                            const v = Math.max(1, Number(e.target.value) || 1);
                             setTempGoal(v);
                           }}
                           style={{
@@ -614,20 +732,29 @@ export default function DBmodule({ user }) {
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                         >Cancel</button>
                         <button
-                          onClick={() => {
-                            setKPIcard(tempGoal);
-                            // Build period label
-                            if (tempPeriodStart && tempPeriodEnd) {
-                              const fmt = (d) => {
-                                const dt = new Date(d);
-                                return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                              };
-                              setKpiPeriodLabel(`${fmt(tempPeriodStart)} – ${fmt(tempPeriodEnd)}`);
-                            } else if (tempPeriodStart) {
-                              const dt = new Date(tempPeriodStart);
-                              setKpiPeriodLabel(`From ${dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
-                            } else {
-                              setKpiPeriodLabel('For this month');
+                          onClick={async () => {
+                            if (!workspaceId) {
+                              setKPIcard(Math.min(100, Math.round((kpiCurrent / tempGoal) * 100)));
+                              setKpiTarget(tempGoal);
+                              setShowKPIPopup(false);
+                              return;
+                            }
+                            try {
+                              const headers = { 'Content-Type': 'application/json' };
+                              if (token) headers['Authorization'] = `Bearer ${token}`;
+                              const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/kpi`, {
+                                method: 'PUT',
+                                headers,
+                                body: JSON.stringify({ target_interactions: tempGoal }),
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setKpiTarget(updated.target_interactions);
+                                setKpiCurrent(updated.current_interactions);
+                                setKPIcard(updated.progress_percentage);
+                              }
+                            } catch (err) {
+                              console.warn('Failed to update KPI goal:', err);
                             }
                             setShowKPIPopup(false);
                           }}
@@ -664,19 +791,57 @@ export default function DBmodule({ user }) {
                   left: 0,
                   overflow: 'hidden' 
                 }}>
-                  {/* Content Layer */}
-                  <h1 style={{
+                  {/* Content Layer inheriting KPI card container height (260px) */}
+                  <div style={{
                     position: 'absolute',
-                    top: '105px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    margin: 0,
-                    padding: 0,
-                    whiteSpace: 'nowrap',
-                    fontFamily: 'Satoshi'
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '260px'
                   }}>
-                    {KPIcard}%
-                  </h1>
+                    <h1 style={{
+                      position: 'absolute',
+                      top: '105px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      margin: 0,
+                      padding: 0,
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'Satoshi'
+                    }}>
+                      {KPIcard}%
+                    </h1>
+
+                    <h1 style={{
+                      position: 'absolute',
+                      bottom: '12px',
+                      right: '0px',
+                      margin: 0,
+                      padding: '15px',
+                      whiteSpace: 'nowrap',
+                      color: 'black',
+                      fontFamily: 'Satoshi',
+                      fontSize: '22px',
+                      fontWeight: '400'
+                    }}>
+                      Goal
+                    </h1>
+
+                    <h1 style={{
+                      position: 'absolute',
+                      bottom: '0px',
+                      right: '0px',
+                      margin: 0,
+                      padding: '15px',
+                      whiteSpace: 'nowrap',
+                      color: 'black',
+                      fontFamily: 'Satoshi',
+                      fontSize: '14px',
+                      fontWeight: '400'
+                    }}>
+                      For this month
+                    </h1>
+                  </div>
                 </div>
 
                 {/* Bot */}
@@ -732,7 +897,7 @@ export default function DBmodule({ user }) {
                     fontSize: '14px',
                     fontWeight: '400'
                   }}>
-                    {kpiPeriodLabel}
+                    For this month
                   </h1>
                 </div>
 
@@ -815,7 +980,7 @@ export default function DBmodule({ user }) {
             padding: '15px',
             boxSizing: 'border-box'
           }}>
-            <MyCalendar />
+            <MyCalendar user={user} />
           </div>
 
           <div style={{

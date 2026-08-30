@@ -31,12 +31,28 @@ export default function MainDashboard() {
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
 
+  // Password change state
+  const [pwState, setPwState] = useState({ current: '', newPw: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [showPwSection, setShowPwSection] = useState(false);
+
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
 
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        const wsId =
+          parsed.workspace_id ||
+          parsed.workspace?.workspace_id ||
+          parsed.workspace?.workspace_uuid ||
+          (typeof parsed.workspace === 'string' ? parsed.workspace : null);
+        setUser({
+          ...parsed,
+          workspace_id: wsId || null,
+        });
       } catch (err) {
         console.error("Error parsing user data", err);
       }
@@ -57,7 +73,7 @@ export default function MainDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     toast.success('Logged out successfully');
     navigate('/signin');
@@ -65,9 +81,63 @@ export default function MainDashboard() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-  const fetchUnreadCount = async () => {
+  const resetAccountModal = () => {
+    setShowAccountModal(false);
+    setPwState({ current: '', newPw: '', confirm: '' });
+    setPwError('');
+    setPwSuccess('');
+    setShowPwSection(false);
+  };
+
+  const handleChangePassword = async () => {
+    setPwError('');
+    setPwSuccess('');
+
+    if (!pwState.current || !pwState.newPw || !pwState.confirm) {
+      setPwError('Please fill in all password fields.');
+      return;
+    }
+    if (pwState.newPw !== pwState.confirm) {
+      setPwError('New passwords do not match.');
+      return;
+    }
+    if (pwState.newPw.length < 8) {
+      setPwError('New password must be at least 8 characters.');
+      return;
+    }
+
+    setPwLoading(true);
     try {
       const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          current_password: pwState.current,
+          new_password: pwState.newPw,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPwError(data.detail || 'Failed to change password.');
+      } else {
+        setPwSuccess('Password changed successfully!');
+        setPwState({ current: '', newPw: '', confirm: '' });
+        toast.success('Password changed successfully!');
+      }
+    } catch (err) {
+      setPwError('Network error. Please try again.');
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
       const res = await fetch(`${API_URL}/notifications/unread-count`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -82,7 +152,7 @@ export default function MainDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const res = await fetch(`${API_URL}/notifications?limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -421,103 +491,199 @@ export default function MainDashboard() {
 
       {/* Account Details Modal */}
       {showAccountModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(6px)',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0,
+            width: '100vw', height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) resetAccountModal(); }}
+        >
           <div style={{
-            width: '400px',
+            width: '440px',
+            maxHeight: '92vh',
+            overflowY: 'auto',
             backgroundColor: '#ffffff',
             borderRadius: '24px',
             padding: '28px',
             boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
             fontFamily: 'Satoshi, system-ui, sans-serif',
             position: 'relative',
+            boxSizing: 'border-box',
           }}>
+
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e1e1e' }}>Account Details</h3>
               <button
-                onClick={() => setShowAccountModal(false)}
+                onClick={resetAccountModal}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '18px',
-                  color: '#7c7c7c',
-                  cursor: 'pointer',
-                  padding: '4px 8px',
-                  borderRadius: '50%'
+                  background: 'none', border: 'none',
+                  fontSize: '18px', color: '#7c7c7c',
+                  cursor: 'pointer', padding: '4px 8px', borderRadius: '50%',
+                  transition: 'background-color 0.15s',
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.06)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 ✕
               </button>
             </div>
 
-            {/* Account Content */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                <div style={{
-                  width: '56px', height: '56px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #FE7216 0%, #f59e0b 100%)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontSize: '24px', fontWeight: '700'
-                }}>
-                  {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div>
-                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e1e1e' }}>{user?.username || 'N/A'}</div>
-                  <div style={{ fontSize: '13px', color: '#7c7c7c' }}>{user?.email || 'No email specified'}</div>
-                </div>
+            {/* Avatar + Name + Email */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.06)', marginBottom: '16px' }}>
+              <div style={{
+                width: '56px', height: '56px', borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, #FE7216 0%, #f59e0b 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: '24px', fontWeight: '700',
+              }}>
+                {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '11px', color: '#7c7c7c', fontWeight: '600', marginBottom: '4px' }}>ROLE</div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#FE7216' }}>{user?.role ? user.role.toUpperCase() : 'USER'}</div>
-                </div>
-
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '11px', color: '#7c7c7c', fontWeight: '600', marginBottom: '4px' }}>ACCOUNT TYPE</div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e' }}>{user?.account_type ? user.account_type.toUpperCase() : 'STANDARD'}</div>
-                </div>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e1e1e' }}>{user?.username || 'N/A'}</div>
+                <div style={{ fontSize: '13px', color: '#7c7c7c', marginTop: '2px' }}>{user?.email || 'No email specified'}</div>
               </div>
-
-              {user?.id && (
-                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '11px', color: '#7c7c7c', fontWeight: '600', marginBottom: '4px' }}>USER ID</div>
-                  <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#5c5c5c' }}>{user.id}</div>
-                </div>
-              )}
             </div>
 
-            {/* Modal Footer */}
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowAccountModal(false)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#FE7216',
-                  color: '#fff',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(254,114,22,0.3)'
-                }}
-              >
-                Close
-              </button>
+            {/* Info Grid */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+
+              {/* Username row */}
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px 14px', borderRadius: '12px' }}>
+                <div style={{ fontSize: '10px', color: '#9c9c9c', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '3px' }}>USERNAME</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e' }}>{user?.username || '—'}</div>
+              </div>
+
+              {/* Email row */}
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px 14px', borderRadius: '12px' }}>
+                <div style={{ fontSize: '10px', color: '#9c9c9c', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '3px' }}>EMAIL</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e', wordBreak: 'break-all' }}>{user?.email || '—'}</div>
+              </div>
+
+              {/* Role + Account Type row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px 14px', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '10px', color: '#9c9c9c', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '3px' }}>ROLE</div>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#FE7216' }}>{user?.role ? user.role.toUpperCase() : '—'}</div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '12px 14px', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '10px', color: '#9c9c9c', fontWeight: '700', letterSpacing: '0.8px', marginBottom: '3px' }}>ACCOUNT TYPE</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e' }}>{user?.account_type ? user.account_type.toUpperCase() : '—'}</div>
+                </div>
+              </div>
             </div>
+
+            {/* Change Password toggle */}
+            <button
+              onClick={() => {
+                setShowPwSection((v) => !v);
+                setPwError('');
+                setPwSuccess('');
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                width: '100%', padding: '11px 14px',
+                backgroundColor: showPwSection ? 'rgba(254,114,22,0.08)' : 'rgba(0,0,0,0.03)',
+                border: showPwSection ? '1px solid rgba(254,114,22,0.25)' : '1px solid transparent',
+                borderRadius: '12px',
+                cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'Satoshi, system-ui, sans-serif',
+                fontSize: '13px', fontWeight: '600',
+                color: showPwSection ? '#FE7216' : '#374151',
+                transition: 'all 0.2s ease',
+                marginBottom: showPwSection ? '12px' : '20px',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Change Password
+              <span style={{ marginLeft: 'auto', fontSize: '11px', opacity: 0.7 }}>{showPwSection ? '▲' : '▼'}</span>
+            </button>
+
+            {/* Password Change Section */}
+            {showPwSection && (
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: '10px',
+                marginBottom: '20px',
+                padding: '16px', borderRadius: '14px',
+                backgroundColor: 'rgba(0,0,0,0.02)',
+                border: '1px solid rgba(0,0,0,0.06)',
+              }}>
+
+                {/* Current password */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#9c9c9c', letterSpacing: '0.6px' }}>CURRENT PASSWORD</label>
+                  <input
+                    type="password"
+                    placeholder="Enter current password"
+                    value={pwState.current}
+                    onChange={(e) => setPwState((s) => ({ ...s, current: e.target.value }))}
+                    style={pwInputStyle}
+                  />
+                </div>
+
+                {/* New password */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#9c9c9c', letterSpacing: '0.6px' }}>NEW PASSWORD</label>
+                  <input
+                    type="password"
+                    placeholder="Min. 8 characters"
+                    value={pwState.newPw}
+                    onChange={(e) => setPwState((s) => ({ ...s, newPw: e.target.value }))}
+                    style={pwInputStyle}
+                  />
+                </div>
+
+                {/* Confirm new password */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#9c9c9c', letterSpacing: '0.6px' }}>CONFIRM NEW PASSWORD</label>
+                  <input
+                    type="password"
+                    placeholder="Repeat new password"
+                    value={pwState.confirm}
+                    onChange={(e) => setPwState((s) => ({ ...s, confirm: e.target.value }))}
+                    style={pwInputStyle}
+                  />
+                </div>
+
+                {/* Error / success feedback */}
+                {pwError && (
+                  <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600', padding: '8px 12px', backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: '8px' }}>
+                    {pwError}
+                  </div>
+                )}
+                {pwSuccess && (
+                  <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600', padding: '8px 12px', backgroundColor: 'rgba(22,163,74,0.08)', borderRadius: '8px' }}>
+                    {pwSuccess}
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  onClick={handleChangePassword}
+                  disabled={pwLoading}
+                  style={{
+                    width: '100%', padding: '10px',
+                    borderRadius: '10px', border: 'none',
+                    backgroundColor: pwLoading ? '#f0a070' : '#FE7216',
+                    color: '#fff', fontWeight: '700', fontSize: '13px',
+                    cursor: pwLoading ? 'not-allowed' : 'pointer',
+                    fontFamily: 'Satoshi, system-ui, sans-serif',
+                    boxShadow: '0 4px 12px rgba(254,114,22,0.25)',
+                    transition: 'background-color 0.2s',
+                    marginTop: '2px',
+                  }}
+                >
+                  {pwLoading ? 'Updating…' : 'Update Password'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -609,3 +775,19 @@ export default function MainDashboard() {
     </div>
   );
 }
+
+// Reusable style for password inputs inside the Account Details modal
+const pwInputStyle = {
+  width: '100%',
+  height: '40px',
+  boxSizing: 'border-box',
+  padding: '0 14px',
+  background: '#F6EFEA',
+  border: '1px solid transparent',
+  borderRadius: '10px',
+  fontSize: '13px',
+  color: '#333',
+  outline: 'none',
+  fontFamily: 'Satoshi, system-ui, sans-serif',
+  transition: 'border-color 0.15s',
+};
