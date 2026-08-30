@@ -15,6 +15,8 @@ from app.models import (
     Task,
     TaskAttachment,
     Notifications,
+    PromptTemplate,
+    KnowledgeBase,
 )
 from app.analytics.models import (
     IngestionRun,

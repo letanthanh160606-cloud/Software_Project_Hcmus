@@ -58,14 +58,14 @@ export default function WSmodule({ user, userRole, openJoinRequestsTrigger }) {
 const fetchMembers = async () => {
   setMembersLoading(true);
   try {
-    const token = localStorage.getItem('token');
+    const access_token = localStorage.getItem('access_token');
     if (!workspaceId) {
       setMembers([]);
       return;
     }
 
     const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
     const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/members`, { headers });
     if (res.ok) {
@@ -96,7 +96,7 @@ useEffect(() => {
   const fetchWorkspaceDetail = async () => {
     setWorkspaceDetailLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       if (!workspaceId) {
         console.warn('WSmodule: missing workspaceId on user object, skip fetching workspace detail', user);
         setWorkspaceDetail(null);
@@ -104,7 +104,7 @@ useEffect(() => {
       }
 
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}`, { headers });
       if (res.ok) {
@@ -138,14 +138,14 @@ useEffect(() => {
   const fetchDistributorChannels = async () => {
     setDistributorLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       if (!workspaceId) {
         setDistributorList([]);
         return;
       }
 
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(
         `http://localhost:8000/api/v1/distribution/channels?workspace_id=${workspaceId}`,
@@ -178,14 +178,14 @@ useEffect(() => {
   const fetchTasks = async () => {
     setTasksLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       if (!workspaceId) {
         setTasks([]);
         return;
       }
 
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks`, { headers });
       if (res.ok) {
@@ -238,9 +238,9 @@ useEffect(() => {
   }
   setIsCreatingTask(true);
   try {
-    const token = localStorage.getItem('token');
+    const access_token = localStorage.getItem('access_token');
     const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
     const payload = {
       title: newTaskTitle,
@@ -298,9 +298,9 @@ useEffect(() => {
     }
     setJoinRequestsLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/join-requests`, { headers });
       if (res.ok) {
@@ -337,9 +337,9 @@ useEffect(() => {
 
   const fetchPostReviews = async (postId) => {
   try {
-    const token = localStorage.getItem('token');
+    const access_token = localStorage.getItem('access_token');
     const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
     const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts/${postId}/reviews`, { headers });
     if (res.ok) {
@@ -357,9 +357,9 @@ useEffect(() => {
 
   const handleAcceptJoinRequest = async (userId, username) => {
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(
         `http://localhost:8000/workspaces/${workspaceId}/join-requests/${userId}/accept`,
@@ -385,9 +385,9 @@ useEffect(() => {
 
   const handleDenyJoinRequest = async (userId, username) => {
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(
         `http://localhost:8000/workspaces/${workspaceId}/join-requests/${userId}`,
@@ -421,9 +421,9 @@ useEffect(() => {
     );
 
     try {
-      const token = localStorage.getItem('token');
+      const access_token = localStorage.getItem('access_token');
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
       const res = await fetch(
         `http://localhost:8000/api/v1/distribution/channels/${id}/toggle-workspace`,
@@ -477,13 +477,13 @@ useEffect(() => {
 const fetchApprovalRequests = async () => {
   setApprovalLoading(true);
   try {
-    const token = localStorage.getItem('token');
+    const access_token = localStorage.getItem('access_token');
     if (!workspaceId) {
       setApprovalRequests([]);
       return;
     }
     const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
     const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts`, { headers });
     if (res.ok) {
@@ -505,9 +505,9 @@ useEffect(() => {
 }, [user, workspaceId]);
 
 const patchPost = async (id, payload) => {
-  const token = localStorage.getItem('token');
+  const access_token = localStorage.getItem('access_token');
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
   const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts/${id}`, {
     method: 'PATCH', headers, body: JSON.stringify(payload),
@@ -530,9 +530,9 @@ const handleApprove = async (id) => {
 const handleDenyWithComment = async (id, comment) => {
   try {
     await patchPost(id, { status: 'rejected' });
-    const token = localStorage.getItem('token');
+    const access_token = localStorage.getItem('access_token');
     const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
     const res = await fetch(
       `http://localhost:8000/workspaces/${workspaceId}/posts/${id}/reviews?comment=${encodeURIComponent(comment)}`,
       { method: 'POST', headers }
@@ -563,9 +563,9 @@ const handleCancelRequest = async (id) => {
 
   const handleKickMember = async (userId, username) => {
   try {
-    const token = localStorage.getItem('token');
+    const access_token = localStorage.getItem('access_token');
     const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
 
     const res = await fetch(
       `http://localhost:8000/workspaces/${workspaceId}/members/${userId}`,

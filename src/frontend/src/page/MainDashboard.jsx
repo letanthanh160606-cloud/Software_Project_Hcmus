@@ -117,7 +117,7 @@ export default function MainDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     toast.success('Logged out successfully');
     navigate('/signin');
@@ -152,7 +152,7 @@ export default function MainDashboard() {
 
     setPwLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const res = await fetch(`${API_URL}/auth/change-password`, {
         method: 'POST',
         headers: {
@@ -181,7 +181,7 @@ export default function MainDashboard() {
 
   const fetchUnreadCount = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const res = await fetch(`${API_URL}/notifications/unread-count`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -196,7 +196,7 @@ export default function MainDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const res = await fetch(`${API_URL}/notifications?limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -17,7 +17,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
 def get_current_user(
-    token: str | None = Depends(oauth2_scheme),
+    access_token: str | None = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     credentials_error = HTTPException(
@@ -26,11 +26,11 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    if token is None:
+    if access_token is None:
         raise credentials_error
 
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(access_token)
     except JWTError as exc:
         raise credentials_error from exc
 

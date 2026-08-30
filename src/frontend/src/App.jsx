@@ -7,13 +7,13 @@ import PendingPage from './page/PendingPage';
 
 // PublicRoute: Prevents logged-in users from seeing SignUp/SignIn
 const PublicRoute = ({ children }) => {
-  const token = localStorage.getItem('token'); // Check your auth state
+  const token = localStorage.getItem('access_token'); // Check your auth state
   return token ? <Navigate to="/dashboard" replace /> : children;
 };
 
 // ProtectedRoute: Prevents logged-out users from accessing Dashboard
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token');
   return token ? children : <Navigate to="/signin" replace />;
 };
 
@@ -89,7 +89,7 @@ export default function App() {
         <Route 
           path="*" 
           element={
-            localStorage.getItem('token') 
+            localStorage.getItem('access_token') 
               ? <Navigate to="/dashboard" replace /> 
               : <Navigate to="/signin" replace />
           } 

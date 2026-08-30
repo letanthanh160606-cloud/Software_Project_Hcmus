@@ -1,6 +1,6 @@
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import Session, selectinload
-from app.models import Post, SocialAccount, Task
+from app.models import KnowledgeBase, Post, PromptTemplate, SocialAccount, Task
 
 from app.models import Post, User, Workspace, WorkspaceMember, Notifications, TaskAttachment, PostReviews
 from app.security import hash_password, hash_pin
@@ -583,3 +583,52 @@ def update_post(db: Session, post: Post, updates: dict) -> Post:
     return post
 
 
+def create_prompt_template(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None, title: str, content: str, tag: str | None, created_by: uuid.UUID) -> PromptTemplate:
+    prompt_template = PromptTemplate(
+        owner_workspace_id=owner_workspace_id,
+        owner_user_id=owner_user_id,
+        title=title,
+        content=content,
+        tag=tag,
+        created_by=created_by
+    )
+    db.add(prompt_template)
+    db.commit()
+    db.refresh(prompt_template)
+    return prompt_template
+
+def get_list_prompt_templates(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None) -> list[PromptTemplate]:
+    query = select(PromptTemplate).where(or_(PromptTemplate.owner_workspace_id == owner_workspace_id, PromptTemplate.owner_user_id == owner_user_id))
+    return db.scalars(query).all()
+
+
+def create_knowledge_base(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None, title: str, file_path: str | None, file_size_bytes: int | None, mime_type: str | None, created_by: uuid.UUID, file_name: str | None, tag: str | None = None) -> KnowledgeBase:
+    knowledge_base = KnowledgeBase(
+        owner_workspace_id=owner_workspace_id,
+        owner_user_id=owner_user_id,
+        title=title,
+        file_path=None,
+        file_size_bytes=None,
+        mime_type=None,
+        created_by=created_by,
+        tag=tag
+    )
+    db.add(knowledge_base)
+    db.flush()
+    upload_url = None
+    if file_name and mime_type:
+        if mime_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(status_code=400, detail=" only PDF, DOC or DOCX")
+        object_key = f"knowledge_bases/{knowledge_base.id}/{file_name}"
+        upload_url = generate_presigned_url(object_key, mime_type)
+        public_url = f"{settings.R2_PUBLIC_BASE_URL}/{object_key}"
+        knowledge_base.file_path = public_url
+        knowledge_base.file_size_bytes = file_size_bytes
+        knowledge_base.mime_type = mime_type
+    db.commit()
+    db.refresh(knowledge_base)
+    return knowledge_base, upload_url
+
+def get_list_knowledge_bases(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None) -> list[KnowledgeBase]:
+    query = select(KnowledgeBase).where(or_(KnowledgeBase.owner_workspace_id == owner_workspace_id, KnowledgeBase.owner_user_id == owner_user_id))
+    return db.scalars(query).all()

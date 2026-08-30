@@ -1,5 +1,5 @@
 import boto3
-from botocore.config import Config 
+from botocore.config import Config
 from app.config import get_settings
 
 def get_r2_client():
@@ -15,12 +15,14 @@ def get_r2_client():
     )
 
 def generate_presigned_url(object_key: str, content_type: str, expires_in: int = 3600) -> str:
+    """Generate presigned URL for R2 upload"""
     settings = get_settings()
     client = get_r2_client()
+    bucket_name = settings.R2_BUCKET_NAME or "default_bucket"
     return client.generate_presigned_url(
         "put_object",
         Params={
-            "Bucket": settings.R2_BUCKET_NAME or "default_bucket",
+            "Bucket": bucket_name,
             "Key": object_key,
             "ContentType": content_type,
         },

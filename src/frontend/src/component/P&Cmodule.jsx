@@ -1,129 +1,246 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+
+// ============================================================
+// CONFIG
+// ============================================================
+// Đổi lại nếu backend chạy ở địa chỉ khác (hoặc dùng import.meta.env.VITE_API_URL)
+const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
+
+function getAuthToken() {
+  return localStorage.getItem('access_token');
+}
+
+function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders() {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function formatDate(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+
+const suggestedTags = [
+  { label: 'Technology', color: '#00bcd4' },
+  { label: 'BA', color: '#ef4444' },
+  { label: 'Marketing', color: '#a855f7' },
+  { label: 'Writing', color: '#3b82f6' },
+  { label: 'SEO', color: '#eab308' },
+  { label: 'Financial', color: '#d946ef' },
+  { label: 'Environment', color: '#22c55e' },
+  { label: 'Guidelines', color: '#3b82f6' },
+  { label: 'Product', color: '#8b5cf6' },
+  { label: 'Persona', color: '#64748b' }
+];
+
+const FALLBACK_COLOR_PALETTE = [
+  '#00bcd4', '#ef4444', '#a855f7', '#3b82f6', '#eab308',
+  '#d946ef', '#22c55e', '#8b5cf6', '#64748b', '#f97316'
+];
+
+// Gán màu ổn định cho những tag chưa có trong suggestedTags (dựa theo hash tên tag)
+function getColorForLabel(label) {
+  const known = suggestedTags.find(t => t.label.toLowerCase() === label.toLowerCase());
+  if (known) return known.color;
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = label.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const idx = Math.abs(hash) % FALLBACK_COLOR_PALETTE.length;
+  return FALLBACK_COLOR_PALETTE[idx];
+}
+
+// "Technology, SEO" -> [{label:'Technology', color:'#00bcd4'}, {label:'SEO', color:'#eab308'}]
+function tagStringToTags(tagString) {
+  if (!tagString) return [];
+  return tagString
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(label => ({ label, color: getColorForLabel(label) }));
+}
+
+// [{label:'Technology'}, {label:'SEO'}] -> "Technology, SEO"
+function tagsToTagString(tagsArray) {
+  return (tagsArray || []).map(t => t.label).join(', ');
+}
+
+// Chuẩn hoá 1 record PromptTemplate trả về từ API sang dạng UI đang dùng
+function mapApiTemplateToUi(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    tags: tagStringToTags(item.tag),
+    created_at: formatDate(item.created_at)
+  };
+}
+
+// ============================================================
+// API CALLS - Prompt Template (có backend thật: /prompt-context/prompt-templates)
+// ============================================================
+async function apiGetPromptTemplates() {
+  const res = await fetch(`${API_BASE_URL}/prompt-context/prompt-templates`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    }
+  });
+  if (!res.ok) {
+    throw new Error(`Get prompt templates failed: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.map(mapApiTemplateToUi);
+}
+
+async function apiCreatePromptTemplate({ title, content, tagString }) {
+  const currentUser = getCurrentUser();
+  const body = {
+    title,
+    content,
+    tag: tagString || null,
+    // Backend hiện tại luôn dùng current_user từ token để set created_by,
+    // nhưng field này vẫn required trong schema nên vẫn phải gửi lên.
+    created_by: currentUser?.users_uuid
+  };
+
+  const res = await fetch(`${API_BASE_URL}/prompt-context/prompt-templates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    let detail = 'Create prompt template failed';
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const created = await res.json();
+  return mapApiTemplateToUi(created);
+}
+
+// Chuẩn hoá 1 record KnowledgeBase trả về từ API sang dạng UI đang dùng
+function mapApiKnowledgeBaseToUi(item) {
+  const filePath = item.file_path || null;
+  const fileName = filePath ? decodeURIComponent(filePath.split('/').pop()) : (item.title || 'Chưa có file');
+  return {
+    id: item.id,
+    title: item.title,
+    file_path: filePath,
+    file_name: fileName,
+    file_size_bytes: item.file_size_bytes ?? null,
+    mime_type: item.mime_type || '',
+    tags: tagStringToTags(item.tag),
+    created_at: formatDate(item.created_at)
+  };
+}
+
+async function apiGetKnowledgeBases() {
+  const res = await fetch(`${API_BASE_URL}/prompt-context/knowledge-bases`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    }
+  });
+  if (!res.ok) {
+    throw new Error(`Get knowledge bases failed: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.map(mapApiKnowledgeBaseToUi);
+}
+
+async function apiCreateKnowledgeBase({ title, tagString, file }) {
+  const currentUser = getCurrentUser();
+
+  // QUAN TRỌNG: endpoint tạo record chỉ nhận JSON metadata (giống
+  // KnowledgeBaseCreateRequest/TaskCreateRequest ở BE), KHÔNG nhận file nhị
+  // phân trực tiếp. BE sẽ trả về record + 1 presigned upload_url (R2), sau đó
+  // client tự PUT file thật lên URL đó ở bước 2. Gửi file dạng multipart/binary
+  // thẳng vào endpoint JSON này là nguyên nhân gây lỗi UnicodeDecodeError khi
+  // FastAPI cố decode bytes của validation error.
+  const body = {
+    title,
+    tag: tagString || null,
+    created_by: currentUser?.users_uuid,
+    file_name: file ? file.name : null,
+    mime_type: file ? (file.type || 'application/octet-stream') : null,
+    file_size_bytes: file ? file.size : null
+  };
+
+  const res = await fetch(`${API_BASE_URL}/prompt-context/knowledge-bases`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders()
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    let detail = 'Create context failed';
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const created = await res.json();
+
+  // Nếu BE trả kèm presigned upload_url (giống flow R2 dùng cho Task attachment),
+  // thực hiện bước 2: PUT file thật lên URL đó.
+  if (created.upload_url && file) {
+    const putRes = await fetch(created.upload_url, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file
+    });
+    if (!putRes.ok) {
+    throw new Error(`Upload file to R2 failed: ${putRes.status}`);
+  }
+  }
+  
+
+  return mapApiKnowledgeBaseToUi(created.knowledge_base || created);
+}
 
 export default function PromptContextmodule() {
-  // --- PRE-SEEDED DATA ---
-  const defaultTemplates = [
-    {
-      id: 1,
-      title: '[BA] Software development',
-      content: 'Act as a Senior Business Analyst with a decade of agile software development experience, specializing in bridging the gap between business stakeholders and technical execution. Your job is to analyze my project ideas or feature requests by asking up to three targeted, clarifying questions to refine the scope. Provide detailed user stories, acceptance criteria using Gherkin syntax, and clear functional requirements.',
-      tags: [
-        { label: 'Technology', color: '#00bcd4' },
-        { label: 'BA', color: '#ef4444' }
-      ],
-      created_at: '16 January 2025'
-    },
-    {
-      id: 2,
-      title: '[MKT] SEO Blog Writer',
-      content: 'Act as an expert SEO copywriter and editor. Analyze the keyword list provided and outline a comprehensive, well-structured article. Ensure you naturally inject semantic keywords, use clean H2/H3 header organization, and write in an informative, professional yet conversational tone to maximize reader engagement and search engine visibility.',
-      tags: [
-        { label: 'Technology', color: '#00bcd4' },
-        { label: 'SEO', color: '#eab308' }
-      ],
-      created_at: '16 January 2025'
-    },
-    {
-      id: 3,
-      title: '[Copy] Social Media Post',
-      content: 'Create highly engaging posts for LinkedIn and Twitter platforms. Formulate eye-catching hooks, utilize bullet points for readability, keep the tone professional but warm, add 3-5 relevant trending hashtags, and end with a high-conversion call to action (CTA).',
-      tags: [
-        { label: 'Marketing', color: '#a855f7' },
-        { label: 'Writing', color: '#3b82f6' }
-      ],
-      created_at: '16 January 2025'
-    },
-    {
-      id: 4,
-      title: '[Copy] Social Media Post',
-      content: 'Create highly engaging posts for LinkedIn and Twitter platforms. Formulate eye-catching hooks, utilize bullet points for readability, keep the tone professional but warm, add 3-5 relevant trending hashtags, and end with a high-conversion call to action (CTA).',
-      tags: [
-        { label: 'Marketing', color: '#a855f7' },
-        { label: 'Writing', color: '#3b82f6' }
-      ],
-      created_at: '16 January 2025'
-    },
-    {
-      id: 5,
-      title: '[Copy] Social Media Post',
-      content: 'Create highly engaging posts for LinkedIn and Twitter platforms. Formulate eye-catching hooks, utilize bullet points for readability, keep the tone professional but warm, add 3-5 relevant trending hashtags, and end with a high-conversion call to action (CTA).',
-      tags: [
-        { label: 'Marketing', color: '#a855f7' },
-        { label: 'Writing', color: '#3b82f6' }
-      ],
-      created_at: '16 January 2025'
-    }
-  ];
-
-  const defaultContexts = [
-    {
-      id: 1,
-      title: 'Business Description',
-      documents: ['Document1', 'Document2', 'Document3', 'Document4'],
-      tags: [
-        { label: 'Financial', color: '#d946ef' },
-        { label: 'Environment', color: '#22c55e' }
-      ],
-      created_at: '16 January 2025'
-    },
-    {
-      id: 2,
-      title: 'Brand Guidelines 2025',
-      documents: ['Logo_Assets.zip', 'Typography_Guide.pdf', 'Brand_Voice.docx'],
-      tags: [
-        { label: 'Guidelines', color: '#3b82f6' },
-        { label: 'Product', color: '#8b5cf6' }
-      ],
-      created_at: '12 February 2025'
-    },
-    {
-      id: 3,
-      title: 'Target Audience Persona',
-      documents: ['User_Research_Report.pdf', 'Persona_SaaS_Enterprise.pdf'],
-      tags: [
-        { label: 'Persona', color: '#64748b' },
-        { label: 'Product', color: '#8b5cf6' }
-      ],
-      created_at: '05 March 2025'
-    },
-    {
-      id: 4,
-      title: 'Target Audience Persona',
-      documents: ['User_Research_Report.pdf', 'Persona_SaaS_Enterprise.pdf'],
-      tags: [
-        { label: 'Persona', color: '#64748b' },
-        { label: 'Product', color: '#8b5cf6' }
-      ],
-      created_at: '05 March 2025'
-    },
-    {
-      id: 5,
-      title: 'Target Audience Persona',
-      documents: ['User_Research_Report.pdf', 'Persona_SaaS_Enterprise.pdf'],
-      tags: [
-        { label: 'Persona', color: '#64748b' },
-        { label: 'Product', color: '#8b5cf6' }
-      ],
-      created_at: '05 March 2025'
-    }
-  ];
-
-  const suggestedTags = [
-    { label: 'Technology', color: '#00bcd4' },
-    { label: 'BA', color: '#ef4444' },
-    { label: 'Marketing', color: '#a855f7' },
-    { label: 'Writing', color: '#3b82f6' },
-    { label: 'SEO', color: '#eab308' },
-    { label: 'Financial', color: '#d946ef' },
-    { label: 'Environment', color: '#22c55e' },
-    { label: 'Guidelines', color: '#3b82f6' },
-    { label: 'Product', color: '#8b5cf6' },
-    { label: 'Persona', color: '#64748b' }
-  ];
-
   // --- STATE ---
-  const [templates, setTemplates] = useState(defaultTemplates);
-  const [contexts, setContexts] = useState(defaultContexts);
+  const [templates, setTemplates] = useState([]);
+  const [contexts, setContexts] = useState([]);
+
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [templateError, setTemplateError] = useState(null);
+  const [submittingTemplate, setSubmittingTemplate] = useState(false);
+
+  const [loadingContexts, setLoadingContexts] = useState(true);
+  const [contextError, setContextError] = useState(null);
+  const [submittingContext, setSubmittingContext] = useState(false);
 
   const [searchTemplate, setSearchTemplate] = useState('');
   const [searchContext, setSearchContext] = useState('');
@@ -142,51 +259,96 @@ export default function PromptContextmodule() {
   const [selectedTplTags, setSelectedTplTags] = useState([]);
 
   const [newCtxTitle, setNewCtxTitle] = useState('');
-  const [newCtxDocs, setNewCtxDocs] = useState('');
+  const [newCtxFile, setNewCtxFile] = useState(null); // chỉ 1 file duy nhất, khớp với BE (field file_path)
   const [selectedCtxTags, setSelectedCtxTags] = useState([]);
 
+  // --- LOAD PROMPT TEMPLATES FROM API ---
+  const loadPromptTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    setTemplateError(null);
+    try {
+      const list = await apiGetPromptTemplates();
+      setTemplates(list);
+    } catch (err) {
+      console.error(err);
+      setTemplateError('Load prompt template failed.');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPromptTemplates();
+  }, [loadPromptTemplates]);
+
+  // --- LOAD CONTEXT / KNOWLEDGE BASE FROM API ---
+  const loadKnowledgeBases = useCallback(async () => {
+    setLoadingContexts(true);
+    setContextError(null);
+    try {
+      const list = await apiGetKnowledgeBases();
+      setContexts(list);
+    } catch (err) {
+      console.error(err);
+      setContextError('Không tải được danh sách context.');
+    } finally {
+      setLoadingContexts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadKnowledgeBases();
+  }, [loadKnowledgeBases]);
+
   // --- HANDLERS ---
-  const handleAddTemplate = (e) => {
+  const handleAddTemplate = async (e) => {
     e.preventDefault();
     if (!newTplTitle.trim() || !newTplContent.trim()) return;
 
-    const newTpl = {
-      id: Date.now(),
-      title: newTplTitle,
-      content: newTplContent,
-      tags: selectedTplTags,
-      created_at: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    };
+    setSubmittingTemplate(true);
+    try {
+      const created = await apiCreatePromptTemplate({
+        title: newTplTitle,
+        content: newTplContent,
+        tagString: tagsToTagString(selectedTplTags) // vd: "Technology, SEO"
+      });
 
-    setTemplates([newTpl, ...templates]);
-    setNewTplTitle('');
-    setNewTplContent('');
-    setSelectedTplTags([]);
-    setShowAddTemplate(false);
+      setTemplates(prev => [created, ...prev]);
+      setNewTplTitle('');
+      setNewTplContent('');
+      setSelectedTplTags([]);
+      setShowAddTemplate(false);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Create prompt template failed.');
+    } finally {
+      setSubmittingTemplate(false);
+    }
   };
 
-  const handleAddContext = (e) => {
+  const handleAddContext = async (e) => {
     e.preventDefault();
     if (!newCtxTitle.trim()) return;
 
-    const docsArray = newCtxDocs
-      .split(',')
-      .map(d => d.trim())
-      .filter(d => d.length > 0);
+    setSubmittingContext(true);
+    try {
+      const created = await apiCreateKnowledgeBase({
+        title: newCtxTitle,
+        tagString: tagsToTagString(selectedCtxTags),
+        file: newCtxFile
+      });
 
-    const newCtx = {
-      id: Date.now(),
-      title: newCtxTitle,
-      documents: docsArray.length > 0 ? docsArray : ['Reference_Doc.pdf'],
-      tags: selectedCtxTags,
-      created_at: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    };
-
-    setContexts([newCtx, ...contexts]);
-    setNewCtxTitle('');
-    setNewCtxDocs('');
-    setSelectedCtxTags([]);
-    setShowAddContext(false);
+      setContexts(prev => [created, ...prev]);
+      setNewCtxTitle('');
+      setNewCtxFile(null);
+      setSelectedCtxTags([]);
+      setShowAddContext(false);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Create context failed.');
+    } finally {
+      setSubmittingContext(false);
+    }
   };
 
   const toggleTplTag = (tag) => {
@@ -217,6 +379,15 @@ export default function PromptContextmodule() {
     c.tags.some(tag => tag.label.toLowerCase().includes(searchContext.toLowerCase()))
   );
 
+  // Bấm vào file của 1 context item -> mở file thật theo file_path (URL public trên R2)
+  const handleContextClick = (context) => {
+    if (!context.file_path) {
+      alert(`Context "${context.title}" chưa có file đính kèm.`);
+      return;
+    }
+    window.open(context.file_path, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div style={{
       width: '97%',
@@ -227,7 +398,6 @@ export default function PromptContextmodule() {
       boxSizing: 'border-box',
       fontFamily: 'Satoshi, system-ui, sans-serif'
     }}>
-      {/* LEFT COLUMN - Prompt Template */}
       <div style={{
         flex: 1,
         backgroundColor: 'rgba(255, 255, 255, 0.5)',
@@ -319,7 +489,31 @@ export default function PromptContextmodule() {
           gap: '5px',
           paddingRight: '4px'
         }}>
-          {filteredTemplates.length === 0 ? (
+          {loadingTemplates ? (
+            <div style={{ textAlign: 'center', color: '#8c8c8c', padding: '40px 20px', fontSize: '14px' }}>
+              Đang tải prompt templates...
+            </div>
+          ) : templateError ? (
+            <div style={{ textAlign: 'center', color: '#ef4444', padding: '40px 20px', fontSize: '14px' }}>
+              {templateError}
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  onClick={loadPromptTemplates}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    backgroundColor: '#fff',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          ) : filteredTemplates.length === 0 ? (
             <div style={{
               textAlign: 'center',
               color: '#8c8c8c',
@@ -393,7 +587,7 @@ export default function PromptContextmodule() {
                     overflow: 'hidden',
                     whiteSpace: 'pre-wrap',
                     textOverflow: 'ellipsis',
-                    
+
                   }}>
                     {tpl.content}
                   </p>
@@ -475,7 +669,7 @@ export default function PromptContextmodule() {
             <circle cx="6" cy="6" r="5" stroke="#9ca3af" strokeWidth="1.5" />
             <path d="M10 10L13 13" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          
+
           <input
             type="text"
             placeholder="Search contexts..."
@@ -507,7 +701,31 @@ export default function PromptContextmodule() {
           gap: '5px',
           paddingRight: '4px'
         }}>
-          {filteredContexts.length === 0 ? (
+          {loadingContexts ? (
+            <div style={{ textAlign: 'center', color: '#8c8c8c', padding: '40px 20px', fontSize: '14px' }}>
+              Đang tải context...
+            </div>
+          ) : contextError ? (
+            <div style={{ textAlign: 'center', color: '#ef4444', padding: '40px 20px', fontSize: '14px' }}>
+              {contextError}
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  onClick={loadKnowledgeBases}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    backgroundColor: '#fff',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Thử lại
+                </button>
+              </div>
+            </div>
+          ) : filteredContexts.length === 0 ? (
             <div style={{
               textAlign: 'center',
               color: '#8c8c8c',
@@ -570,32 +788,36 @@ export default function PromptContextmodule() {
                     </div>
                   </div>
 
-                  {/* Attachment document chips */}
+                  {/* File đính kèm - mỗi context chỉ có đúng 1 file (khớp field file_path bên BE).
+                      Bấm vào file này sẽ chạy/mở theo file_path thật, không toggle expand card. */}
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '8px',
                     marginBottom: '12px'
                   }}>
-                    {ctx.documents.map((doc, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          color: '#555',
-                          backgroundColor: 'rgba(0,0,0,0.04)',
-                          border: '1px solid rgba(0,0,0,0.02)',
-                          padding: '6px 12px',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        📎 {doc}
-                      </span>
-                    ))}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleContextClick(ctx);
+                      }}
+                      title={ctx.file_path ? 'Bấm để mở file' : 'Chưa có file đính kèm'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        color: ctx.file_path ? '#C2410C' : '#9ca3af',
+                        backgroundColor: ctx.file_path ? '#FFF7ED' : 'rgba(0,0,0,0.04)',
+                        border: ctx.file_path ? '1px solid #FE7216' : '1px solid rgba(0,0,0,0.02)',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        cursor: ctx.file_path ? 'pointer' : 'default'
+                      }}
+                    >
+                      📎 {ctx.file_name}
+                    </span>
                   </div>
 
                   <div style={{
@@ -737,6 +959,11 @@ export default function PromptContextmodule() {
                     );
                   })}
                 </div>
+                {selectedTplTags.length > 0 && (
+                  <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                    Sẽ lưu dưới dạng: "{tagsToTagString(selectedTplTags)}"
+                  </span>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
@@ -758,6 +985,7 @@ export default function PromptContextmodule() {
                 </button>
                 <button
                   type="submit"
+                  disabled={submittingTemplate}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '10px',
@@ -766,11 +994,12 @@ export default function PromptContextmodule() {
                     fontSize: '13px',
                     fontWeight: '600',
                     color: '#fff',
-                    cursor: 'pointer',
+                    cursor: submittingTemplate ? 'not-allowed' : 'pointer',
+                    opacity: submittingTemplate ? 0.7 : 1,
                     boxShadow: '0 4px 12px rgba(254,114,22,0.3)'
                   }}
                 >
-                  Create
+                  {submittingTemplate ? 'Đang tạo...' : 'Create'}
                 </button>
               </div>
             </form>
@@ -848,11 +1077,7 @@ export default function PromptContextmodule() {
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    setNewCtxDocs(files.map(f => f.name).join(', '));
-                  }}
+                  onChange={(e) => setNewCtxFile(e.target.files?.[0] || null)}
                   style={{
                     padding: '10px 12px',
                     borderRadius: '10px',
@@ -865,6 +1090,9 @@ export default function PromptContextmodule() {
                     fontFamily: 'Satoshi, system-ui, sans-serif'
                   }}
                 />
+                {newCtxFile && (
+                  <span style={{ fontSize: '11px', color: '#9ca3af' }}>Đã chọn: {newCtxFile.name}</span>
+                )}
               </div>
 
               {/* Tag Picker */}
@@ -925,6 +1153,7 @@ export default function PromptContextmodule() {
                 </button>
                 <button
                   type="submit"
+                  disabled={submittingContext}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '10px',
@@ -933,11 +1162,12 @@ export default function PromptContextmodule() {
                     fontSize: '13px',
                     fontWeight: '600',
                     color: '#fff',
-                    cursor: 'pointer',
+                    cursor: submittingContext ? 'not-allowed' : 'pointer',
+                    opacity: submittingContext ? 0.7 : 1,
                     boxShadow: '0 4px 12px rgba(254,114,22,0.3)'
                   }}
                 >
-                  Create
+                  {submittingContext ? 'Đang tạo...' : 'Create'}
                 </button>
               </div>
             </form>

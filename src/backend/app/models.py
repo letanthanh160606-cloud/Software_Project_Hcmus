@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, SmallInteger, String, Text, func, text
+from sqlalchemy import BigInteger, Boolean, DateTime, Enum, ForeignKey, SmallInteger, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -444,3 +444,43 @@ class PostReviews(Base):
     action: Mapped[str] = mapped_column(ReviewActionEnum, nullable=False, server_default="reject")
     comment: Mapped[str] = mapped_column(String, nullable=False, server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class PromptTemplate(Base):
+    __tablename__ = "prompt_templates"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    owner_workspace_id: Mapped[str | None] = mapped_column(
+        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE"), nullable=True
+    )
+    owner_user_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=True
+    )
+    tag: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_base_documents"
+    __table_args__ = {"schema": "workspaces"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+    owner_workspace_id: Mapped[str | None] = mapped_column(
+        String(16), ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE"), nullable=True
+    )
+    owner_user_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    file_path: Mapped[str] = mapped_column(String, nullable=True)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    mime_type: Mapped[str] = mapped_column(String, nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=True
+    )
+    tag: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
