@@ -6,7 +6,13 @@ from app import crud
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Post, User
-from app.schemas import PostCreate, PostResponse
+from app.schemas import (
+    AIContentGenerateRequest,
+    AIContentGenerateResponse,
+    PostCreate,
+    PostResponse,
+)
+from app.services.ai_content_service import ai_content_service
 
 
 router = APIRouter(
@@ -25,6 +31,7 @@ def create_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Post:
+    is_manager = False
     if payload.workspace_id is not None:
         workspace = crud.get_workspace_by_id(
             db,
@@ -46,6 +53,7 @@ def create_post(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have access to this workspace",
             )
+        is_manager = (workspace.manager_id == current_user.users_uuid)
 
     # Cross-validation between target_platforms and target_account_ids
     if payload.target_account_ids and len(payload.target_account_ids) > 0:
@@ -62,7 +70,14 @@ def create_post(
                     detail=f"Invalid target account: '{acc.display_name}' ({acc.platform}) does not belong to selected target platforms {list(selected_platforms)}."
                 )
 
-    post_status = "pending_review" if payload.status in ("pending", "pending_review") else "draft"
+    if is_manager:
+        post_status = "draft" if payload.status == "draft" else "ready_for_distribution"
+    elif payload.workspace_id is not None:
+        # Member submitting to workspace
+        post_status = "draft" if payload.status == "draft" else "pending_review"
+    else:
+        # Individual account
+        post_status = "draft" if payload.status == "draft" else "ready_for_distribution"
 
     try:
         return crud.create_post(
@@ -100,3 +115,38 @@ def list_posts(
 ) -> list[PostResponse]:
     posts = crud.list_posts_for_user(db, current_user.users_uuid)
     return crud.attach_engagements_to_posts(db, posts)
+
+
+@router.post(
+    "/generate-ai",
+    response_model=AIContentGenerateResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_ai_content(
+    payload: AIContentGenerateRequest,
+    current_user: User = Depends(get_current_user),
+) -> AIContentGenerateResponse:
+    try:
+        result = await ai_content_service.generate_content(
+            prompt_template=payload.prompt_template,
+            manual_prompt=payload.manual_prompt,
+            knowledge_base_context=payload.knowledge_base_context,
+            existing_title=payload.existing_title,
+            existing_content=payload.existing_content,
+            target_platforms=payload.target_platforms,
+        )
+        return AIContentGenerateResponse(
+            title=result.get("title", ""),
+            content=result.get("content", ""),
+            suggested_hashtags=result.get("suggested_hashtags", []),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI generation failed: {exc}",
+        ) from exc

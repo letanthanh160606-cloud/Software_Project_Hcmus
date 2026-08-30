@@ -74,6 +74,10 @@ def sync_database():
             'ALTER TABLE workspaces.social_accounts ADD COLUMN IF NOT EXISTS access_token text;',
             # Task updates
             'ALTER TABLE workspaces.tasks ADD COLUMN IF NOT EXISTS upload_url text;',
+            # Workspace pin updates
+            'ALTER TABLE workspaces.workspaces DROP CONSTRAINT IF EXISTS workspaces_pin_hash_key;',
+            # Notification updates
+            'ALTER TABLE workspaces.notifications ALTER COLUMN task_id DROP NOT NULL;',
         ]
         for patch in patches:
             try:

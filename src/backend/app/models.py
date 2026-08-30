@@ -98,7 +98,7 @@ class Workspace(Base):
     )
     workspacename: Mapped[str] = mapped_column(String, nullable=False)
     manager_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=False)
-    pin_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    pin_hash: Mapped[str] = mapped_column(String, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -427,8 +427,8 @@ class Notifications(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv4()"))
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"), nullable=False)
-    task_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("workspaces.tasks.id"))
-    type: Mapped[str] = mapped_column(String, nullable= False, server_default="due_soon")
+    task_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("workspaces.tasks.id"), nullable=True)
+    type: Mapped[str] = mapped_column(String, nullable=False, server_default="due_soon")
     message: Mapped[str] = mapped_column(String, nullable=False, server_default="")
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("False"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

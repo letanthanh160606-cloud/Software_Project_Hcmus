@@ -28,6 +28,7 @@ export default function MainDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [openJoinRequestsTrigger, setOpenJoinRequestsTrigger] = useState(0);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
 
@@ -40,6 +41,7 @@ export default function MainDashboard() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
 
     if (savedUser) {
       try {
@@ -57,7 +59,49 @@ export default function MainDashboard() {
         console.error("Error parsing user data", err);
       }
     }
-  }, []);
+
+    // Verify session in real-time with backend
+    const verifyUserSession = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch('http://localhost:8000/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/signin');
+          return;
+        }
+        if (res.ok) {
+          const freshUser = await res.json();
+          const savedUserStr = localStorage.getItem('user');
+          const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : {};
+
+          // If member was removed from workspace (account_type is business, had workspace, but role is now individual)
+          if (parsedUser.account_type === 'business' && parsedUser.workspace_id && freshUser.role === 'individual') {
+            toast.error('Your account has been removed from the Workspace by the manager.');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            navigate('/signin');
+            return;
+          }
+
+          const updated = {
+            ...parsedUser,
+            ...freshUser,
+            role: freshUser.role || parsedUser.role,
+          };
+          localStorage.setItem('user', JSON.stringify(updated));
+          setUser(prev => ({ ...prev, ...updated }));
+        }
+      } catch (e) {
+        console.error('Failed to verify user session with backend:', e);
+      }
+    };
+
+    verifyUserSession();
+  }, [navigate]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -194,6 +238,17 @@ export default function MainDashboard() {
       }
     } catch (err) {
       console.error('Failed to mark all as read', err);
+    }
+  };
+
+  const handleNotificationClick = (notif) => {
+    if (!notif.is_read) {
+      markAsRead(notif.id);
+    }
+    if (notif.type === 'member_join_request') {
+      setActiveTab('Team Workspace');
+      setIsNotifOpen(false);
+      setOpenJoinRequestsTrigger((prev) => prev + 1);
     }
   };
 
@@ -337,26 +392,30 @@ export default function MainDashboard() {
                       notifications.map((notif) => (
                         <div
                           key={notif.id}
-                          onClick={() => { if (!notif.is_read) markAsRead(notif.id); }}
+                          onClick={() => handleNotificationClick(notif)}
                           style={{
                             display: 'flex', alignItems: 'flex-start', gap: '12px',
                             padding: '12px 14px', borderRadius: '10px',
-                            cursor: notif.is_read ? 'default' : 'pointer',
+                            cursor: 'pointer',
                             backgroundColor: notif.is_read ? 'transparent' : 'rgba(254, 114, 22, 0.04)',
                             borderLeft: notif.is_read ? '3px solid transparent' : '3px solid #FE7216',
                             transition: 'background-color 0.15s ease',
                             marginBottom: '2px',
                           }}
-                          onMouseEnter={(e) => { if (!notif.is_read) e.currentTarget.style.backgroundColor = 'rgba(254, 114, 22, 0.08)'; }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(254, 114, 22, 0.08)'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = notif.is_read ? 'transparent' : 'rgba(254, 114, 22, 0.04)'; }}
                         >
                           <div style={{
                             width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: '14px',
-                            backgroundColor: notif.type === 'due_soon' ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)',
+                            backgroundColor: notif.type === 'member_join_request'
+                              ? 'rgba(254,114,22,0.15)'
+                              : notif.type === 'due_soon'
+                              ? 'rgba(245,158,11,0.12)'
+                              : 'rgba(59,130,246,0.12)',
                           }}>
-                            {notif.type === 'due_soon' ? '⏰' : '📋'}
+                            {notif.type === 'member_join_request' ? '👤' : (notif.type === 'due_soon' ? '⏰' : '📋')}
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{
@@ -367,8 +426,15 @@ export default function MainDashboard() {
                             }}>
                               {notif.message}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#9c9c9c', marginTop: '4px' }}>
-                              {getRelativeTime(notif.created_at)}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                              <span style={{ fontSize: '11px', color: '#9c9c9c' }}>
+                                {getRelativeTime(notif.created_at)}
+                              </span>
+                              {notif.type === 'member_join_request' && (
+                                <span style={{ fontSize: '11px', color: '#FE7216', fontWeight: '700' }}>
+                                  Review now →
+                                </span>
+                              )}
                             </div>
                           </div>
                           {!notif.is_read && (
@@ -758,7 +824,7 @@ export default function MainDashboard() {
           ) : activeTab === 'Calendar' ? (
             <Calenmodule user={user} userRole={user?.role} />
           ) : activeTab === 'Team Workspace' ? (
-            <WSmodule user={user} userRole={user?.role} />
+            <WSmodule user={user} userRole={user?.role} openJoinRequestsTrigger={openJoinRequestsTrigger} />
           ) : activeTab === 'Post Management' ? (
             <PMmodule user={user} />
           ) : activeTab === 'Prompt & Context' ? (

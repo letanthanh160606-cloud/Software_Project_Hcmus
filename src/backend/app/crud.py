@@ -105,6 +105,15 @@ def create_member_for_workspace(
     )
     db.add(membership)
 
+    # Create a real-time notification for the Workspace Manager
+    join_notification = Notifications(
+        user_id=workspace.manager_id,
+        task_id=None,
+        type="member_join_request",
+        message=f"Member {user.username} ({user.email}) requested to join workspace {workspace.workspacename}.",
+    )
+    db.add(join_notification)
+
     db.commit()
     db.refresh(user)
     return user

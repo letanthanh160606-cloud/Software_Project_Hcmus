@@ -54,6 +54,7 @@ def get_workspace_detail(
     resp = WorkspaceDetailResponse.model_validate(ctx.workspace)
     resp.member_count = crud.count_workspace_members(db, ctx.workspace.workspace_uuid)
     resp.manager_name = ctx.workspace.manager.username
+    resp.pin = ctx.workspace.pin_hash if ctx.role == "manager" else "••••••"
     return resp
 
 

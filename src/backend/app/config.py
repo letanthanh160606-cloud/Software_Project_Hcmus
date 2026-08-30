@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # --- Analytics & Ingestion & AI ---
     internal_api_key: str = "default-internal-secret-key-12345"
     gemini_api_key: str = ""
+    gemini_backup_api_key: str = ""
     openai_api_key: str = ""
 
     # --- Cloudflare R2 Storage ---

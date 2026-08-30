@@ -32,7 +32,7 @@ function platformIcon(platform) {
 }
 
 
-export default function WSmodule({ user }) {
+export default function WSmodule({ user, userRole, openJoinRequestsTrigger }) {
   const isManager = user?.role === 'manager';
 
   const [approvalRequests, setApprovalRequests] = useState([]);
@@ -113,6 +113,7 @@ useEffect(() => {
           name: data.workspace_name,
           managerName: data.manager_name,
           workspaceId: data.workspace_id,
+          pin: data.pin || '',
           createdAt: data.created_at
             ? new Date(data.created_at).toLocaleDateString('en-GB', {
                 day: 'numeric', month: 'long', year: 'numeric'
@@ -314,6 +315,19 @@ useEffect(() => {
       setJoinRequestsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isManager && workspaceId) {
+      fetchJoinRequests();
+    }
+  }, [isManager, workspaceId]);
+
+  useEffect(() => {
+    if (openJoinRequestsTrigger) {
+      setShowJoinModal(true);
+      fetchJoinRequests();
+    }
+  }, [openJoinRequestsTrigger]);
 
   useEffect(() => {
     if (showJoinModal) {
@@ -638,63 +652,92 @@ const handleCancelRequest = async (id) => {
             </h1>
 
             {isManager && (
-              <div
-                onClick={() => setShowJoinModal(true)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.width = '120px';
-                  e.currentTarget.querySelector('.jr-label').style.opacity = '1';
-                  e.currentTarget.querySelector('.jr-label').style.maxWidth = '100px';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.width = '30px';
-                  e.currentTarget.querySelector('.jr-label').style.opacity = '0';
-                  e.currentTarget.querySelector('.jr-label').style.maxWidth = '0px';
-                }}
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '50px',
-                  backgroundColor: '#FE7216',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  overflow: 'hidden',
-                  transition: 'width 0.3s ease',
-                  flexShrink: 0,
-                  padding: '0 5px',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <span
-                  className="jr-label"
+              <div style={{ position: 'relative' }}>
+                <div
+                  onClick={() => setShowJoinModal(true)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.width = '120px';
+                    e.currentTarget.querySelector('.jr-label').style.opacity = '1';
+                    e.currentTarget.querySelector('.jr-label').style.maxWidth = '100px';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.width = '30px';
+                    e.currentTarget.querySelector('.jr-label').style.opacity = '0';
+                    e.currentTarget.querySelector('.jr-label').style.maxWidth = '0px';
+                  }}
                   style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#fff',
-                    whiteSpace: 'nowrap',
-                    opacity: 0,
-                    maxWidth: '0px',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50px',
+                    backgroundColor: '#FE7216',
+                    cursor: 'pointer',
+                    userSelect: 'none',
                     overflow: 'hidden',
-                    transition: 'opacity 0.25s ease 0.05s, max-width 0.3s ease',
-                    marginRight: '6px'
+                    transition: 'width 0.3s ease',
+                    flexShrink: 0,
+                    padding: '0 5px',
+                    boxSizing: 'border-box'
                   }}
                 >
-                  Join Request
-                </span>
-                <img
-                  src={addMember}
-                  alt="Join Request"
-                  style={{
-                    width: '15px',
-                    height: '15px',
-                    objectFit: 'contain',
-                    flexShrink: 0,
-                    filter: 'brightness(0) invert(1)'
-                  }}
-                />
+                  <span
+                    className="jr-label"
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#fff',
+                      whiteSpace: 'nowrap',
+                      opacity: 0,
+                      maxWidth: '0px',
+                      overflow: 'hidden',
+                      transition: 'opacity 0.25s ease 0.05s, max-width 0.3s ease',
+                      marginRight: '6px'
+                    }}
+                  >
+                    Join Request
+                  </span>
+                  <img
+                    src={addMember}
+                    alt="Join Request"
+                    style={{
+                      width: '15px',
+                      height: '15px',
+                      objectFit: 'contain',
+                      flexShrink: 0,
+                      filter: 'brightness(0) invert(1)'
+                    }}
+                  />
+                </div>
+                {joinRequests.length > 0 && (
+                  <span
+                    onClick={() => setShowJoinModal(true)}
+                    style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      minWidth: '17px',
+                      height: '17px',
+                      backgroundColor: '#EF4444',
+                      color: '#fff',
+                      borderRadius: '9px',
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 4px',
+                      border: '2px solid #fff',
+                      boxShadow: '0 2px 5px rgba(239,68,68,0.4)',
+                      cursor: 'pointer',
+                      zIndex: 3
+                    }}
+                  >
+                    {joinRequests.length}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -1214,12 +1257,36 @@ const handleCancelRequest = async (id) => {
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554e43' }}>
               Member
             </h3>
-            <span
-              onClick={() => setShowManageMemberModal(true)}
-              style={{ fontSize: '12px', color: '#554e43', fontWeight: '500', cursor: 'pointer' }}
-            >
-              {isManager ? 'Manage >' : 'View >'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isManager && joinRequests.length > 0 && (
+                <span
+                  onClick={() => setShowJoinModal(true)}
+                  style={{
+                    fontSize: '11px',
+                    backgroundColor: '#FEF2F2',
+                    color: '#DC2626',
+                    border: '1px solid #FCA5A5',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Click to review join requests"
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EF4444' }}></span>
+                  {joinRequests.length} Pending
+                </span>
+              )}
+              <span
+                onClick={() => setShowManageMemberModal(true)}
+                style={{ fontSize: '12px', color: '#554e43', fontWeight: '500', cursor: 'pointer' }}
+              >
+                {isManager ? 'Manage >' : 'View >'}
+              </span>
+            </div>
           </div>
 
           {/* Subtitle */}
@@ -1326,15 +1393,19 @@ const handleCancelRequest = async (id) => {
                   <span style={{ fontSize: '11px', fontWeight: '600', color: '#78716C', minWidth: '85px' }}>PIN Password</span>
                   <div
                     onClick={() => {
-                      const val = workspaceDetail?.pin || '••••••';
-                      navigator.clipboard.writeText(val);
-                      toast.success('PIN copied!');
+                      const val = workspaceDetail?.pin || '';
+                      if (val) {
+                        navigator.clipboard.writeText(val);
+                        toast.success('PIN copied!');
+                      }
                     }}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E5E7EB', cursor: 'pointer', transition: 'background-color 0.15s ease' }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
                   >
-                    <span style={{ fontSize: '12px', fontWeight: '500', color: '#1e1e1e', fontFamily: 'monospace' }}>{workspaceDetail?.pin || '••••••'}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#FE7216', fontFamily: 'monospace', letterSpacing: '1px' }}>
+                      {workspaceDetail?.pin || 'N/A'}
+                    </span>
                     <span style={{ fontSize: '11px', color: '#9CA3AF' }}>📋</span>
                   </div>
                 </div>
@@ -1758,10 +1829,47 @@ const handleCancelRequest = async (id) => {
               <button onClick={() => setShowManageMemberModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✕</button>
             </div>
 
-            {/* Member count */}
+            {/* Member count & Pending notice */}
             <div style={{ fontSize: '12px', color: '#8c8c8c', marginBottom: '12px' }}>
-              {(members.length > 0 ? members.length : 0)} members
+              {(members.length > 0 ? members.length : 0)} active members
             </div>
+
+            {/* Pending Requests Banner inside Manage Members modal */}
+            {isManager && joinRequests.length > 0 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#FFF7ED',
+                border: '1px solid #FDBA74',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                marginBottom: '14px'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#9A3412' }}>
+                  🔔 {joinRequests.length} pending join {joinRequests.length === 1 ? 'request' : 'requests'} awaiting approval
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManageMemberModal(false);
+                    setShowJoinModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#FE7216',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Review
+                </button>
+              </div>
+            )}
 
             {/* Scrollable list */}
             <div className="custom-scroll" style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>

@@ -25,15 +25,19 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
     return pwd_context.verify(plain_password, password_hash)
 
 
-# Workspace PINs are hashed with the same Argon2id context as passwords.
-# Kept as separate named functions so call sites read clearly and so the
-# hashing scheme for PINs can diverge from passwords later if needed.
+# Workspace PINs are stored in plain text for easy sharing by workspace managers.
+# verify_pin supports both plain text comparison and legacy Argon2 hash verification.
 def hash_pin(plain_pin: str) -> str:
-    return pwd_context.hash(plain_pin)
+    return str(plain_pin)
 
 
 def verify_pin(plain_pin: str, pin_hash: str) -> bool:
-    return pwd_context.verify(plain_pin, pin_hash)
+    if plain_pin == pin_hash:
+        return True
+    try:
+        return pwd_context.verify(plain_pin, pin_hash)
+    except Exception:
+        return False
 
 
 def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None) -> tuple[str, int]:

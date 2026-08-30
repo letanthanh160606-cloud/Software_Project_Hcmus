@@ -300,19 +300,76 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 
 ---
 
-## 📌 22. File: `src/frontend/src/component/DBmodule.jsx` & `src/backend/app/analytics/service.py` (This Week Timeline & Card Transition)
+---
+
+## 📌 23. File: `src/frontend/src/component/WSmodule.jsx` & Backend `workspaces.py`, `schemas.py`, `security.py` (Plain Workspace PIN Display for Manager)
 
 * **Vị trí**:
-  * `DBmodule.jsx`: Dòng 55 – 65, 110 – 125, 530 – 545.
-  * Backend: `service.py` (`get_timeline`).
+  * `WSmodule.jsx`: Dòng 110 – 125, 1325 – 1345.
+  * Backend: `app/security.py` (`hash_pin`, `verify_pin`), `app/schemas.py` (`WorkspaceDetailResponse`), `app/routers/workspaces.py` (`get_workspace_detail`).
 * **Thay đổi**:
-  * Chuyển đổi thẻ banner lớn màu cam và biểu đồ từ **"This Month"** sang **"This Week"**:
-    * Tiêu đề đổi thành **`This Week`** (thay cho `This Month`).
-    * Biểu đồ đường hiển thị 7 ngày trong tuần: `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`, `Sun` và các điểm tương tác tương ứng của từng ngày trong tuần hiện tại.
-    * Con số lớn hiển thị tổng số lượt tương tác của **Tuần này (This Week Interactions)** (ví dụ: `211` vào Thứ Năm - Thu).
-  * Backend:
-    * Chuẩn hóa bộ lọc thời gian `get_timeline(timeframe="Weekly")` từ Thứ Hai đến Chủ Nhật của tuần hiện tại.
-    * Cập nhật danh sách nhãn (labels) Title Case thân thiện: `['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']`.
+  * **Frontend (`WSmodule.jsx`)**:
+    * Trong Modal **Pending Join Requests** $\rightarrow$ mục **Share to Invite Members**:
+    * Trường **PIN Password**: Thay thế ký tự ẩn `••••••` bằng giá trị mã PIN thực tế (ví dụ: `789456` với kiểu chữ monospace, màu cam nổi bật `#FE7216`).
+    * Cho phép Manager bấm trực tiếp vào ô để copy nhanh mã PIN gửi cho thành viên.
+  * **Backend**:
+    * Cập nhật `hash_pin` lưu mã PIN dưới dạng chuỗi rõ ràng (Plain text), và `verify_pin` hỗ trợ kiểm tra mã PIN trực tiếp.
+    * Thêm trường `pin` vào `WorkspaceDetailResponse` và trả về mã PIN thật khi người yêu cầu là Manager của Workspace.
 * **Lý do thay đổi**:
-  * Yêu cầu từ người dùng: chuyển đổi chế độ xem tiến độ tương tác nhanh trên Dashboard chính sang dạng Tuần này (This Week), giữ nguyên 100% bố cục và màu sắc thiết kế gốc.
+  * Đáp ứng yêu cầu từ người dùng: Manager cần xem được mã PIN rõ ràng của Workspace trong giao diện chia sẻ/mời thành viên để dễ dàng sao chép và gửi cho các Member tham gia Workspace. Giữ nguyên 100% bố cục và thiết kế của Modal.
+
+---
+
+## 📌 24. File: `MainDashboard.jsx`, `WSmodule.jsx` & Backend `crud.py`, `models.py`, `schemas.py` (Member Join Request Real-time Notification & Manager Click-to-Approve Flow)
+
+* **Vị trí**:
+  * `MainDashboard.jsx`: Dòng 30 – 40, 240 – 255, 390 – 435, 825 – 830.
+  * `WSmodule.jsx`: Dòng 35 – 40, 315 – 330, 650 – 715, 1250 – 1285, 1830 – 1875.
+  * Backend: `models.py` (`Notifications.task_id nullable`), `crud.py` (`create_member_for_workspace`), `schemas.py` (`NotificationResponse`).
+* **Thay đổi**:
+  * **Backend**:
+    * Khi một thành viên (Member) đăng ký xin vào Workspace, hệ thống tự động tạo 1 bản ghi thông báo mới trong bảng `workspaces.notifications` gửi đích danh đến **Manager** của Workspace đó (`type="member_join_request"`).
+    * Hỗ trợ `task_id` nullable trong `Notifications` model và schema `NotificationResponse`.
+  * **Navbar Thông báo (MainDashboard.jsx)**:
+    * Biểu tượng chuông 🔔 hiển thị số đỏ thông báo chưa đọc.
+    * Trong danh sách thông báo: Hiển thị icon thành viên `👤`, nội dung thông báo chuẩn Tiếng Anh (*"Member [User] ([Email]) requested to join workspace [Name]."*), kèm nhãn **`Review now →`**.
+    * **Tương tác trực tiếp**: Khi Manager bấm vào thông báo này, hệ thống sẽ tự động chuyển sang tab **Team Workspace** và **tự động bật Modal `Pending Join Requests`** để Manager xem thông tin và bấm **Accept** hoặc **Decline** ngay lập tức.
+  * **Giao diện Team Workspace (WSmodule.jsx)**:
+    * **Nút Join Request** (góc trên bên phải thẻ Manage Your Workspace): Hiển thị huy hiệu đỏ số lượng yêu cầu chờ duyệt khi có thành viên gửi yêu cầu.
+    * **Mục Member (Bên phải)**: Hiển thị nhãn `{count} Pending` bên cạnh nút `Manage >`.
+    * **Modal Manage Members**: Hiển thị thanh thông báo chuẩn Tiếng Anh *"🔔 {count} pending join request(s) awaiting approval"* kèm nút **[Review]** chuyển nhanh sang Modal phê duyệt.
+* **Lý do thay đổi**:
+  * Đáp ứng yêu cầu chuẩn hóa toàn bộ giao diện và thông báo sang tiếng Anh đồng bộ với toàn bộ hệ thống. Giữ nguyên 100% bố cục và thẩm mỹ thiết kế.
+
+---
+
+## 📌 25. File: `Contmodule.jsx` & Backend `ai_content_service.py`, `posts.py`, `schemas.py` (AI Content Generation from Multi-Input Sources)
+
+* **Vị trí**:
+  * `Contmodule.jsx`: Dòng 175 – 215 (SearchBar), 270 – 430 (State, Templates, KB Data & `handleGenerateAI`), 670 – 710 (`+ Generate` Button with Loading State), 880 – 1070 (Dynamic Search & KB View Modal).
+  * Backend: `app/services/ai_content_service.py`, `app/routers/posts.py` (`POST /posts/generate-ai`), `app/schemas.py` (`AIContentGenerateRequest`, `AIContentGenerateResponse`).
+* **Thay đổi**:
+  * **Frontend (`Contmodule.jsx`)**:
+    * Khi bật toggle **`Enable AI`**, người dùng có thể kết hợp linh hoạt 4 nguồn dữ liệu:
+      1. **Prompt Template** (chọn mẫu prompt có sẵn).
+      2. **Knowledge Base** (chọn một hoặc nhiều tài liệu ngữ cảnh).
+      3. **Manual Prompt** (nhập chỉ thị tùy biến của người dùng).
+      4. **Existing Post Content** (tiêu đề và nội dung bài viết hiện có trong ô soạn thảo).
+    * Gắn sự kiện cho nút **`+ Generate`**:
+      * Kiểm tra dữ liệu đầu vào; nếu rỗng toàn bộ sẽ hiển thị thông báo nhắc nhở mà không gọi API vô nghĩa.
+      * Hiển thị trạng thái đang sinh bài `Generating...` kèm hiệu ứng mượt mà và vô hiệu hóa nút trong lúc xử lý.
+      * Khi nhận kết quả từ AI, tự động điền vào ô Title và Body để người dùng xem lại (review) và chỉnh sửa trước khi bấm `Submit` hoặc `Save as Draft`.
+      * Nếu có lỗi phát sinh, bảo toàn 100% nội dung bài viết hiện tại của người dùng, không bị ghi đè.
+    * Cung cấp thanh tìm kiếm **Search** hoạt động trực tiếp cho cả Knowledge Base và Prompt Template.
+    * Cho phép nhấn **View** trên từng tài liệu Knowledge Base để xem chi tiết nội dung trong Popup Modal.
+  * **Backend**:
+    * Xây dựng service `AIContentService` tuân thủ đúng thứ tự ưu tiên và quy tắc kết hợp: *System Instruction $\rightarrow$ Prompt Template $\rightarrow$ Manual Prompt (Ưu tiên đè khi xung đột) $\rightarrow$ Knowledge Base Context $\rightarrow$ Existing Content $\rightarrow$ Output Format JSON*.
+    * Tích hợp gọi trực tiếp Google Gemini API (`gemini-2.5-flash`) kết hợp bộ sinh nội dung dự phòng thông minh (resilient offline fallback) đảm bảo hệ thống không bao giờ bị gián đoạn hay crash.
+* **Lý do thay đổi**:
+  * Hiện thực hóa trọn vẹn đặc tả kỹ thuật trong `Prompt_Ai_Content_Feature.md`, đáp ứng đầy đủ 10 Acceptance Criteria, mang đến trải nghiệm sáng tạo nội dung mạng xã hội thông minh và tối ưu nhất cho người dùng.
+
+
+
+
+
 

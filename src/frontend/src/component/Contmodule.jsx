@@ -176,8 +176,7 @@ function PromptItem({ title, description, aiEnabled, selected, onSelect }) {
 }
 
 
-function SearchBar({ placeholder = 'Search', disabled = false }) {
-  const [value, setValue] = React.useState('');
+function SearchBar({ placeholder = 'Search', disabled = false, value = '', onChange }) {
   return (
     <div style={{
       display: 'flex',
@@ -198,7 +197,7 @@ function SearchBar({ placeholder = 'Search', disabled = false }) {
       <input
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={onChange}
         placeholder={placeholder}
         disabled={disabled}
         style={{
@@ -271,24 +270,61 @@ export default function Contmodule() {
   const [promptInput, setPromptInput] = useState('');
   const [selectedPromptId, setSelectedPromptId] = useState(null);
   const [viewingKbItem, setViewingKbItem] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [kbSearch, setKbSearch] = useState('');
+  const [promptSearch, setPromptSearch] = useState('');
 
-  // KB data
+  // Knowledge Base data with rich factual context
   const [kbItems, setKbItems] = useState([
-    { id: 1, title: 'BA Anual Analysis', checked: false },
-    { id: 2, title: 'BA Anual Analysis', checked: false },
-    { id: 3, title: 'BA Anual Analysis', checked: false },
-    { id: 4, title: 'BA Anual Analysis', checked: false },
-    { id: 5, title: 'BA Anual Analysis', checked: false },
-    { id: 6, title: 'BA Anual Analysis', checked: false },
-    { id: 7, title: 'BA Anual Analysis', checked: false },
-    { id: 8, title: 'BA Anual Analysis', checked: false }
+    {
+      id: 1,
+      title: 'Omni Platform Overview',
+      content: 'Omni Platforms is a unified social media management suite providing cross-platform publishing, RBAC approval workflows, analytics ingestion, and AI automation for enterprise teams and creators.',
+      checked: false
+    },
+    {
+      id: 2,
+      title: 'Brand Voice Guidelines',
+      content: 'Brand voice is innovative, professional, approachable, and data-backed. Use clear active voice, concise paragraphs, and meaningful business metrics.',
+      checked: false
+    },
+    {
+      id: 3,
+      title: 'Q3 Product Roadmap',
+      content: 'Key Q3 initiatives: Automated multi-account scheduling, granular engagement metrics tracking, real-time join request notifications, and AI post writer.',
+      checked: false
+    },
+    {
+      id: 4,
+      title: 'Target Audience Persona',
+      content: 'Audience consists of Marketing Managers, Social Media Specialists, Tech Founders, and Agency Leads seeking scalable automation.',
+      checked: false
+    },
+    {
+      id: 5,
+      title: 'Security & Compliance FAQ',
+      content: 'Enterprise-grade AES-256 Fernet token encryption, secure OAuth 2.0 flow, and dedicated PostgreSQL tenancy schema isolation.',
+      checked: false
+    }
   ]);
 
-  // Prompt data
+  // Prompt Templates with specialized instructions
   const promptTemplates = [
-    { id: 1, title: 'BA Anual Analysis', description: 'As a senior BA, put this business under close inspection...' },
-    { id: 2, title: 'BA Anual Analysis', description: 'As a senior BA, put this business under close inspection...' },
-    { id: 3, title: 'BA Anual Analysis', description: 'As a senior BA, put this business under close inspection...' },
+    {
+      id: 1,
+      title: 'LinkedIn Thought Leadership',
+      description: 'Write an inspiring thought-leadership post for LinkedIn with a compelling hook, structured bullet points, and an engaging question to drive comments.'
+    },
+    {
+      id: 2,
+      title: 'Product Launch & Feature Announcement',
+      description: 'Create an exciting product update post highlighting key user benefits, solving pain points, and inviting feedback.'
+    },
+    {
+      id: 3,
+      title: 'Educational Tip & Case Study',
+      description: 'Break down an actionable industry tip or case study with structured takeaways and relevant hashtags.'
+    }
   ];
 
   // Media drag state
@@ -296,6 +332,74 @@ export default function Contmodule() {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+
+  const handleGenerateAI = async () => {
+    if (!aiEnabled) {
+      toast.error('Please enable AI toggle first.');
+      return;
+    }
+
+    // 1. Gather all inputs
+    const selectedTemplate = promptTemplates.find(pt => pt.id === selectedPromptId);
+    const templateText = selectedTemplate ? selectedTemplate.description : null;
+    const manualPromptText = promptInput.trim() || null;
+
+    const checkedKbItems = kbItems.filter(k => k.checked);
+    const kbContext = checkedKbItems.length > 0
+      ? checkedKbItems.map(k => `${k.title}:\n${k.content || k.title}`).join('\n\n')
+      : null;
+
+    const existingTitleText = title.trim() || null;
+    const existingContentText = body.trim() || null;
+
+    const selectedPlatformNames = platforms
+      .filter(p => p.selected)
+      .map(p => p.name.toLowerCase());
+
+    // 2. Validate empty state (Requirement: Show validation toast if all are empty)
+    if (!templateText && !manualPromptText && !kbContext && !existingTitleText && !existingContentText) {
+      toast.error('Please provide a prompt, select a Prompt Template or Knowledge Base, or enter some post content before generating.');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('http://localhost:8000/posts/generate-ai', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          prompt_template: templateText,
+          manual_prompt: manualPromptText,
+          knowledge_base_context: kbContext,
+          existing_title: existingTitleText,
+          existing_content: existingContentText,
+          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['linkedin'],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Failed to generate AI content');
+      }
+
+      if (data.title && !title.trim()) {
+        setTitle(data.title);
+      }
+      if (data.content) {
+        setBody(data.content);
+      }
+
+      toast.success('Content generated with AI successfully!');
+    } catch (err) {
+      toast.error(err.message || 'AI generation failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleCreatePost = async (statusType = 'pending_review') => {
     if (!title.trim() && !body.trim()) {
@@ -347,10 +451,12 @@ export default function Contmodule() {
         throw new Error(errMsg);
       }
 
-      if (statusType === 'draft') {
-        toast.success('Bài viết đã được lưu dưới dạng Bản nháp (Draft)!');
+      if (statusType === 'draft' || data.status === 'draft') {
+        toast.success('Post saved as draft successfully!');
+      } else if (data.status === 'ready_for_distribution' || data.status === 'published') {
+        toast.success('Post created successfully (Ready for distribution)!');
       } else {
-        toast.success('Bài viết đã được gửi duyệt thành công (Pending)!');
+        toast.success('Post submitted for review successfully (Pending)!');
       }
       setTitle('');
       setBody('');
@@ -371,8 +477,12 @@ export default function Contmodule() {
   };
 
   const handleSelectPrompt = (pt) => {
-    setSelectedPromptId(pt.id);
-    setPromptInput(pt.description);
+    if (selectedPromptId === pt.id) {
+      setSelectedPromptId(null);
+    } else {
+      setSelectedPromptId(pt.id);
+      setPromptInput(pt.description);
+    }
   };
 
   const handleDrop = (e) => {
@@ -446,32 +556,24 @@ export default function Contmodule() {
               gap: '12px', 
               flexDirection: 'row', 
               overflowX: 'auto',
-              padding: '8px 0'
+              paddingBottom: '4px' 
             }}
           >
-            {platforms.length === 0 ? (
-              <div style={{ fontSize: '13px', color: '#94a3b8', padding: '10px 4px', fontFamily: 'Satoshi, sans-serif' }}>
-                No connected channels found. Go to <strong>Distribution</strong> tab to connect your Facebook Page or LinkedIn channel.
-              </div>
-            ) : (
+            {platforms.length > 0 ? (
               platforms.map((p) => (
-                <div 
-                  key={p.id} 
-                  style={{ 
-                    width: '240px',
-                    minWidth: '240px',
-                    flexShrink: 0 
-                  }}
-                >
-                  <PlatformCard
-                    icon={p.icon}
-                    platformName={p.name}
-                    accountName={p.account}
-                    selected={p.selected}
-                    onToggle={() => togglePlatform(p.id)}
-                  />
-                </div>
+                <PlatformCard
+                  key={p.id}
+                  icon={p.icon}
+                  platformName={p.name}
+                  accountName={p.account}
+                  selected={p.selected}
+                  onToggle={() => togglePlatform(p.id)}
+                />
               ))
+            ) : (
+              <div style={{ fontSize: '13px', color: '#8c8c8c', padding: '10px 0' }}>
+                No connected platforms available. Connect a channel in Distribution to post.
+              </div>
             )}
           </div>
 
@@ -482,10 +584,10 @@ export default function Contmodule() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {/* Post Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#5c5c5c', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
               Post
             </span>
-            <AIToggle enabled={aiEnabled} onToggle={() => setAiEnabled((v) => !v)} />
+            <AIToggle enabled={aiEnabled} onToggle={() => setAiEnabled((prev) => !prev)} />
           </div>
 
           {/* Title Input */}
@@ -516,7 +618,7 @@ export default function Contmodule() {
             placeholder={
               aiEnabled
                 ? 'Have an idea but don\'t know how to write it properly?\nTry our AI content generation feature from your original idea!'
-                : 'Have an idea but don\'t know how to write it properly?\nTry our AI content generation feature from your original idea!'
+                : 'Enter your post content here...'
             }
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -569,31 +671,45 @@ export default function Contmodule() {
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(0,0,0,0.09)'; }}
               />
               <button
+                type="button"
+                onClick={handleGenerateAI}
+                disabled={isGenerating}
                 style={{
                   padding: '10px 18px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #FE7216 0%, #f59e0b 100%)',
+                  background: isGenerating
+                    ? '#9ca3af'
+                    : 'linear-gradient(135deg, #FE7216 0%, #f59e0b 100%)',
                   color: '#fff',
                   fontFamily: 'Satoshi, system-ui, sans-serif',
                   fontSize: '13px',
                   fontWeight: '700',
-                  cursor: 'pointer',
+                  cursor: isGenerating ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   whiteSpace: 'nowrap',
                   boxShadow: '0 4px 14px rgba(254,114,22,0.35)',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  opacity: isGenerating ? 0.8 : 1,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(254,114,22,0.45)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(254,114,22,0.35)'; }}
+                onMouseEnter={(e) => {
+                  if (!isGenerating) {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 6px 18px rgba(254,114,22,0.45)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(254,114,22,0.35)';
+                }}
               >
                 {/* Sparkle icon */}
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                   <path d="M6.5 1L7.5 5.5L12 6.5L7.5 7.5L6.5 12L5.5 7.5L1 6.5L5.5 5.5L6.5 1Z" fill="white" />
                 </svg>
-                Generate
+                {isGenerating ? 'Generating...' : '+ Generate'}
               </button>
             </div>
           )}
@@ -798,56 +914,62 @@ export default function Contmodule() {
               marginBottom: '10px',
             }}
           >
-            {kbItems.map((item) => (
-              <div 
-                key={item.id}
-                onClick={() => {
-                  if (aiEnabled) toggleKB(item.id);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  backgroundColor: 'rgba(254, 254, 254, 0.5)',
-                  height: '25px',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  marginBottom: '8px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                  cursor: aiEnabled ? 'pointer' : 'not-allowed',
-                  opacity: aiEnabled ? 1 : 0.5,
-                  transition: 'all 0.2s ease',
-                  userSelect: 'none',
-                  position: 'relative'
-                }}  
-              >
-                <KBItem title={item.title} checked={item.checked} disabled={!aiEnabled} />
-                
-                <span 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (aiEnabled) setViewingKbItem(item);
+            {kbItems
+              .filter(item => item.title.toLowerCase().includes(kbSearch.toLowerCase()) || (item.content || '').toLowerCase().includes(kbSearch.toLowerCase()))
+              .map((item) => (
+                <div 
+                  key={item.id}
+                  onClick={() => {
+                    if (aiEnabled) toggleKB(item.id);
                   }}
-                  style={{ 
-                    fontSize: '13px', 
-                    color: aiEnabled ? '#FE7216' : '#9ca3af', 
-                    fontWeight: '600', 
-                    cursor: aiEnabled ? 'pointer' : 'not-allowed', 
-                    fontFamily: 'Satoshi, system-ui, sans-serif',
-                    flexShrink: 0,
-                    position: 'absolute',
-                    right: '15px'
-                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    backgroundColor: 'rgba(254, 254, 254, 0.5)',
+                    height: '25px',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    marginBottom: '8px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                    cursor: aiEnabled ? 'pointer' : 'not-allowed',
+                    opacity: aiEnabled ? 1 : 0.5,
+                    transition: 'all 0.2s ease',
+                    userSelect: 'none',
+                    position: 'relative'
+                  }}  
                 >
-                  View
-                </span>
-
-              </div>
+                  <KBItem title={item.title} checked={item.checked} disabled={!aiEnabled} />
+                  
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (aiEnabled) setViewingKbItem(item);
+                    }}
+                    style={{ 
+                      fontSize: '13px', 
+                      color: aiEnabled ? '#FE7216' : '#9ca3af', 
+                      fontWeight: '600', 
+                      cursor: aiEnabled ? 'pointer' : 'not-allowed', 
+                      fontFamily: 'Satoshi, system-ui, sans-serif',
+                      flexShrink: 0,
+                      position: 'absolute',
+                      right: '15px'
+                    }}
+                  >
+                    View
+                  </span>
+                </div>
             ))}
           </div>
 
           <div style={{ flexShrink: 0, position: 'relative', zIndex: 1 }}>
-            <SearchBar placeholder="Search" disabled={!aiEnabled} />
+            <SearchBar
+              placeholder="Search Knowledge Base"
+              disabled={!aiEnabled}
+              value={kbSearch}
+              onChange={(e) => setKbSearch(e.target.value)}
+            />
           </div>
         </div>
 
@@ -881,18 +1003,25 @@ export default function Contmodule() {
             {aiEnabled ? 'choose your desired prompt' : 'enable AI to use'}
           </div>
           
-          {promptTemplates.map((pt) => (
-            <PromptItem 
-              key={pt.id} 
-              title={pt.title} 
-              description={pt.description}
-              aiEnabled={aiEnabled}
-              selected={selectedPromptId === pt.id}
-              onSelect={() => handleSelectPrompt(pt)}
-            />
+          {promptTemplates
+            .filter(pt => pt.title.toLowerCase().includes(promptSearch.toLowerCase()) || pt.description.toLowerCase().includes(promptSearch.toLowerCase()))
+            .map((pt) => (
+              <PromptItem 
+                key={pt.id} 
+                title={pt.title} 
+                description={pt.description}
+                aiEnabled={aiEnabled}
+                selected={selectedPromptId === pt.id}
+                onSelect={() => handleSelectPrompt(pt)}
+              />
           ))}
 
-          <SearchBar placeholder="Search" disabled={!aiEnabled} />
+          <SearchBar
+            placeholder="Search Prompt Templates"
+            disabled={!aiEnabled}
+            value={promptSearch}
+            onChange={(e) => setPromptSearch(e.target.value)}
+          />
         </div>
       </div>
 
@@ -912,7 +1041,7 @@ export default function Contmodule() {
             backgroundColor: 'white',
             borderRadius: '20px',
             padding: '24px 28px',
-            width: '420px',
+            width: '440px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
             fontFamily: 'Satoshi, system-ui, sans-serif'
           }}>
@@ -925,9 +1054,19 @@ export default function Contmodule() {
                 ✕
               </button>
             </div>
-            <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
-              Knowledge base document contents and parameters for <strong>{viewingKbItem.title}</strong>. This content is passed to AI as context when generating posts.
-            </p>
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              fontSize: '13px',
+              color: '#334155',
+              lineHeight: '1.6',
+              maxHeight: '220px',
+              overflowY: 'auto'
+            }}>
+              {viewingKbItem.content || `Knowledge base document contents and parameters for ${viewingKbItem.title}.`}
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
               <button
                 onClick={() => setViewingKbItem(null)}
