@@ -87,6 +87,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class WorkspaceInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    workspace_id: str = Field(validation_alias="workspace_uuid")
+    workspace_name: str = Field(validation_alias="workspacename")
+    manager_email: str | None = None
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,15 +103,10 @@ class UserResponse(BaseModel):
     email: EmailStr
     account_type: str
     role: str = ""
+    workspace_id: str | None = None
+    workspace: WorkspaceInfo | None = None
     created_at: datetime
 
-
-class WorkspaceInfo(BaseModel):
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-
-    workspace_id: str = Field(validation_alias="workspace_uuid")
-    workspace_name: str = Field(validation_alias="workspacename")
-    manager_email: str | None = None
 
 
 class RegisterResponse(BaseModel):
@@ -154,6 +157,7 @@ class DistributorResponse(BaseModel):
 
 
 class PostCreate(BaseModel):
+    id: uuid.UUID | None = None
     workspace_id: str | None = Field(
         default=None,
         min_length=WORKSPACE_ID_LENGTH,
@@ -176,6 +180,8 @@ class PostCreate(BaseModel):
     target_platforms: list[str] | None = None
     target_account_ids: list[str] | None = None
     target_accounts_mode: str = "ALL_SELECTED_PLATFORMS"
+    image_url: str | None = None  # Pre-uploaded R2 public URL to attach as PostMedia
+
 
 class PostMediaResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -220,11 +226,13 @@ class PostResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class TaskAttachmentResponse(BaseModel):    
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     image_url: str
     uploaded_at: datetime
+
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -274,7 +282,7 @@ class TaskCreateRequest(BaseModel):
 class TaskUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content: str | None = None
-    status: Literal["todo", "in_progress", "review", "completed", "cancelled"] | None = None
+    status: Literal["todo", "in_progress", "doing", "done", "review", "completed", "cancelled"] | None = None
     priority: Literal["low", "medium", "high", "urgent"] | None = None
     assigned_to: uuid.UUID | None = None
     due_date: datetime | None = None
@@ -312,7 +320,6 @@ class NotificationResponse(BaseModel):
 class NotificationCountUnreadResponse(BaseModel):
     unread_count: int
 
-
 class PostReviewReponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -347,6 +354,7 @@ class KnowledgeBaseResponse(BaseModel):
 
     id: uuid.UUID
     title: str
+    content: str | None = None
     file_path: str | None = None
     file_name: str | None = None
     file_size_bytes: int | None = None
@@ -360,13 +368,13 @@ class KnowledgeBaseCreateRequest(BaseModel):
     owner_workspace_id: uuid.UUID | None = None
     owner_user_id: uuid.UUID | None = None
     title: str
+    content: str | None = None
     file_path: str | None = None
     file_size_bytes: int | None = None
     mime_type: str | None = None
     created_by: uuid.UUID
     file_name: str | None = None
-    tag: str | None = None 
-
+    tag: str | None = None
 
 class KnowledgeBaseCreateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -374,12 +382,9 @@ class KnowledgeBaseCreateResponse(BaseModel):
     knowledge_base: KnowledgeBaseResponse
     upload_url: str | None = None
 
-
-
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
-
 
 class AIContentGenerateRequest(BaseModel):
     prompt_template: str | None = None
@@ -389,11 +394,26 @@ class AIContentGenerateRequest(BaseModel):
     existing_content: str | None = None
     target_platforms: list[str] = ["linkedin"]
 
-
 class AIContentGenerateResponse(BaseModel):
     title: str
     content: str
     suggested_hashtags: list[str] = []
 
+# ─── SEO / GEO Suggest ────────────────────────────────────────────────────────
 
+class SEOSuggestRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    target_platforms: list[str] = ["linkedin", "facebook"]
 
+class SEOSuggestResponse(BaseModel):
+    seo_keywords: list[str] = []
+    hashtags: list[str] = []
+    geo_tip: str = ""
+
+# ─── Post Media Upload ────────────────────────────────────────────────────────
+
+class PostMediaUploadResponse(BaseModel):
+    upload_url: str
+    object_key: str
+    public_url: str

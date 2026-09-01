@@ -207,11 +207,96 @@ useEffect(() => {
 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [showAllTasksModal, setShowAllTasksModal] = useState(false);
+  const [tasksSearchQuery, setTasksSearchQuery] = useState('');
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
   const [showManageMemberModal, setShowManageMemberModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRejectReason, setShowRejectReason] = useState(false);
   const [rejectComment, setRejectComment] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState(null);
+
+  const formatTaskDate = (dateStr) => {
+    if (!dateStr) return 'Ongoing';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getStatusStyle = (status) => {
+    const s = String(status || '').toLowerCase();
+    if (s === 'done' || s === 'completed') {
+      return { color: '#16a34a', border: '1px solid #86efac', backgroundColor: '#f0fdf4', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'inline-block' };
+    }
+    return { color: '#2563eb', border: '1px solid #93c5fd', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'inline-block' };
+  };
+
+  const handleMarkDone = async (taskId) => {
+    const access_token = localStorage.getItem('access_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
+
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: 'done' })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to mark task as done');
+      }
+      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'done' } : t));
+      toast.success('Task marked as Done!');
+    } catch (err) {
+      toast.error(err.message || 'Error updating task status');
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!isManager) {
+      toast.error('Only managers have permission to delete tasks.');
+      return;
+    }
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    const access_token = localStorage.getItem('access_token');
+    const headers = {};
+    if (access_token) headers['Authorization'] = `Bearer ${access_token}`;
+
+    setDeletingTaskId(taskId);
+    try {
+      const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to delete task');
+      }
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      toast.success('Task deleted successfully');
+    } catch (err) {
+      toast.error(err.message || 'Error deleting task');
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
+  const filteredAllTasks = tasks.filter((t) =>
+    (t.title || '').toLowerCase().includes(tasksSearchQuery.toLowerCase()) ||
+    (t.assigned_to || '').toLowerCase().includes(tasksSearchQuery.toLowerCase()) ||
+    (t.status || '').toLowerCase().includes(tasksSearchQuery.toLowerCase())
+  );
 
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskContent, setNewTaskContent] = useState('');
@@ -766,7 +851,8 @@ const handleCancelRequest = async (id) => {
               width: '100%',
               borderCollapse: 'collapse',
               textAlign: 'left',
-              fontSize: '13px'
+              fontSize: '13px',
+              tableLayout: 'fixed'
             }}>
               <thead>
                 <tr style={{ color: '#7c7c7c', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
@@ -787,7 +873,7 @@ const handleCancelRequest = async (id) => {
               overflowY: 'auto',
               flex: 1
             }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', tableLayout: 'fixed' }}>
                 <tbody>
                   {approvalLoading ? (
                     <tr>
@@ -809,17 +895,17 @@ const handleCancelRequest = async (id) => {
                         borderBottom: '1px solid rgba(0, 0, 0, 0.04)'
                       }}
                     >
-                      <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: '30%' }}>
+                      <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: '30%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={req.title}>
                         {req.title}
                       </td>
 
                       {isManager ? (
-                        <td style={{ padding: '10px 5px', color: '#666666', width: '27%' }}>
+                        <td style={{ padding: '10px 5px', color: '#666666', width: '27%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={members.find(m => m.id === req.authorId)?.name || 'Member'}>
                           {members.find(m => m.id === req.authorId)?.name || 'Member'}
                         </td>
                       ) : (
-                        <td style={{ padding: '10px', color: '#7c7c7c', width: '27%' }}>
-                          {req.content}
+                        <td style={{ padding: '10px 5px', color: '#7c7c7c', width: '27%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={req.content}>
+                          {req.content || '—'}
                         </td>
                       )}
 
@@ -1107,34 +1193,40 @@ const handleCancelRequest = async (id) => {
                 {isManager ? 'Tasks Assigned to Others' : 'My Tasks'}
               </h2>
 
-              {isManager ? (
-                /* Orange Add Button */
-                <button
-                  onClick={() => setShowAddTaskModal(true)}
-                  style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'transform 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span
+                  onClick={() => setShowAllTasksModal(true)}
+                  style={{ fontSize: '12px', color: '#FE7216', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.15s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '0.75'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                 >
-                  <img src={addIconImg} alt="Add task" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                </button>
-              ) : (
-                /* See all Link */
-                <span style={{ fontSize: '12px', color: '#554e43', fontWeight: '500', cursor: 'pointer' }}>
                   See all &gt;
                 </span>
-              )}
+
+                {isManager && (
+                  /* Orange Add Button */
+                  <button
+                    onClick={() => setShowAddTaskModal(true)}
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'transform 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <img src={addIconImg} alt="Add task" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Fixed Table Header */}
@@ -1146,13 +1238,14 @@ const handleCancelRequest = async (id) => {
             }}>
               <thead>
                 <tr style={{ color: '#7c7c7c', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', width: isManager ? '35%' : '40%' }}>Name</th>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '25%' }}>Date</th>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '15%' }}>Priority</th>
-                  <th style={{ padding: '10px 5px', fontWeight: '600', width: isManager ? '15%' : '20%' }}>Attachment</th>
-                  {isManager && (
-                    <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '10%' }}>Assignee</th>
-                  )}
+                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '28%' }}>Name</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '18%' }}>Date</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '14%' }}>Status</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '14%' }}>Priority</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', width: '14%' }}>Attachment</th>
+                  <th style={{ padding: '10px 5px', fontWeight: '600', textAlign: 'center', width: '12%' }}>
+                    {isManager ? 'Assignee' : 'Action'}
+                  </th>
                 </tr>
               </thead>
             </table>
@@ -1166,68 +1259,121 @@ const handleCancelRequest = async (id) => {
                 <tbody>
                   {tasksLoading ? (
                     <tr>
-                      <td colSpan={isManager ? 5 : 4} style={{ padding: '14px 5px', color: '#7c7c7c', textAlign: 'center' }}>
+                      <td colSpan={6} style={{ padding: '14px 5px', color: '#7c7c7c', textAlign: 'center' }}>
                         Loading...
                       </td>
                     </tr>
                   ) : tasks.length === 0 ? (
                     <tr>
-                      <td colSpan={isManager ? 5 : 4} style={{ padding: '14px 5px', color: '#7c7c7c', textAlign: 'center' }}>
+                      <td colSpan={6} style={{ padding: '14px 5px', color: '#7c7c7c', textAlign: 'center' }}>
                         {isManager ? 'No tasks assigned yet' : 'No tasks assigned to you'}
                       </td>
                     </tr>
                   ) : (
-                    tasks.map((task) => (
-                      <tr
-                        key={task.id}
-                        style={{
-                          borderBottom: '1px solid rgba(0, 0, 0, 0.04)'
-                        }}
-                      >
-                        {/* Name */}
-                        <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: isManager ? '35%' : '40%' }}>
-                          {task.title}
-                        </td>
-
-                        {/* Date */}
-                        <td style={{ padding: '10px 5px', color: '#666666', whiteSpace: 'nowrap', width: '25%' }}>
-                          {formatTaskDate(task.due_date)}
-                        </td>
-
-                        {/* Priority */}
-                        <td style={{ padding: '10px 5px', textAlign: 'center', width: '15%' }}>
-                          {task.priority ? (
-                            <span style={getPriorityStyle(task.priority)}>
-                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                            </span>
-                          ) : null}
-                        </td>
-
-                        {/* Attachment: download link instead of filename/logo */}
-                        <td style={{ padding: '10px 5px', color: '#666666', width: isManager ? '15%' : '20%' }}>
-                          {task.attachment ? (
-                            <a
-                              href={task.attachment.image_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download={task.attachment.image_url.split('/').pop()}
-                              style={{ color: '#FE7216', fontWeight: '600', textDecoration: 'none' }}
-                            >
-                              Download
-                            </a>
-                          ) : (
-                            <span style={{ color: '#b5b5b5' }}>—</span>
-                          )}
-                        </td>
-
-                        {/* Assignee: name text instead of avatar (Manager View) */}
-                        {isManager && (
-                          <td style={{ padding: '10px 5px', textAlign: 'center', width: '10%', color: '#666666' }}>
-                            {task.assigned_to || 'Unassigned'}
+                    tasks.map((task) => {
+                      const isTaskDone = (task.status || '').toLowerCase() === 'done' || (task.status || '').toLowerCase() === 'completed';
+                      return (
+                        <tr
+                          key={task.id}
+                          style={{
+                            borderBottom: '1px solid rgba(0, 0, 0, 0.04)'
+                          }}
+                        >
+                          {/* Name */}
+                          <td style={{ padding: '8px 5px', color: '#666666', fontWeight: '500', width: '28%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span title={task.title}>{task.title}</span>
                           </td>
-                        )}
-                      </tr>
-                    ))
+
+                          {/* Date */}
+                          <td style={{ padding: '10px 5px', color: '#666666', whiteSpace: 'nowrap', width: '18%' }}>
+                            {formatTaskDate(task.due_date)}
+                          </td>
+
+                          {/* Status */}
+                          <td style={{ padding: '10px 5px', textAlign: 'center', width: '14%' }}>
+                            <span style={getStatusStyle(task.status)}>
+                              {isTaskDone ? 'Done' : 'Doing'}
+                            </span>
+                          </td>
+
+                          {/* Priority */}
+                          <td style={{ padding: '10px 5px', textAlign: 'center', width: '14%' }}>
+                            {task.priority ? (
+                              <span style={getPriorityStyle(task.priority)}>
+                                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                              </span>
+                            ) : null}
+                          </td>
+
+                          {/* Attachment */}
+                          <td style={{ padding: '10px 5px', color: '#666666', width: '14%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {task.attachment ? (
+                              <a
+                                href={task.attachment.image_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={task.attachment.image_url.split('/').pop()}
+                                style={{ color: '#FE7216', fontWeight: '600', textDecoration: 'none' }}
+                              >
+                                Download ↗
+                              </a>
+                            ) : (
+                              <span style={{ color: '#b5b5b5' }}>—</span>
+                            )}
+                          </td>
+
+                          {/* Assignee (Manager) or Action Done button (Member) */}
+                          <td style={{ padding: '10px 5px', textAlign: 'center', width: '12%' }}>
+                            {isManager ? (
+                              <span style={{ color: '#666666', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {task.assigned_to || 'Unassigned'}
+                              </span>
+                            ) : (
+                              isTaskDone ? (
+                                <span style={{
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  color: '#16a34a',
+                                  backgroundColor: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  ✓ Done
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkDone(task.id)}
+                                  disabled={updatingTaskId === task.id}
+                                  style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #86efac',
+                                    backgroundColor: '#f0fdf4',
+                                    color: '#16a34a',
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    cursor: updatingTaskId === task.id ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#16a34a'; e.currentTarget.style.color = '#ffffff'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f0fdf4'; e.currentTarget.style.color = '#16a34a'; }}
+                                >
+                                  {updatingTaskId === task.id ? '...' : '✓ Done'}
+                                </button>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1924,6 +2070,268 @@ const handleCancelRequest = async (id) => {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- See All Tasks Modal --- */}
+      {showAllTasksModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+          fontFamily: 'Satoshi, system-ui, sans-serif'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            width: '92%',
+            maxWidth: '880px',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            overflow: 'hidden',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>
+                  {isManager ? 'Tasks Assigned to Others' : 'My Tasks'}
+                </h3>
+                <span style={{
+                  backgroundColor: '#fff7ed',
+                  color: '#ea580c',
+                  border: '1px solid #ffedd5',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: '700'
+                }}>
+                  {tasks.length} tasks
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllTasksModal(false)}
+                style={{
+                  border: 'none',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  fontSize: '16px',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Search filter */}
+            <div style={{ padding: '14px 24px', borderBottom: '1px solid #f8fafc', backgroundColor: '#fafafa' }}>
+              <input
+                type="text"
+                placeholder="Search tasks by title, status (Doing/Done), or assignee..."
+                value={tasksSearchQuery}
+                onChange={(e) => setTasksSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  backgroundColor: '#ffffff'
+                }}
+              />
+            </div>
+
+            {/* Modal Body: Task Table */}
+            <div className="custom-scroll" style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', tableLayout: 'fixed' }}>
+                <thead>
+                  <tr style={{ color: '#64748b', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <th style={{ width: '24%', padding: '14px 8px', fontWeight: '700', borderBottom: '1px solid #e2e8f0' }}>Task Name</th>
+                    <th style={{ width: '16%', padding: '14px 8px', fontWeight: '700', borderBottom: '1px solid #e2e8f0' }}>Due Date</th>
+                    <th style={{ width: '12%', padding: '14px 8px', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>Status</th>
+                    <th style={{ width: '12%', padding: '14px 8px', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>Priority</th>
+                    <th style={{ width: '14%', padding: '14px 8px', fontWeight: '700', borderBottom: '1px solid #e2e8f0' }}>Attachment</th>
+                    <th style={{ width: '12%', padding: '14px 8px', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>Assignee</th>
+                    <th style={{ width: '10%', padding: '14px 8px', fontWeight: '700', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAllTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '40px 10px', color: '#94a3b8', fontSize: '13px' }}>
+                        No matching tasks found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAllTasks.map((task) => {
+                      const isTaskDone = (task.status || '').toLowerCase() === 'done' || (task.status || '').toLowerCase() === 'completed';
+                      return (
+                        <tr key={task.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#334155', fontSize: '13px' }}>
+                          <td style={{ padding: '12px 8px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span title={task.title}>{task.title}</span>
+                          </td>
+                          <td style={{ padding: '12px 8px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {formatTaskDate(task.due_date)}
+                          </td>
+                          <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                            <span style={getStatusStyle(task.status)}>
+                              {isTaskDone ? 'Done' : 'Doing'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                            <span style={getPriorityStyle(task.priority)}>
+                              {task.priority ? (task.priority.charAt(0).toUpperCase() + task.priority.slice(1)) : 'Medium'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {task.attachment ? (
+                              <a
+                                href={task.attachment.image_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={task.attachment.image_url.split('/').pop()}
+                                style={{ color: '#FE7216', textDecoration: 'none', fontWeight: '600' }}
+                              >
+                                📎 Download ↗
+                              </a>
+                            ) : (
+                              <span style={{ color: '#94a3b8' }}>None</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '500', color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {task.assigned_to || 'Unassigned'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                            {isManager ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTask(task.id)}
+                                disabled={deletingTaskId === task.id}
+                                title="Delete Task"
+                                style={{
+                                  padding: '6px 10px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #fecaca',
+                                  backgroundColor: '#fef2f2',
+                                  color: '#dc2626',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  cursor: deletingTaskId === task.id ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#dc2626'; e.currentTarget.style.color = '#ffffff'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.color = '#dc2626'; }}
+                              >
+                                {deletingTaskId === task.id ? '...' : '🗑 Delete'}
+                              </button>
+                            ) : (
+                              isTaskDone ? (
+                                <span style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  color: '#16a34a',
+                                  backgroundColor: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  ✓ Done
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkDone(task.id)}
+                                  disabled={updatingTaskId === task.id}
+                                  title="Mark Task as Done"
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #86efac',
+                                    backgroundColor: '#f0fdf4',
+                                    color: '#16a34a',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    cursor: updatingTaskId === task.id ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#16a34a'; e.currentTarget.style.color = '#ffffff'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f0fdf4'; e.currentTarget.style.color = '#16a34a'; }}
+                                >
+                                  {updatingTaskId === task.id ? '...' : '✓ Done'}
+                                </button>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              backgroundColor: '#fafafa'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowAllTasksModal(false)}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

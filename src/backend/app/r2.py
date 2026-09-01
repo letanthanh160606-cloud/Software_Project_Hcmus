@@ -28,3 +28,16 @@ def generate_presigned_url(object_key: str, content_type: str, expires_in: int =
         },
         ExpiresIn=expires_in,
     )
+
+def upload_file_to_r2(file_bytes: bytes, object_key: str, content_type: str) -> str:
+    """Directly upload file bytes to Cloudflare R2 bucket"""
+    settings = get_settings()
+    client = get_r2_client()
+    bucket_name = settings.R2_BUCKET_NAME or "default_bucket"
+    client.put_object(
+        Bucket=bucket_name,
+        Key=object_key,
+        Body=file_bytes,
+        ContentType=content_type,
+    )
+    return f"{(settings.R2_PUBLIC_BASE_URL or '').rstrip('/')}/{object_key}"

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -6,13 +6,19 @@ from app import crud
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Post, User
+from app.r2 import generate_presigned_url, upload_file_to_r2
+from app.config import get_settings
 from app.schemas import (
     AIContentGenerateRequest,
     AIContentGenerateResponse,
     PostCreate,
     PostResponse,
+    PostMediaUploadResponse,
+    SEOSuggestRequest,
+    SEOSuggestResponse,
 )
 from app.services.ai_content_service import ai_content_service
+from app.services.seo_service import seo_suggest_service
 
 
 router = APIRouter(
@@ -31,11 +37,17 @@ def create_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Post:
+    ws_id = payload.workspace_id
+    if ws_id is None:
+        user_ws = crud.get_workspace_for_user(db, current_user)
+        if user_ws:
+            ws_id = user_ws.workspace_uuid
+
     is_manager = False
-    if payload.workspace_id is not None:
+    if ws_id is not None:
         workspace = crud.get_workspace_by_id(
             db,
-            payload.workspace_id,
+            ws_id,
         )
 
         if workspace is None:
@@ -47,7 +59,7 @@ def create_post(
         if not crud.user_can_access_workspace(
             db,
             user=current_user,
-            workspace_id=payload.workspace_id,
+            workspace_id=ws_id,
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -72,7 +84,7 @@ def create_post(
 
     if is_manager:
         post_status = "draft" if payload.status == "draft" else "ready_for_distribution"
-    elif payload.workspace_id is not None:
+    elif ws_id is not None:
         # Member submitting to workspace
         post_status = "draft" if payload.status == "draft" else "pending_review"
     else:
@@ -80,13 +92,14 @@ def create_post(
         post_status = "draft" if payload.status == "draft" else "ready_for_distribution"
 
     try:
-        return crud.create_post(
+        post = crud.create_post(
             db,
             author=current_user,
-            workspace_id=payload.workspace_id,
+            workspace_id=ws_id,
             title=payload.title,
             content=payload.content,
             prompt_template_id=payload.prompt_template_id,
+
             knowledge_base_id=payload.knowledge_base_id,
             seo_keywords=payload.seo_keywords,
             seo_hashtags=payload.seo_hashtags,
@@ -94,11 +107,19 @@ def create_post(
             target_account_ids=payload.target_account_ids,
             target_accounts_mode=payload.target_accounts_mode or "ALL_SELECTED_PLATFORMS",
             status=post_status,
+            post_id=payload.id,
         )
+
+        # Link media attachment if an image was pre-uploaded
+        if payload.image_url:
+            crud.create_post_media(db, post_id=post.id, image_url=payload.image_url)
+            db.refresh(post)
+
+        return post
 
     except IntegrityError as exc:
         db.rollback()
-
+        logger.error(f"Post creation IntegrityError: {exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Post could not be created because related data is invalid",
@@ -126,6 +147,14 @@ async def generate_ai_content(
     payload: AIContentGenerateRequest,
     current_user: User = Depends(get_current_user),
 ) -> AIContentGenerateResponse:
+    """
+    Generate compelling post content using Gemini AI based on:
+    - prompt_template: content from selected PromptTemplate
+    - manual_prompt: user's freeform prompt input
+    - knowledge_base_context: concatenated text from checked KnowledgeBase items
+    - existing_title / existing_content: draft text already in the form
+    - target_platforms: platforms targeted (affects tone/formatting)
+    """
     try:
         result = await ai_content_service.generate_content(
             prompt_template=payload.prompt_template,
@@ -148,5 +177,125 @@ async def generate_ai_content(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI generation failed: {exc}",
-        ) from exc
+            detail=f"AI content generation failed: {exc}",
+        ) from exc
+
+
+@router.post(
+    "/upload-media",
+    response_model=PostMediaUploadResponse,
+    status_code=status.HTTP_200_OK,
+)
+def upload_media(
+    file_name: str = Query(..., description="Original name of the image file"),
+    content_type: str = Query(..., description="MIME type of the image"),
+    post_id: str | None = Query(default=None, description="Post ID used as directory name"),
+    current_user: User = Depends(get_current_user),
+) -> PostMediaUploadResponse:
+    """
+    Generate a presigned PUT URL so the frontend can upload an image directly to
+    Cloudflare R2. Returns the upload URL and the public URL that will be stored
+    in the database once the upload completes.
+    """
+    import uuid as _uuid
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type '{content_type}'. Allowed: JPEG, PNG, WebP, GIF.",
+        )
+
+    settings = get_settings()
+    folder_id = post_id.strip() if (post_id and post_id.strip()) else str(_uuid.uuid4())
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "jpg"
+    object_key = f"posts/{folder_id}/{_uuid.uuid4()}.{ext}"
+
+    try:
+        upload_url = generate_presigned_url(object_key, content_type, expires_in=900)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Could not generate upload URL: {exc}",
+        ) from exc
+
+    public_url = f"{(settings.R2_PUBLIC_BASE_URL or '').rstrip('/')}/{object_key}"
+
+    return PostMediaUploadResponse(
+        upload_url=upload_url,
+        object_key=object_key,
+        public_url=public_url,
+    )
+
+
+@router.post(
+    "/upload-media-direct",
+    summary="Upload image directly through backend to Cloudflare R2 into post folder",
+)
+async def upload_media_direct(
+    file: UploadFile = File(...),
+    post_id: str | None = Query(default=None, description="Post ID used as directory name"),
+    current_user: User = Depends(get_current_user),
+):
+    import uuid as _uuid
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    content_type = file.content_type or "image/jpeg"
+    if content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type '{content_type}'. Allowed: JPEG, PNG, WebP, GIF.",
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large (max 50MB)")
+
+    folder_id = post_id.strip() if (post_id and post_id.strip()) else str(_uuid.uuid4())
+    file_name = file.filename or "image.jpg"
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "jpg"
+    object_key = f"posts/{folder_id}/{_uuid.uuid4()}.{ext}"
+
+    try:
+        public_url = upload_file_to_r2(file_bytes, object_key, content_type)
+        return {"public_url": public_url, "object_key": object_key, "post_id": folder_id}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file to storage: {exc}"
+        ) from exc
+
+
+
+@router.post(
+    "/seo-suggest",
+    response_model=SEOSuggestResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def seo_suggest(
+    payload: SEOSuggestRequest,
+    current_user: User = Depends(get_current_user),
+) -> SEOSuggestResponse:
+    """
+    Analyze post content with Gemini AI and return SEO keywords, hashtags,
+    and a GEO (Generative Engine Optimization) tip.
+    """
+    try:
+        result = await seo_suggest_service.suggest(
+            title=payload.title,
+            content=payload.content,
+            target_platforms=payload.target_platforms,
+        )
+        return SEOSuggestResponse(
+            seo_keywords=result.get("seo_keywords", []),
+            hashtags=result.get("hashtags", []),
+            geo_tip=result.get("geo_tip", ""),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"SEO analysis failed: {exc}",
+        ) from exc

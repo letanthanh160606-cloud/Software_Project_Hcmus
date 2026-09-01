@@ -62,6 +62,7 @@ def create_knowledge_base(
             owner_workspace_id=None,
             owner_user_id=current_user.users_uuid,
             title=payload.title,
+            content=payload.content,
             file_size_bytes=payload.file_size_bytes,
             mime_type=payload.mime_type,
             created_by=current_user.users_uuid,
@@ -95,4 +96,37 @@ def get_list_knowledge_bases(
             owner_user_id=current_user.users_uuid,
         )
         return knowledge_bases
+
+@router.delete("/prompt-templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_prompt_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import uuid as _uuid
+    try:
+        t_uuid = _uuid.UUID(template_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid template ID")
+    success = crud.delete_prompt_template(db, template_id=t_uuid, owner_user_id=current_user.users_uuid)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prompt template not found.")
+    return None
+
+@router.delete("/knowledge-bases/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_knowledge_base(
+    kb_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import uuid as _uuid
+    try:
+        k_uuid = _uuid.UUID(kb_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid knowledge base ID")
+    success = crud.delete_knowledge_base(db, kb_id=k_uuid, owner_user_id=current_user.users_uuid)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found.")
+    return None
+
 

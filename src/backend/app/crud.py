@@ -178,12 +178,20 @@ def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> l
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
+    user = db.get(User, user_id)
+    if user:
+        role = derive_role(db, user)
+        workspace = get_workspace_for_user(db, user)
+        if workspace:
+            return list_posts_for_role(db, workspace.workspace_uuid, user_id, role)
+
     return db.scalars(
         select(Post)
         .where(Post.author_id == user_id)
         .options(selectinload(Post.attachment))
         .order_by(Post.created_at.desc())
     ).all()
+
 
 
 def attach_engagements_to_posts(db: Session, posts: list[Post]) -> list[any]:
@@ -241,6 +249,7 @@ ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
 }
 
 def create_task(
@@ -291,6 +300,19 @@ def update_task(db: Session, task: Task, updates: dict) -> Task:
     db.commit()
     db.refresh(task)
     return task
+
+def delete_task(db: Session, *, task_id: uuid.UUID, workspace_id: uuid.UUID | None = None) -> bool:
+    query = select(Task).where(Task.id == task_id)
+    if workspace_id is not None:
+        query = query.where(Task.workspace_id == workspace_id)
+    task = db.scalar(query)
+    if task is None:
+        return False
+
+    db.query(TaskAttachment).filter(TaskAttachment.task_id == task.id).delete()
+    db.delete(task)
+    db.commit()
+    return True
 
 def soft_remove_member(db: Session, workspace_id: str, user_id) -> WorkspaceMember | None:
     membership = db.scalar(
@@ -347,28 +369,64 @@ def create_post(
     target_account_ids: list[str] | None = None,
     target_accounts_mode: str = "ALL_SELECTED_PLATFORMS",
     status: str = "draft",
+    post_id: uuid.UUID | None = None,
 ) -> Post:
-    post = Post(
-        workspace_id=workspace_id,
-        author_id=author.users_uuid,
-        title=title,
-        content=content,
-        status=status,
-        prompt_template_id=prompt_template_id,
-        knowledge_base_id=knowledge_base_id,
-        ai_generated=False,
-        seo_keywords=seo_keywords,
-        seo_hashtags=seo_hashtags,
-        target_platforms=target_platforms or [],
-        target_account_ids=target_account_ids or [],
-        target_accounts_mode=target_accounts_mode or "ALL_SELECTED_PLATFORMS",
-    )
+    # Validate workspace_id actually exists in database before attaching
+    valid_ws_id = None
+    if workspace_id:
+        try:
+            ws_uuid = uuid.UUID(str(workspace_id))
+            ws = db.get(Workspace, ws_uuid)
+            if ws:
+                valid_ws_id = ws.workspace_uuid
+        except (ValueError, TypeError):
+            valid_ws_id = None
+
+    if post_id is not None:
+        existing_post = db.get(Post, post_id)
+        if existing_post:
+            post_id = uuid.uuid4()
+
+    post_kwargs = {
+        "workspace_id": valid_ws_id,
+        "author_id": author.users_uuid,
+        "title": title,
+        "content": content,
+        "status": status,
+        "prompt_template_id": prompt_template_id,
+        "knowledge_base_id": knowledge_base_id,
+        "ai_generated": False,
+        "seo_keywords": seo_keywords,
+        "seo_hashtags": seo_hashtags,
+        "target_platforms": target_platforms or [],
+        "target_account_ids": target_account_ids or [],
+        "target_accounts_mode": target_accounts_mode or "ALL_SELECTED_PLATFORMS",
+    }
+    if post_id is not None:
+        post_kwargs["id"] = post_id
+
+    post = Post(**post_kwargs)
 
     db.add(post)
     db.commit()
     db.refresh(post)
 
     return post
+
+
+def create_post_media(db: Session, *, post_id, image_url: str, position: int = 0):
+    """Attach a media record to a post. Replaces any existing attachment."""
+    from app.models import PostMedia
+    # Remove old attachment if exists
+    existing = db.scalar(select(PostMedia).where(PostMedia.post_id == post_id))
+    if existing:
+        db.delete(existing)
+        db.flush()
+    media = PostMedia(post_id=post_id, image_url=image_url, position=position)
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return media
 
 def create_personal_task(
     db: Session, *, title: str, content: str, priority: str,
@@ -602,11 +660,12 @@ def get_list_prompt_templates(db: Session, *, owner_workspace_id: uuid.UUID | No
     return db.scalars(query).all()
 
 
-def create_knowledge_base(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None, title: str, file_path: str | None, file_size_bytes: int | None, mime_type: str | None, created_by: uuid.UUID, file_name: str | None, tag: str | None = None) -> KnowledgeBase:
+def create_knowledge_base(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None, title: str, content: str | None = None, file_path: str | None = None, file_size_bytes: int | None = None, mime_type: str | None = None, created_by: uuid.UUID, file_name: str | None = None, tag: str | None = None) -> tuple[KnowledgeBase, str | None]:
     knowledge_base = KnowledgeBase(
         owner_workspace_id=owner_workspace_id,
         owner_user_id=owner_user_id,
         title=title,
+        content=content,
         file_path=None,
         file_size_bytes=None,
         mime_type=None,
@@ -632,3 +691,24 @@ def create_knowledge_base(db: Session, *, owner_workspace_id: uuid.UUID | None, 
 def get_list_knowledge_bases(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None) -> list[KnowledgeBase]:
     query = select(KnowledgeBase).where(or_(KnowledgeBase.owner_workspace_id == owner_workspace_id, KnowledgeBase.owner_user_id == owner_user_id))
     return db.scalars(query).all()
+
+def delete_prompt_template(db: Session, *, template_id: uuid.UUID, owner_user_id: uuid.UUID | None = None) -> bool:
+    template = db.scalar(
+        select(PromptTemplate).where(PromptTemplate.id == template_id)
+    )
+    if not template:
+        return False
+    db.delete(template)
+    db.commit()
+    return True
+
+def delete_knowledge_base(db: Session, *, kb_id: uuid.UUID, owner_user_id: uuid.UUID | None = None) -> bool:
+    kb = db.scalar(
+        select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
+    )
+    if not kb:
+        return False
+    db.delete(kb)
+    db.commit()
+    return True
+

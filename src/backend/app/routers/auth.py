@@ -212,9 +212,35 @@ def read_current_user(
     db: Session = Depends(get_db),
 ) -> UserResponse:
     role = crud.derive_role(db, current_user)
+    workspace = crud.get_workspace_for_user(db, current_user)
+
+    if workspace is None and current_user.account_type == "business":
+        from app.models import WorkspaceMember, Workspace
+        pending_membership = db.scalar(
+            select(WorkspaceMember).where(
+                WorkspaceMember.user_id == current_user.users_uuid,
+                WorkspaceMember.status == "pending",
+            )
+        )
+        if pending_membership:
+            workspace = db.get(Workspace, pending_membership.workspace_id)
+
+    workspace_info = None
+    workspace_id = None
+    if workspace:
+        workspace_id = workspace.workspace_uuid
+        workspace_info = WorkspaceInfo(
+            workspace_id=workspace.workspace_uuid,
+            workspace_name=workspace.workspacename,
+            manager_email=workspace.manager.email if workspace.manager else None,
+        )
+
     user_response = UserResponse.model_validate(current_user)
     user_response.role = role
+    user_response.workspace_id = workspace_id
+    user_response.workspace = workspace_info
     return user_response
+
 
 
 @router.post("/change-password", status_code=200)

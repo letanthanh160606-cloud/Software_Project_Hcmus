@@ -41,7 +41,7 @@ export default function MainDashboard() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
 
     if (savedUser) {
       try {
@@ -62,14 +62,22 @@ export default function MainDashboard() {
 
     // Verify session in real-time with backend
     const verifyUserSession = async () => {
-      if (!token) return;
+      if (!token) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/signin');
+        return;
+      }
       try {
         const res = await fetch('http://localhost:8000/auth/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.status === 401) {
+          localStorage.removeItem('access_token');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
           navigate('/signin');
           return;
         }
@@ -81,6 +89,7 @@ export default function MainDashboard() {
           // If member was removed from workspace (account_type is business, had workspace, but role is now individual)
           if (parsedUser.account_type === 'business' && parsedUser.workspace_id && freshUser.role === 'individual') {
             toast.error('Your account has been removed from the Workspace by the manager.');
+            localStorage.removeItem('access_token');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             navigate('/signin');
@@ -196,7 +205,7 @@ export default function MainDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const res = await fetch(`${API_URL}/notifications?limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -211,7 +220,7 @@ export default function MainDashboard() {
 
   const markAsRead = async (id) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const res = await fetch(`${API_URL}/notifications/${id}/read`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` },
@@ -227,7 +236,7 @@ export default function MainDashboard() {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const res = await fetch(`${API_URL}/notifications/mark-all-read`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` },
@@ -816,7 +825,7 @@ export default function MainDashboard() {
           {activeTab === 'Dashboard' ? (
             <DBmodule user={user} />
           ) : activeTab === 'Content' ? (
-            <Contmodule />
+            <Contmodule onNavigateTab={setActiveTab} />
           ) : activeTab === 'Statistics' ? (
             <Stamodule user={user} />
           ) : activeTab === 'Distribution' ? (

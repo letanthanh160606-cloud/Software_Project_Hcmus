@@ -68,7 +68,7 @@ export default function Dismodule({ user }) {
   const [editNote, setEditNote] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null);
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
   const userRole = user?.role || 'individual';
   const workspaceId =
     user?.workspace_id ||
@@ -134,7 +134,7 @@ export default function Dismodule({ user }) {
         initiateUrl += `&workspace_id=${workspaceId}`;
       }
 
-      const currentToken = localStorage.getItem('token');
+      const currentToken = localStorage.getItem('access_token') || localStorage.getItem('token');
       if (!currentToken) {
         toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
         setIsSubmitting(false);

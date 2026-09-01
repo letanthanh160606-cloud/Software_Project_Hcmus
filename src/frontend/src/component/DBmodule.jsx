@@ -42,7 +42,7 @@ export default function DBmodule({ user }) {
     user?.workspace?.workspace_id ||
     user?.workspace?.workspace_uuid ||
     (typeof user?.workspace === 'string' ? user.workspace : null);
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
 
   const [NIGincrease, setNIGincrease] = useState(true);
   const [netGainPct, setNetGainPct] = useState(0);

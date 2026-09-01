@@ -38,12 +38,12 @@ export default function SignIn() {
             }
 
             localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('token', data.access_token);
             localStorage.setItem('user', JSON.stringify({
                 ...data.user,
                 workspace_id: data.workspace?.workspace_id || null,
                 workspace: data.workspace || null,
-
-        }));
+            }));
 
             toast.success('Login successful!');
             navigate('/dashboard');

@@ -16,6 +16,7 @@ from app.schemas import (
     PostUpdateRequest,
     TaskCreateRequest,
     TaskResponse,
+    TaskUpdateRequest,
     WorkspaceDetailResponse,
     TaskAttachmentResponse,
     PostReviewReponse,
@@ -179,6 +180,43 @@ def create_task(
         content_type=payload.content_type,
     )
     return _task_to_response(db, task, upload_url) 
+
+@router.patch("/{workspace_id}/tasks/{task_id}", response_model=TaskResponse)
+def update_task_endpoint(
+    task_id: uuid.UUID,
+    payload: TaskUpdateRequest,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TaskResponse:
+    task = db.scalar(select(crud.Task).where(crud.Task.id == task_id, crud.Task.workspace_id == ctx.workspace.workspace_uuid))
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if ctx.role == "member":
+        if task.assigned_to != current_user.users_uuid:
+            raise HTTPException(status_code=403, detail="You can only update tasks assigned to you.")
+        allowed_keys = {"status"}
+        if any(k not in allowed_keys for k in updates.keys()):
+            raise HTTPException(status_code=403, detail="Members can only update task status.")
+
+    updated_task = crud.update_task(db, task, updates)
+    return _task_to_response(db, updated_task)
+
+@router.delete("/{workspace_id}/tasks/{task_id}", status_code=204)
+def delete_task(
+    task_id: uuid.UUID,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if ctx.role != "manager":
+        raise HTTPException(status_code=403, detail="Only managers can delete tasks.")
+    deleted = crud.delete_task(db, task_id=task_id, workspace_id=ctx.workspace.workspace_uuid)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return None
 
 @router.delete("/{workspace_id}/members/{user_id}", response_model=MemberResponse)
 def remove_member(

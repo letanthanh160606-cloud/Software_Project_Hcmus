@@ -105,7 +105,7 @@ function MultiLineChart({ timeframe, seriesData, labelsData }) {
 
 export default function Stamodule({ user }) {
   const isManager = user?.role === 'manager';
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
   const workspaceId =
     user?.workspace_id ||
     user?.workspace?.workspace_id ||
@@ -234,8 +234,12 @@ export default function Stamodule({ user }) {
     }
   };
 
-  // 6. Generate AI Report on Timeframe Change
-  const fetchAIReport = async (tf) => {
+  // 6. Generate AI Report manually on demand
+  const handleCreateReport = async (tf = reportTimeframe) => {
+    if (!workspaceId) {
+      toast.error('Workspace ID is not available.');
+      return;
+    }
     setIsGeneratingReport(true);
     try {
       const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/generate`, {
@@ -247,9 +251,14 @@ export default function Stamodule({ user }) {
         const data = await res.json();
         setReportTitle(data.title);
         setReportText(data.summary);
+        toast.success('AI Statistical report generated successfully!');
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to generate AI report');
       }
     } catch (err) {
-      console.warn('Using default report summary:', err);
+      console.warn('Error generating AI report:', err);
+      toast.error(err.message || 'Error generating AI report');
     } finally {
       setIsGeneratingReport(false);
     }
@@ -275,11 +284,6 @@ export default function Stamodule({ user }) {
     if (!workspaceId) return;
     fetchTimeline(graphTimeframe);
   }, [graphTimeframe, workspaceId]);
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    fetchAIReport(reportTimeframe);
-  }, [reportTimeframe, workspaceId]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -345,6 +349,10 @@ export default function Stamodule({ user }) {
   };
 
   const handleSaveReport = async () => {
+    if (!reportText || !reportText.trim()) {
+      toast.error('Please click Create Report first before saving.');
+      return;
+    }
     const newTitle = reportTitle || `[${reportTimeframe} report for ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}]`;
 
     try {
@@ -717,7 +725,7 @@ export default function Stamodule({ user }) {
               <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#1E1E1E' }}>
                 Statistical Report
               </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <select
                   value={reportTimeframe}
                   onChange={(e) => setReportTimeframe(e.target.value)}
@@ -740,22 +748,59 @@ export default function Stamodule({ user }) {
                 </select>
 
                 <button
-                  onClick={handleSaveReport}
+                  onClick={() => handleCreateReport(reportTimeframe)}
+                  disabled={isGeneratingReport}
                   style={{
-                    padding: '5px 16px',
+                    padding: '5px 14px',
                     borderRadius: '16px',
                     border: 'none',
-                    backgroundColor: '#FE7216',
+                    background: isGeneratingReport ? '#ffd0b0' : 'linear-gradient(135deg, #FE7216 0%, #f59e0b 100%)',
                     color: 'white',
                     fontWeight: '700',
                     fontSize: '12px',
-                    cursor: 'pointer',
+                    cursor: isGeneratingReport ? 'not-allowed' : 'pointer',
                     fontFamily: 'Satoshi',
-                    boxShadow: '0 2px 8px rgba(254,114,22,0.3)',
+                    boxShadow: '0 2px 8px rgba(254,114,22,0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'transform 0.15s ease, opacity 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isGeneratingReport) e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isGeneratingReport) e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L14.4 7.2L20 9.6L14.4 12L12 17.2L9.6 12L4 9.6L9.6 7.2L12 2Z" />
+                  </svg>
+                  {isGeneratingReport ? 'Generating...' : 'Create Report'}
+                </button>
+
+                <button
+                  onClick={handleSaveReport}
+                  disabled={!reportText || isGeneratingReport}
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(0,0,0,0.1)',
+                    backgroundColor: reportText ? 'white' : 'rgba(255,255,255,0.5)',
+                    color: reportText ? '#FE7216' : '#9ca3af',
+                    fontWeight: '700',
+                    fontSize: '12px',
+                    cursor: reportText ? 'pointer' : 'not-allowed',
+                    fontFamily: 'Satoshi',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
                     transition: 'transform 0.15s ease, background-color 0.15s ease',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                  onMouseEnter={(e) => {
+                    if (reportText) e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (reportText) e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
                   Save
                 </button>
@@ -776,10 +821,21 @@ export default function Stamodule({ user }) {
               }}
             >
               {isGeneratingReport ? (
-                <div style={{ color: '#FE7216', fontSize: '13px', fontWeight: '600', padding: '10px 0' }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  gap: '8px',
+                  color: '#FE7216',
+                  fontSize: '13px',
+                  fontWeight: '600'
+                }}>
+                  <div style={{ fontSize: '20px' }}>✨</div>
                   Generating AI Statistical Report with Gemini...
                 </div>
-              ) : (
+              ) : reportText ? (
                 <>
                   <div style={{ fontWeight: '700', fontSize: '13px', color: '#1E1E1E', marginBottom: '6px' }}>
                     {reportTitle || (reportText ? `[${reportTimeframe} report]` : 'AI Statistical Report')}
@@ -788,14 +844,31 @@ export default function Stamodule({ user }) {
                     style={{
                       margin: 0,
                       fontSize: '12px',
-                      lineHeight: '1.6',
-                      color: '#4A4A4A',
+                      lineHeight: '1.65',
+                      color: '#334155',
                       fontFamily: 'Satoshi',
                     }}
                   >
-                    {reportText || 'No report generated yet. Select a timeframe or click Save to create an AI report.'}
+                    {reportText}
                   </p>
                 </>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
+                  padding: '20px 10px',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  fontFamily: 'Satoshi',
+                  lineHeight: '1.6'
+                }}>
+                  <span style={{ fontSize: '22px', marginBottom: '6px' }}>📊</span>
+                  <span>Select a timeframe ({reportTimeframe}) and click <strong>Create Report</strong> to generate an AI-powered statistical analysis.</span>
+                </div>
               )}
             </div>
           </div>

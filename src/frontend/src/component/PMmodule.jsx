@@ -35,30 +35,39 @@ function PostThumbnail({ title , post, user }) {
   return (
     <div
       style={{
-        width: '35px',
-        height: '35px',
-        borderRadius: '5px',
-        backgroundColor: 'lightgrey',
+        width: '38px',
+        height: '38px',
+        borderRadius: '6px',
+        backgroundColor: '#f1f5f9',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
         overflow: 'hidden',
         position: 'relative',
+        border: '1px solid rgba(0,0,0,0.06)'
       }}
     >  
-      <span style={{ fontSize: '20px', opacity: 1 }}>📄</span>
-
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: 0,
-            width: '4px',
-            backgroundColor: indicatorColor,
-          }}
+      {post?.thumbnail ? (
+        <img
+          src={post.thumbnail}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
+      ) : (
+        <span style={{ fontSize: '18px', opacity: 0.85 }}>📄</span>
+      )}
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: '4px',
+          backgroundColor: indicatorColor,
+        }}
+      />
     </div>
   );
 }
@@ -320,7 +329,7 @@ export default function PMmodule({ user }) {
         return;
       }
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const cacheKey = `published_urls_${selectedPost.id}`;
         const cachedStr = localStorage.getItem(cacheKey);
         if (cachedStr) {
@@ -351,7 +360,7 @@ export default function PMmodule({ user }) {
   useEffect(() => {
     const fetchConnectedChannels = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const savedUserStr = localStorage.getItem('user');
         let workspaceId = null;
         if (savedUserStr) {
@@ -388,8 +397,23 @@ export default function PMmodule({ user }) {
     const fetchPosts = async () => {
       setIsLoading(true);
       try {
-        const token = localStorage.getItem('token');
-        const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+        const savedUserStr = localStorage.getItem('user');
+        let parsedUser = null;
+        if (savedUserStr) {
+          try {
+            parsedUser = JSON.parse(savedUserStr);
+          } catch (e) {}
+        }
+        const effectiveUser = user || parsedUser || {};
+        const workspaceId =
+          effectiveUser.workspace_id ||
+          effectiveUser.workspace?.workspace_id ||
+          effectiveUser.workspace?.workspace_uuid ||
+          parsedUser?.workspace_id ||
+          parsedUser?.workspace?.workspace_id ||
+          parsedUser?.workspace?.workspace_uuid ||
+          null;
 
         const headers = { 'Content-Type': 'application/json' };
         if (token) {
@@ -400,7 +424,7 @@ export default function PMmodule({ user }) {
         let data = personalRes.ok ? await personalRes.json() : [];
         data = Array.isArray(data) ? data : [];
       
-        if (role === 'manager' && workspaceId) {
+        if (workspaceId) {
           const reviewRes = await fetch(`http://localhost:8000/workspaces/${workspaceId}/posts`, { headers });
           if (reviewRes.ok) {
             const reviewData = await reviewRes.json();
@@ -415,15 +439,16 @@ export default function PMmodule({ user }) {
           }
         }
 
+
       
     
         const mapped = data.map((p) => {
         let statusLabel = 'Drafts';
         if (p.status === 'draft') statusLabel = 'Drafts';
-          else if (p.status === 'pending_review') statusLabel = 'Pending';
-          else if (p.status === 'rejected') statusLabel = 'Rejected';
-          else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
-          else if (p.status === 'failed') statusLabel = 'Failed';
+        else if (p.status === 'pending_review') statusLabel = 'Pending';
+        else if (p.status === 'rejected') statusLabel = 'Rejected';
+        else if (p.status === 'ready_for_distribution' || p.status === 'published') statusLabel = 'Published';
+        else if (p.status === 'failed') statusLabel = 'Failed';
 
             const createdDate = p.created_at
               ? new Date(p.created_at).toLocaleDateString('en-US', {
@@ -452,7 +477,8 @@ export default function PMmodule({ user }) {
               id: p.id,
               title: p.title || 'Untitled Post',
               content: p.content || '',
-              thumbnail: null,
+              thumbnail: p.attachment?.image_url || null,
+              attachment: p.attachment || null,
               platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
                 ? p.target_platforms
                 : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
@@ -483,7 +509,7 @@ export default function PMmodule({ user }) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       // 1. Strictly scope to selectedPost.platforms
       const postPlatforms = (selectedPost?.platforms || ['facebook']).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
       const scopedChannels = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
@@ -524,29 +550,31 @@ export default function PMmodule({ user }) {
       const successNames = results.map(r => r.channel_name || (r.platform === 'linkedin' ? 'LinkedIn' : 'Facebook')).join(', ');
       toast.success(`Published successfully to ${results.length} account(s): ${successNames}!`);
 
-      const formattedUrls = results.map(r => ({
-        channel_name: r.channel_name || (r.platform === 'linkedin' ? 'LinkedIn' : 'Facebook'),
-        platform: r.platform,
-        published_url: r.linkedin_post_url || r.facebook_post_url || 'https://www.linkedin.com/feed/'
-      }));
+      const formattedUrls = results.map(r => {
+        const isLi = r.platform === 'linkedin';
+        const pubUrl = isLi
+          ? (r.linkedin_post_url || 'https://www.linkedin.com/feed/')
+          : (r.facebook_post_url || 'https://www.facebook.com/');
+        return {
+          channel_name: r.channel_name || (isLi ? 'LinkedIn Channel' : 'Facebook Page'),
+          platform: r.platform,
+          published_url: pubUrl
+        };
+      });
       setPublishedUrlsList(formattedUrls);
       try {
         localStorage.setItem(`published_urls_${postId}`, JSON.stringify(formattedUrls));
       } catch (e) {}
 
-      const publishedUrl = results.find(r => r.linkedin_post_url || r.facebook_post_url)?.linkedin_post_url 
-                        || results.find(r => r.linkedin_post_url || r.facebook_post_url)?.facebook_post_url;
+      const firstFb = results.find(r => r.platform === 'facebook')?.facebook_post_url;
+      const firstLi = results.find(r => r.platform === 'linkedin')?.linkedin_post_url;
 
-      if (publishedUrl) {
-        setSelectedPost((prev) => prev ? { 
-          ...prev, 
-          status: 'Published', 
-          facebook_post_url: publishedUrl,
-          linkedin_post_url: publishedUrl
-        } : null);
-      } else {
-        setSelectedPost(null);
-      }
+      setSelectedPost((prev) => prev ? { 
+        ...prev, 
+        status: 'Published', 
+        facebook_post_url: firstFb || (prev.platforms?.includes('facebook') ? 'https://www.facebook.com/' : null),
+        linkedin_post_url: firstLi || (prev.platforms?.includes('linkedin') ? 'https://www.linkedin.com/feed/' : null)
+      } : null);
       // Reload posts list
       const savedUserStr = localStorage.getItem('user');
       const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
@@ -591,7 +619,8 @@ export default function PMmodule({ user }) {
             id: p.id,
             title: p.title || 'Untitled Post',
             content: p.content || '',
-            thumbnail: null,
+            thumbnail: p.attachment?.image_url || null,
+            attachment: p.attachment || null,
             platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
               ? p.target_platforms
               : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
@@ -1006,6 +1035,57 @@ export default function PMmodule({ user }) {
               </div>
             </div>
 
+            {/* Attached Media / Image */}
+            {selectedPost.thumbnail && (
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
+                  Attached Media
+                </label>
+                <div
+                  style={{
+                    marginTop: '6px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <img
+                    src={selectedPost.thumbnail}
+                    alt="Post Attachment"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '260px',
+                      borderRadius: '8px',
+                      objectFit: 'contain',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                    }}
+                  />
+                  <a
+                    href={selectedPost.thumbnail}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: '12px',
+                      color: '#FE7216',
+                      fontWeight: '600',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Open original image ↗
+                  </a>
+                </div>
+              </div>
+            )}
+
             {selectedPost.status?.toLowerCase() === 'rejected' && !isIndividual && (
               <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' }}>
@@ -1085,92 +1165,105 @@ export default function PMmodule({ user }) {
                 </label>
                 <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {publishedUrlsList.length > 0 ? (
-                    publishedUrlsList.map((item, idx) => (
-                      <div
-                        key={idx}
-                        style={{
+                    publishedUrlsList.map((item, idx) => {
+                      const isLi = item.platform === 'linkedin';
+                      const defaultUrl = isLi ? 'https://www.linkedin.com/feed/' : 'https://www.facebook.com/';
+                      const targetUrl = item.published_url || defaultUrl;
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            backgroundColor: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '12px',
+                            padding: '10px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <img src={isLi ? linkedin : facebook} alt={item.platform} style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                                {item.channel_name || (isLi ? 'LinkedIn Channel' : 'Facebook Page')}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {targetUrl}
+                              </span>
+                            </div>
+                          </div>
+                          <a
+                            href={targetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              backgroundColor: isLi ? '#0A66C2' : '#1877F2',
+                              color: '#ffffff',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              textDecoration: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            View on {isLi ? 'LinkedIn' : 'Facebook'} ↗
+                          </a>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    (() => {
+                      const isLi = selectedPost.platforms?.includes('linkedin') && !selectedPost.platforms?.includes('facebook');
+                      const fbUrl = selectedPost.facebook_post_url || 'https://www.facebook.com/';
+                      const liUrl = selectedPost.linkedin_post_url || 'https://www.linkedin.com/feed/';
+                      const targetUrl = isLi ? liUrl : fbUrl;
+                      return (
+                        <div style={{
                           backgroundColor: '#f0fdf4',
                           border: '1px solid #bbf7d0',
                           borderRadius: '12px',
-                          padding: '10px 14px',
+                          padding: '12px 16px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '12px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <img src={item.platform === 'linkedin' ? linkedin : facebook} alt={item.platform} style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
-                              {item.channel_name || (item.platform === 'linkedin' ? 'LinkedIn Channel' : 'Facebook Page')}
-                            </span>
-                            <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.published_url}
-                            </span>
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <img src={isLi ? linkedin : facebook} alt={isLi ? 'linkedin' : 'facebook'} style={{ width: '20px', height: '20px', objectFit: 'contain' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                                {isLi ? 'LinkedIn Channel' : 'Facebook Channel'}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
+                                {targetUrl}
+                              </span>
+                            </div>
                           </div>
+                          <a
+                            href={targetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '10px',
+                              backgroundColor: isLi ? '#0A66C2' : '#1877F2',
+                              color: '#ffffff',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              textDecoration: 'none'
+                            }}
+                          >
+                            View on {isLi ? 'LinkedIn' : 'Facebook'} ↗
+                          </a>
                         </div>
-                        <a
-                          href={item.published_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: '8px',
-                            backgroundColor: item.platform === 'linkedin' ? '#0A66C2' : '#1877F2',
-                            color: '#ffffff',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          View on {item.platform === 'linkedin' ? 'LinkedIn' : 'Facebook'} ↗
-                        </a>
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{
-                      backgroundColor: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
-                      borderRadius: '12px',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '18px' }}>🔗</span>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534' }}>
-                            {primaryPlatform === 'linkedin' ? 'LinkedIn Channel' : 'Facebook Channel'}
-                          </span>
-                          <span style={{ fontSize: '11px', color: '#15803d', wordBreak: 'break-all' }}>
-                            {selectedPost.linkedin_post_url || selectedPost.facebook_post_url || 'https://www.linkedin.com/feed/'}
-                          </span>
-                        </div>
-                      </div>
-                      <a
-                        href={selectedPost.linkedin_post_url || selectedPost.facebook_post_url || 'https://www.linkedin.com/feed/'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          padding: '8px 16px',
-                          borderRadius: '10px',
-                          backgroundColor: primaryPlatform === 'linkedin' ? '#0A66C2' : '#1877F2',
-                          color: '#ffffff',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        View Post ↗
-                      </a>
-                    </div>
+                      );
+                    })()
                   )}
                 </div>
               </div>
@@ -1389,7 +1482,7 @@ export default function PMmodule({ user }) {
                           }
                           const reasonText = newCommentText.trim();
                           try {
-                            const token = localStorage.getItem('token');
+                            const token = localStorage.getItem('access_token') || localStorage.getItem('token');
                             const savedUserStr = localStorage.getItem('user');
                             const parsedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
                             const workspaceId = user?.workspace_id || parsedUser?.workspace_id || parsedUser?.workspace?.workspace_uuid;

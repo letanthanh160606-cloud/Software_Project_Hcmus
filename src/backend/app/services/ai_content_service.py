@@ -157,6 +157,9 @@ class AIContentService:
             target_platforms=target_platforms,
         )
 
+    # Alias for flexibility
+    generate = generate_content
+
     async def _call_gemini(self, prompt: str, api_key: str, model_name: str = "gemini-2.5-flash") -> dict[str, Any]:
         endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         payload = {

@@ -141,6 +141,19 @@ async function apiCreatePromptTemplate({ title, content, tagString }) {
   return mapApiTemplateToUi(created);
 }
 
+async function apiDeletePromptTemplate(id) {
+  const res = await fetch(`${API_BASE_URL}/prompt-context/prompt-templates/${id}`, {
+    method: 'DELETE',
+    headers: {
+      ...authHeaders()
+    }
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Delete prompt template failed: ${res.status}`);
+  }
+  return true;
+}
+
 // Chuẩn hoá 1 record KnowledgeBase trả về từ API sang dạng UI đang dùng
 function mapApiKnowledgeBaseToUi(item) {
   const filePath = item.file_path || null;
@@ -148,6 +161,7 @@ function mapApiKnowledgeBaseToUi(item) {
   return {
     id: item.id,
     title: item.title,
+    content: item.content || '',
     file_path: filePath,
     file_name: fileName,
     file_size_bytes: item.file_size_bytes ?? null,
@@ -172,17 +186,12 @@ async function apiGetKnowledgeBases() {
   return data.map(mapApiKnowledgeBaseToUi);
 }
 
-async function apiCreateKnowledgeBase({ title, tagString, file }) {
+async function apiCreateKnowledgeBase({ title, content, tagString, file }) {
   const currentUser = getCurrentUser();
 
-  // QUAN TRỌNG: endpoint tạo record chỉ nhận JSON metadata (giống
-  // KnowledgeBaseCreateRequest/TaskCreateRequest ở BE), KHÔNG nhận file nhị
-  // phân trực tiếp. BE sẽ trả về record + 1 presigned upload_url (R2), sau đó
-  // client tự PUT file thật lên URL đó ở bước 2. Gửi file dạng multipart/binary
-  // thẳng vào endpoint JSON này là nguyên nhân gây lỗi UnicodeDecodeError khi
-  // FastAPI cố decode bytes của validation error.
   const body = {
     title,
+    content: content || null,
     tag: tagString || null,
     created_by: currentUser?.users_uuid,
     file_name: file ? file.name : null,
@@ -229,6 +238,19 @@ async function apiCreateKnowledgeBase({ title, tagString, file }) {
   return mapApiKnowledgeBaseToUi(created.knowledge_base || created);
 }
 
+async function apiDeleteKnowledgeBase(id) {
+  const res = await fetch(`${API_BASE_URL}/prompt-context/knowledge-bases/${id}`, {
+    method: 'DELETE',
+    headers: {
+      ...authHeaders()
+    }
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Delete knowledge base failed: ${res.status}`);
+  }
+  return true;
+}
+
 export default function PromptContextmodule() {
   // --- STATE ---
   const [templates, setTemplates] = useState([]);
@@ -248,6 +270,7 @@ export default function PromptContextmodule() {
   // Expanded views
   const [expandedTemplateId, setExpandedTemplateId] = useState(null);
   const [expandedContextId, setExpandedContextId] = useState(null);
+  const [viewingContext, setViewingContext] = useState(null);
 
   // Modals
   const [showAddTemplate, setShowAddTemplate] = useState(false);
@@ -259,6 +282,7 @@ export default function PromptContextmodule() {
   const [selectedTplTags, setSelectedTplTags] = useState([]);
 
   const [newCtxTitle, setNewCtxTitle] = useState('');
+  const [newCtxContent, setNewCtxContent] = useState('');
   const [newCtxFile, setNewCtxFile] = useState(null); // chỉ 1 file duy nhất, khớp với BE (field file_path)
   const [selectedCtxTags, setSelectedCtxTags] = useState([]);
 
@@ -334,12 +358,14 @@ export default function PromptContextmodule() {
     try {
       const created = await apiCreateKnowledgeBase({
         title: newCtxTitle,
+        content: newCtxContent.trim() || null,
         tagString: tagsToTagString(selectedCtxTags),
         file: newCtxFile
       });
 
       setContexts(prev => [created, ...prev]);
       setNewCtxTitle('');
+      setNewCtxContent('');
       setNewCtxFile(null);
       setSelectedCtxTags([]);
       setShowAddContext(false);
@@ -348,6 +374,31 @@ export default function PromptContextmodule() {
       alert(err.message || 'Create context failed.');
     } finally {
       setSubmittingContext(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this prompt template?')) return;
+    try {
+      await apiDeletePromptTemplate(id);
+      setTemplates(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Delete template failed.');
+    }
+  };
+
+  const handleDeleteContext = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this context item?')) return;
+    try {
+      await apiDeleteKnowledgeBase(id);
+      setContexts(prev => prev.filter(c => c.id !== id));
+      if (viewingContext?.id === id) setViewingContext(null);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Delete context failed.');
     }
   };
 
@@ -600,7 +651,29 @@ export default function PromptContextmodule() {
                     color: '#8c8c8c'
                   }}>
                     <span>{isExpanded ? 'Click to collapse' : 'Click to expand'}</span>
-                    <span>Added {tpl.created_at}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span>Added {tpl.created_at}</span>
+                      <button
+                        onClick={(e) => handleDeleteTemplate(e, tpl.id)}
+                        title="Delete template"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          padding: '2px 4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 0.75,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.75}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -734,17 +807,14 @@ export default function PromptContextmodule() {
             }}>No matching context items found.</div>
           ) : (
             filteredContexts.map((ctx) => {
-              const isExpanded = expandedContextId === ctx.id;
               return (
                 <div
                   key={ctx.id}
-                  onClick={() => setExpandedContextId(isExpanded ? null : ctx.id)}
                   style={{
                     backgroundColor: 'rgba(255,255,255,0.75)',
                     border: '1px solid rgba(0,0,0,0.06)',
                     borderRadius: '16px',
                     padding: '16px',
-                    cursor: 'pointer',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
                     transition: 'all 0.2s ease'
                   }}
@@ -755,7 +825,7 @@ export default function PromptContextmodule() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    marginBottom: '12px',
+                    marginBottom: ctx.file_path ? '10px' : '6px',
                     gap: '12px'
                   }}>
                     <span style={{
@@ -788,37 +858,38 @@ export default function PromptContextmodule() {
                     </div>
                   </div>
 
-                  {/* File đính kèm - mỗi context chỉ có đúng 1 file (khớp field file_path bên BE).
-                      Bấm vào file này sẽ chạy/mở theo file_path thật, không toggle expand card. */}
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px',
-                    marginBottom: '12px'
-                  }}>
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleContextClick(ctx);
-                      }}
-                      title={ctx.file_path ? 'Bấm để mở file' : 'Chưa có file đính kèm'}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        color: ctx.file_path ? '#C2410C' : '#9ca3af',
-                        backgroundColor: ctx.file_path ? '#FFF7ED' : 'rgba(0,0,0,0.04)',
-                        border: ctx.file_path ? '1px solid #FE7216' : '1px solid rgba(0,0,0,0.02)',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        cursor: ctx.file_path ? 'pointer' : 'default'
-                      }}
-                    >
-                      📎 {ctx.file_name}
-                    </span>
-                  </div>
+                  {/* File đính kèm nếu có */}
+                  {ctx.file_path && (
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      marginBottom: '10px'
+                    }}>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleContextClick(ctx);
+                        }}
+                        title="Bấm để mở file"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          color: '#C2410C',
+                          backgroundColor: '#FFF7ED',
+                          border: '1px solid #FE7216',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        📎 {ctx.file_name}
+                      </span>
+                    </div>
+                  )}
 
                   <div style={{
                     display: 'flex',
@@ -827,8 +898,46 @@ export default function PromptContextmodule() {
                     fontSize: '11px',
                     color: '#8c8c8c'
                   }}>
-                    <span>{isExpanded ? 'Click to collapse' : 'Click to expand'}</span>
-                    <span>Added {ctx.created_at}</span>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingContext(ctx);
+                      }}
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: '#FE7216',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      View content →
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span>Added {ctx.created_at}</span>
+                      <button
+                        onClick={(e) => handleDeleteContext(e, ctx.id)}
+                        title="Delete context item"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          padding: '2px 4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 0.75,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.75}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1073,10 +1182,31 @@ export default function PromptContextmodule() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#7c7c7c' }}>Content</label>
+                <textarea
+                  placeholder="Enter context description or reference content..."
+                  value={newCtxContent}
+                  onChange={(e) => setNewCtxContent(e.target.value)}
+                  rows={4}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    fontSize: '13px',
+                    outline: 'none',
+                    fontFamily: 'Satoshi, system-ui, sans-serif',
+                    resize: 'vertical',
+                    backgroundColor: '#fff',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '13px', fontWeight: '600', color: '#4b5563' }}>Attachment</label>
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx"
+                  accept=".pdf,.doc,.docx,.txt"
                   onChange={(e) => setNewCtxFile(e.target.files?.[0] || null)}
                   style={{
                     padding: '10px 12px',
@@ -1171,6 +1301,139 @@ export default function PromptContextmodule() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal to view Context Item details */}
+      {viewingContext && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '24px',
+            padding: '28px',
+            width: '480px',
+            maxWidth: '90vw',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+            fontFamily: 'Satoshi, system-ui, sans-serif',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e1e1e' }}>{viewingContext.title}</h3>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                  {viewingContext.tags?.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: '#fff',
+                        backgroundColor: tag.color,
+                        padding: '2px 8px',
+                        borderRadius: '20px',
+                        lineHeight: 1
+                      }}
+                    >
+                      {tag.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button 
+                onClick={() => setViewingContext(null)}
+                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#7c7c7c' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid rgba(0,0,0,0.06)',
+              borderRadius: '14px',
+              padding: '14px 16px',
+              fontSize: '13px',
+              color: '#334155',
+              lineHeight: '1.6',
+              maxHeight: '260px',
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap'
+            }} className="custom-scroll">
+              {viewingContext.content || (
+                <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Không có nội dung văn bản trực tiếp. Vui lòng mở tệp đính kèm bên dưới.</span>
+              )}
+            </div>
+
+            {viewingContext.file_path && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Tệp đính kèm:</span>
+                <span
+                  onClick={() => handleContextClick(viewingContext)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#C2410C',
+                    backgroundColor: '#FFF7ED',
+                    border: '1px solid #FE7216',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📎 {viewingContext.file_name}
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+              <button
+                onClick={(e) => handleDeleteContext(e, viewingContext.id)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #fecaca',
+                  backgroundColor: '#fef2f2',
+                  color: '#ef4444',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setViewingContext(null)}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#FE7216',
+                  color: 'white',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(254,114,22,0.3)'
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

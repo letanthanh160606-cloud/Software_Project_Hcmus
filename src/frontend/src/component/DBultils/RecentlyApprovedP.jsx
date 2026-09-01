@@ -9,7 +9,7 @@ export default function RecentlyApproveP({ user }) {
     const fetchRealPosts = async () => {
       setIsLoading(true);
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
         let url = 'http://localhost:8000/posts';
         if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;

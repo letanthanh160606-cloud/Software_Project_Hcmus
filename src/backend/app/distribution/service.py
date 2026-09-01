@@ -378,14 +378,15 @@ class DistributionService:
         if not channel:
             raise HTTPException(status_code=400, detail="Không tìm thấy kênh mạng xã hội nào đang kết nối.")
 
-        # Validation: Verify channel platform is included in post.target_platforms if specified
+        # Scoping Guard: ensure channel's platform is in post.target_platforms if specified
         if post.target_platforms and len(post.target_platforms) > 0:
-            allowed_platforms = set(p.lower().strip() for p in post.target_platforms)
+            allowed_platforms = [p.lower().strip() for p in post.target_platforms]
             if channel.platform.lower().strip() not in allowed_platforms:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Không thể xuất bản: Kênh '{channel.display_name}' ({channel.platform}) không nằm trong danh sách nền tảng đích của bài viết ({list(allowed_platforms)})."
+                    detail=f"Kênh {channel.display_name} ({channel.platform}) không nằm trong danh sách nền tảng đích của bài viết ({allowed_platforms})."
                 )
+
 
         # Idempotency Check per channel: check if this post was already published on this channel
         existing_dist = self.db.scalar(
@@ -459,30 +460,62 @@ class DistributionService:
 
                             url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
 
-                        res = client.post(
-                            url,
-                            data={
-                                "message": post_text,
-                                "access_token": access_token,
-                            },
-                        )
+                        image_url = post.attachment.image_url if post.attachment else None
+
+                        if image_url:
+                            # 1. Upload photo as unpublished media asset
+                            photo_upload_url = f"https://graph.facebook.com/v19.0/{target_id}/photos"
+                            res_photo = client.post(
+                                photo_upload_url,
+                                data={
+                                    "url": image_url,
+                                    "published": "false",
+                                    "access_token": access_token,
+                                },
+                            )
+                            photo_id = None
+                            if res_photo.status_code in (200, 201):
+                                photo_id = res_photo.json().get("id")
+
+                            if photo_id:
+                                # 2. Publish official Wall Feed post with photo attached to Page timeline
+                                feed_url = f"https://graph.facebook.com/v19.0/{target_id}/feed"
+                                res = client.post(
+                                    feed_url,
+                                    data={
+                                        "message": post_text,
+                                        "attached_media[0]": f'{{"media_fbid":"{photo_id}"}}',
+                                        "access_token": access_token,
+                                    },
+                                )
+                            else:
+                                # Direct photo upload fallback
+                                res = client.post(
+                                    photo_upload_url,
+                                    data={
+                                        "url": image_url,
+                                        "caption": post_text,
+                                        "published": "true",
+                                        "access_token": access_token,
+                                    },
+                                )
+                        else:
+                            # Text-only feed post
+                            res = client.post(
+                                url,
+                                data={
+                                    "message": post_text,
+                                    "access_token": access_token,
+                                },
+                            )
 
                         if res.status_code in (200, 201):
                             fb_data = res.json()
                             fb_post_id = str(fb_data.get("id", ""))
                         else:
-                            # Try fallback to /me/feed
-                            res_me = client.post(
-                                "https://graph.facebook.com/v19.0/me/feed",
-                                data={"message": post_text, "access_token": access_token},
-                            )
-                            if res_me.status_code in (200, 201):
-                                fb_data = res_me.json()
-                                fb_post_id = str(fb_data.get("id", ""))
-                            else:
-                                error_text = res.text or res_me.text
-                                logger.warning(f"Facebook Graph API publish notice: {error_text}")
-                                fb_post_id = f"fb_post_{str(post.id)[:8]}"
+                            error_text = res.text
+                            logger.warning(f"Facebook Graph API publish notice: {error_text}")
+                            fb_post_id = f"fb_post_{str(post.id)[:8]}"
                 except Exception as exc:
                     logger.warning(f"Network error connecting to Facebook API: {exc}")
                     fb_post_id = f"fb_post_{str(post.id)[:8]}"
@@ -516,6 +549,7 @@ class DistributionService:
             }
         elif channel.platform == "linkedin":
             post_text = f"{post.title}\n\n{post.content}" if post.content else post.title
+            image_url = post.attachment.image_url if post.attachment else None
             import httpx
 
             account_id = channel.platform_account_id or ""
@@ -551,48 +585,92 @@ class DistributionService:
                     if not author_urn:
                         author_urn = f"urn:li:person:{account_id}"
 
-                    # Try v2/posts API first, fallback to v2/ugcPosts
+                    asset_urn = None
+                    if image_url:
+                        try:
+                            # Step 1: Register upload with LinkedIn Assets API
+                            reg_payload = {
+                                "registerUploadRequest": {
+                                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                                    "owner": author_urn,
+                                    "serviceRelationships": [
+                                        {
+                                            "relationshipType": "OWNER",
+                                            "identifier": "urn:li:userGeneratedContent"
+                                        }
+                                    ]
+                                }
+                            }
+                            reg_res = client.post(
+                                "https://api.linkedin.com/v2/assets?action=registerUpload",
+                                json=reg_payload,
+                                headers={"Authorization": f"Bearer {access_token}"},
+                                timeout=15.0
+                            )
+                            if reg_res.status_code == 200:
+                                val = reg_res.json().get("value", {})
+                                upload_mechanism = val.get("uploadMechanism", {}).get("com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {})
+                                li_upload_url = upload_mechanism.get("uploadUrl")
+                                asset_urn = val.get("asset")
+
+                                if li_upload_url and asset_urn:
+                                    # Step 2: Fetch image binary from Cloudflare R2 and PUT to LinkedIn uploadUrl
+                                    img_fetch_res = client.get(image_url, timeout=30.0)
+                                    if img_fetch_res.status_code == 200:
+                                        content_type = img_fetch_res.headers.get("content-type", "image/png")
+                                        client.put(
+                                            li_upload_url,
+                                            content=img_fetch_res.content,
+                                            headers={
+                                                "Authorization": f"Bearer {access_token}",
+                                                "Content-Type": content_type
+                                            },
+                                            timeout=60.0
+                                        )
+                            else:
+                                logger.error(f"LinkedIn asset register failed: {reg_res.text}")
+                        except Exception as upload_err:
+                            logger.error(f"Failed to upload media to LinkedIn: {upload_err}")
+
+                    # Step 3: Publish to LinkedIn via ugcPosts API
+                    if asset_urn:
+                        ugc_content = {
+                            "com.linkedin.ugc.ShareContent": {
+                                "shareCommentary": {"text": post_text},
+                                "shareMediaCategory": "IMAGE",
+                                "media": [
+                                    {
+                                        "status": "READY",
+                                        "description": {"text": post.title or "Post Photo"},
+                                        "media": asset_urn,
+                                        "title": {"text": post.title or "Post Photo"}
+                                    }
+                                ]
+                            }
+                        }
+                    else:
+                        ugc_content = {
+                            "com.linkedin.ugc.ShareContent": {
+                                "shareCommentary": {"text": post_text},
+                                "shareMediaCategory": "NONE",
+                            }
+                        }
+
                     res = client.post(
-                        "https://api.linkedin.com/v2/posts",
+                        "https://api.linkedin.com/v2/ugcPosts",
                         json={
                             "author": author_urn,
-                            "commentary": post_text,
-                            "visibility": "PUBLIC",
-                            "distribution": {
-                                "feedDistribution": "MAIN_FEED",
-                                "targetEntities": [],
-                                "thirdPartyDistributionChannels": []
-                            },
                             "lifecycleState": "PUBLISHED",
+                            "specificContent": ugc_content,
+                            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
                         },
                         headers={
                             "Authorization": f"Bearer {access_token}",
-                            "LinkedIn-Version": "202401",
+                            "X-Restli-Protocol-Version": "2.0.0",
                             "Content-Type": "application/json",
                         },
+                        timeout=20.0
                     )
-
-                    if res.status_code not in (200, 201):
-                        # Fallback to ugcPosts API with correct MemberNetworkVisibility enum
-                        res = client.post(
-                            "https://api.linkedin.com/v2/ugcPosts",
-                            json={
-                                "author": author_urn,
-                                "lifecycleState": "PUBLISHED",
-                                "specificContent": {
-                                    "com.linkedin.ugc.ShareContent": {
-                                        "shareCommentary": {"text": post_text},
-                                        "shareMediaCategory": "NONE",
-                                    }
-                                },
-                                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
-                            },
-                            headers={
-                                "Authorization": f"Bearer {access_token}",
-                                "X-Restli-Protocol-Version": "2.0.0",
-                                "Content-Type": "application/json",
-                            },
-                        )
 
                     if res.status_code not in (200, 201):
                         error_text = res.text

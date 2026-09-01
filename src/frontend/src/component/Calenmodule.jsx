@@ -50,7 +50,7 @@ export default function Calenmodule({ user, userRole }) {
 
   const fetchCalendarTasks = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const res = await fetch(`${API_URL}/calendar/tasks`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -97,7 +97,7 @@ export default function Calenmodule({ user, userRole }) {
     if (isCreatingTask) return;
     setIsCreatingTask(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 

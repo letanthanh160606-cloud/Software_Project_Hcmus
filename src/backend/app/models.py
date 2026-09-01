@@ -474,7 +474,8 @@ class KnowledgeBase(Base):
     )
     owner_user_id : Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Users.users.users_uuid"))
     title: Mapped[str] = mapped_column(String, nullable=False)
-    file_path: Mapped[str] = mapped_column(String, nullable=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=True)
     mime_type: Mapped[str] = mapped_column(String, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(

@@ -46,7 +46,7 @@ export function ApprovalRequests({ user }) {
   useEffect(() => {
     const fetchPendingPosts = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
         let url = 'http://localhost:8000/posts';
         if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
@@ -160,7 +160,7 @@ export function MyCalendar({ user }) {
   useEffect(() => {
     const fetchRealEvents = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
         if (!workspaceId) return;
 
@@ -280,7 +280,7 @@ export function ChannelList({ user }) {
   useEffect(() => {
     const fetchRealChannels = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
         let url = 'http://localhost:8000/api/v1/distribution/channels';
         if (workspaceId) url += `?workspace_id=${workspaceId}`;

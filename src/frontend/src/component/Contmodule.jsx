@@ -105,7 +105,7 @@ function PlatformCard({ icon, platformName, accountName, selected, onToggle }) {
 
 function KBItem({ title, checked, disabled }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, paddingRight: '45px' }}>
       {/* Checkbox dot */}
       <div
         style={{
@@ -134,7 +134,20 @@ function KBItem({ title, checked, disabled }) {
         )}
       </div>
       
-      <span style={{ fontSize: '13px', fontWeight: '500', color: disabled ? '#777' : '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
+      <span 
+        title={title}
+        style={{ 
+          fontSize: '13px', 
+          fontWeight: '500', 
+          color: disabled ? '#777' : '#1e1e1e', 
+          fontFamily: 'Satoshi, system-ui, sans-serif',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '100%',
+          display: 'block'
+        }}
+      >
         {title} 
       </span>
     </div>
@@ -215,7 +228,7 @@ function SearchBar({ placeholder = 'Search', disabled = false, value = '', onCha
   );
 }
 
-export default function Contmodule() {
+export default function Contmodule({ onNavigateTab }) {
   const componentGap = '20px';
 
   // Platforms data dynamically fetched from Backend
@@ -224,7 +237,7 @@ export default function Contmodule() {
   React.useEffect(() => {
     const fetchChannels = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const savedUserStr = localStorage.getItem('user');
         let workspaceId = null;
         if (savedUserStr) {
@@ -274,64 +287,97 @@ export default function Contmodule() {
   const [kbSearch, setKbSearch] = useState('');
   const [promptSearch, setPromptSearch] = useState('');
 
-  // Knowledge Base data with rich factual context
-  const [kbItems, setKbItems] = useState([
-    {
-      id: 1,
-      title: 'Omni Platform Overview',
-      content: 'Omni Platforms is a unified social media management suite providing cross-platform publishing, RBAC approval workflows, analytics ingestion, and AI automation for enterprise teams and creators.',
-      checked: false
-    },
-    {
-      id: 2,
-      title: 'Brand Voice Guidelines',
-      content: 'Brand voice is innovative, professional, approachable, and data-backed. Use clear active voice, concise paragraphs, and meaningful business metrics.',
-      checked: false
-    },
-    {
-      id: 3,
-      title: 'Q3 Product Roadmap',
-      content: 'Key Q3 initiatives: Automated multi-account scheduling, granular engagement metrics tracking, real-time join request notifications, and AI post writer.',
-      checked: false
-    },
-    {
-      id: 4,
-      title: 'Target Audience Persona',
-      content: 'Audience consists of Marketing Managers, Social Media Specialists, Tech Founders, and Agency Leads seeking scalable automation.',
-      checked: false
-    },
-    {
-      id: 5,
-      title: 'Security & Compliance FAQ',
-      content: 'Enterprise-grade AES-256 Fernet token encryption, secure OAuth 2.0 flow, and dedicated PostgreSQL tenancy schema isolation.',
-      checked: false
-    }
-  ]);
+  // Knowledge Base & Prompt Templates loaded dynamically from Backend
+  const [kbItems, setKbItems] = useState([]);
+  const [promptTemplates, setPromptTemplates] = useState([]);
 
-  // Prompt Templates with specialized instructions
-  const promptTemplates = [
-    {
-      id: 1,
-      title: 'LinkedIn Thought Leadership',
-      description: 'Write an inspiring thought-leadership post for LinkedIn with a compelling hook, structured bullet points, and an engaging question to drive comments.'
-    },
-    {
-      id: 2,
-      title: 'Product Launch & Feature Announcement',
-      description: 'Create an exciting product update post highlighting key user benefits, solving pain points, and inviting feedback.'
-    },
-    {
-      id: 3,
-      title: 'Educational Tip & Case Study',
-      description: 'Break down an actionable industry tip or case study with structured takeaways and relevant hashtags.'
-    }
-  ];
+  React.useEffect(() => {
+    const fetchPromptContextData = async () => {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Media drag state
+      try {
+        const kbRes = await fetch('http://localhost:8000/prompt-context/knowledge-bases', { headers });
+        if (kbRes.ok) {
+          const kbData = await kbRes.json();
+          if (Array.isArray(kbData)) {
+            setKbItems(kbData.map(item => {
+              const cleanTitle = (item.title || 'Untitled Document').split('\n')[0].trim();
+              return {
+                id: item.id,
+                title: cleanTitle.length > 80 ? cleanTitle.slice(0, 80) + '...' : cleanTitle,
+                rawTitle: item.title,
+                content: item.content || '',
+                file_path: item.file_path || null,
+                file_name: item.file_name || null,
+                checked: false
+              };
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching knowledge bases:', err);
+      }
+
+      try {
+        const ptRes = await fetch('http://localhost:8000/prompt-context/prompt-templates', { headers });
+        if (ptRes.ok) {
+          const ptData = await ptRes.json();
+          if (Array.isArray(ptData)) {
+            setPromptTemplates(ptData.map(item => ({
+              id: item.id,
+              title: item.title,
+              description: item.content || item.title
+            })));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching prompt templates:', err);
+      }
+    };
+
+    fetchPromptContextData();
+  }, []);
+
+  const handleDeleteKbItem = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this knowledge base document?')) return;
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+    try {
+      const res = await fetch(`http://localhost:8000/prompt-context/knowledge-bases/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error(`Delete failed: ${res.status}`);
+      }
+      setKbItems(prev => prev.filter(k => k.id !== id));
+      if (viewingKbItem?.id === id) setViewingKbItem(null);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Delete knowledge base failed.');
+    }
+  };
+
+  // Media upload state
+  const [draftPostId, setDraftPostId] = useState(() => (typeof window !== 'undefined' && window.crypto?.randomUUID ? window.crypto.randomUUID() : 'post_' + Math.random().toString(36).substring(2)));
   const [isDragging, setIsDragging] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState([]);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [selectedMediaFile, setSelectedMediaFile] = useState(null); // Raw file object
+  const [uploadedImageUrl, setUploadedImageUrl] = useState(null); // Public R2 URL
+  const [mediaPreview, setMediaPreview] = useState(null); // Local blob URL for preview
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+
+  // SEO/GEO state
+  const [isAnalyzingSeo, setIsAnalyzingSeo] = useState(false);
+  const [seoResult, setSeoResult] = useState(null); // { seo_keywords[], hashtags[], geo_tip }
+  const [showSeoPanel, setShowSeoPanel] = useState(false);
+  const [appliedKeywords, setAppliedKeywords] = useState([]); // Track inserted keywords
+  const [appliedHashtags, setAppliedHashtags] = useState([]); // Track inserted hashtags
 
   const handleGenerateAI = async () => {
     if (!aiEnabled) {
@@ -364,7 +410,7 @@ export default function Contmodule() {
 
     setIsGenerating(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -401,6 +447,136 @@ export default function Contmodule() {
     }
   };
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Image Upload Handlers
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const uploadFileToR2 = async (file) => {
+    const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`http://localhost:8000/posts/upload-media-direct?post_id=${draftPostId}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to upload image');
+    }
+
+    const data = await res.json();
+    return data.public_url;
+  };
+
+  const processMediaFile = async (file) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only JPEG, PNG, WebP, and GIF images are supported.');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('File size must be under 50MB.');
+      return;
+    }
+
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setMediaPreview(localUrl);
+    setSelectedMediaFile(file);
+    setUploadedImageUrl(null);
+    setIsUploadingMedia(true);
+
+    try {
+      const publicUrl = await uploadFileToR2(file);
+      setUploadedImageUrl(publicUrl);
+      toast.success('Image uploaded successfully!');
+    } catch (err) {
+      toast.error(err.message || 'Image upload failed');
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
+  const handleRemoveMedia = () => {
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+    setMediaPreview(null);
+    setSelectedMediaFile(null);
+    setUploadedImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SEO / GEO Handlers
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const handleApplySEO = async () => {
+    if (!title.trim() && !body.trim()) {
+      toast.error('Please enter post content before applying GEO/SEO analysis.');
+      return;
+    }
+    setIsAnalyzingSeo(true);
+    setSeoResult(null);
+    setShowSeoPanel(false);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const selectedPlatformNames = platforms
+        .filter(p => p.selected)
+        .map(p => p.name.toLowerCase());
+
+      const res = await fetch('http://localhost:8000/posts/seo-suggest', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          title: title.trim() || null,
+          content: body.trim() || null,
+          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['linkedin', 'facebook'],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'SEO analysis failed');
+      setSeoResult(data);
+      setShowSeoPanel(true);
+      setAppliedKeywords([]);
+      setAppliedHashtags([]);
+    } catch (err) {
+      toast.error(err.message || 'GEO/SEO analysis failed');
+    } finally {
+      setIsAnalyzingSeo(false);
+    }
+  };
+
+  const handleInsertKeyword = (keyword) => {
+    if (appliedKeywords.includes(keyword)) return;
+    setBody(prev => prev ? `${prev} ${keyword}` : keyword);
+    setAppliedKeywords(prev => [...prev, keyword]);
+  };
+
+  const handleInsertHashtag = (tag) => {
+    if (appliedHashtags.includes(tag)) return;
+    setBody(prev => prev ? `${prev} ${tag}` : tag);
+    setAppliedHashtags(prev => [...prev, tag]);
+  };
+
+  const handleApplyAllSEO = () => {
+    if (!seoResult) return;
+    const newKeywords = seoResult.seo_keywords.filter(k => !appliedKeywords.includes(k));
+    const newHashtags = seoResult.hashtags.filter(h => !appliedHashtags.includes(h));
+    const toInsert = [...newKeywords, ...newHashtags].join(' ');
+    if (toInsert) setBody(prev => prev ? `${prev}\n\n${toInsert}` : toInsert);
+    setAppliedKeywords(seoResult.seo_keywords);
+    setAppliedHashtags(seoResult.hashtags);
+    toast.success('All SEO keywords and hashtags applied!');
+  };
+
   const handleCreatePost = async (statusType = 'pending_review') => {
     if (!title.trim() && !body.trim()) {
       toast.error('Please enter a title or content for your post.');
@@ -409,7 +585,20 @@ export default function Contmodule() {
 
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem('token');
+      // If user selected a file but it hasn't completed uploading, upload now
+      let finalImageUrl = uploadedImageUrl;
+      if (!finalImageUrl && selectedMediaFile) {
+        try {
+          finalImageUrl = await uploadFileToR2(selectedMediaFile);
+          setUploadedImageUrl(finalImageUrl);
+        } catch (uploadErr) {
+          toast.error('Image upload failed: ' + (uploadErr.message || 'Please try uploading again'));
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const savedUserStr = localStorage.getItem('user');
       let workspaceId = null;
 
@@ -435,13 +624,15 @@ export default function Contmodule() {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
+          id: (draftPostId && typeof draftPostId === 'string' && draftPostId.length === 36) ? draftPostId : null,
           workspace_id: workspaceId,
           title: title.trim() || 'Untitled Post',
           content: body.trim(),
           status: statusType,
           target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['facebook'],
-          seo_keywords: [],
-          seo_hashtags: []
+          seo_keywords: seoResult ? seoResult.seo_keywords : [],
+          seo_hashtags: seoResult ? seoResult.hashtags : [],
+          image_url: finalImageUrl || null,
         }),
       });
 
@@ -454,13 +645,41 @@ export default function Contmodule() {
       if (statusType === 'draft' || data.status === 'draft') {
         toast.success('Post saved as draft successfully!');
       } else if (data.status === 'ready_for_distribution' || data.status === 'published') {
-        toast.success('Post created successfully (Ready for distribution)!');
+        const newPostId = data.id || draftPostId;
+        const selectedChannels = platforms.filter(p => p.selected);
+        if (selectedChannels.length > 0) {
+          const toastLoadingId = toast.loading('Publishing to selected channels...');
+          try {
+            const pubResults = await Promise.all(selectedChannels.map(async (ch) => {
+              const pubRes = await fetch(`http://localhost:8000/api/v1/distribution/channels/publish/${newPostId}?platform=${ch.name.toLowerCase()}&channel_id=${ch.id}`, {
+                method: 'POST',
+                headers: headers,
+              });
+              return await pubRes.json();
+            }));
+            toast.dismiss(toastLoadingId);
+            const pubNames = selectedChannels.map(c => c.account || c.name).join(', ');
+            toast.success(`Published successfully to ${pubNames}!`);
+          } catch (pubErr) {
+            toast.dismiss(toastLoadingId);
+            console.warn('Auto publish notice:', pubErr);
+            toast.success('Post created (Ready in Post Management)!');
+          }
+        } else {
+          toast.success('Post created successfully!');
+        }
       } else {
         toast.success('Post submitted for review successfully (Pending)!');
       }
+      // Reset all state on success & assign fresh draftPostId
+      setDraftPostId(typeof window !== 'undefined' && window.crypto?.randomUUID ? window.crypto.randomUUID() : 'post_' + Math.random().toString(36).substring(2));
       setTitle('');
       setBody('');
-      setMediaFiles([]);
+      handleRemoveMedia();
+      setSeoResult(null);
+      setShowSeoPanel(false);
+      setAppliedKeywords([]);
+      setAppliedHashtags([]);
     } catch (err) {
       toast.error(err.message || 'Error creating post');
     } finally {
@@ -489,12 +708,12 @@ export default function Contmodule() {
     e.preventDefault();
     setIsDragging(false);
     const files = Array.from(e.dataTransfer.files);
-    setMediaFiles((prev) => [...prev, ...files]);
+    if (files.length > 0) processMediaFile(files[0]);
   };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    setMediaFiles((prev) => [...prev, ...files]);
+    if (files.length > 0) processMediaFile(files[0]);
   };
 
   return (
@@ -719,57 +938,105 @@ export default function Contmodule() {
 
             {/* Drop Zone */}
             <div
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (!mediaPreview) setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !mediaPreview && fileInputRef.current?.click()}
               style={{
                 flex: 1,
                 minHeight: '100px',
-                border: `2px dashed ${isDragging ? '#FE7216' : 'rgba(0,0,0,0.12)'}`,
+                border: mediaPreview
+                  ? '2px solid rgba(0,0,0,0.08)'
+                  : `2px dashed ${isDragging ? '#FE7216' : 'rgba(0,0,0,0.12)'}`,
                 borderRadius: '12px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                cursor: 'pointer',
-                backgroundColor: isDragging ? 'rgba(254,114,22,0.04)' : 'rgba(255,255,255,0.4)',
+                cursor: mediaPreview ? 'default' : 'pointer',
+                backgroundColor: isDragging ? 'rgba(254,114,22,0.04)' : (mediaPreview ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.4)'),
                 transition: 'border-color 0.2s ease, background-color 0.2s ease',
-                padding: '16px',
+                padding: '10px',
                 boxSizing: 'border-box',
-                height: '139px'
+                height: '139px',
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png"
-                multiple
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
               />
-              {/* Upload icon */}
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(254,114,22,0.12)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="1" y="10" width="14" height="4" rx="1.5" stroke="#FE7216" strokeWidth="1.4" />
-                  <path d="M8 1V9M5 4L8 1L11 4" stroke="#FE7216" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              {mediaFiles.length > 0 ? (
-                <span style={{ fontSize: '12px', color: '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif', fontWeight: '600' }}>
-                  {mediaFiles.length} file{mediaFiles.length > 1 ? 's' : ''} selected
-                </span>
-              ) : (
+
+              {/* State 1: Image preview */}
+              {mediaPreview ? (
                 <>
+                  <img
+                    src={mediaPreview}
+                    alt="Preview"
+                    style={{
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  {/* Overlay status badge */}
+                  {isUploadingMedia && (
+                    <div style={{
+                      position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)',
+                      background: 'rgba(0,0,0,0.65)', color: '#fff', borderRadius: '20px',
+                      padding: '3px 10px', fontSize: '11px', fontFamily: 'Satoshi, system-ui, sans-serif',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Uploading...
+                    </div>
+                  )}
+                  {!isUploadingMedia && uploadedImageUrl && (
+                    <div style={{
+                      position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)',
+                      background: 'rgba(34,197,94,0.85)', color: '#fff', borderRadius: '20px',
+                      padding: '3px 10px', fontSize: '11px', fontFamily: 'Satoshi, system-ui, sans-serif',
+                      whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px',
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Uploaded
+                    </div>
+                  )}
+                  {/* Remove button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleRemoveMedia(); }}
+                    style={{
+                      position: 'absolute', top: '6px', right: '6px',
+                      width: '22px', height: '22px', borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.55)', border: 'none',
+                      color: '#fff', cursor: 'pointer', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      fontSize: '14px', lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </>
+              ) : (
+                /* State 2: Empty drop zone */
+                <>
+                  <div style={{
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    backgroundColor: 'rgba(254,114,22,0.12)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <rect x="1" y="10" width="14" height="4" rx="1.5" stroke="#FE7216" strokeWidth="1.4" />
+                      <path d="M8 1V9M5 4L8 1L11 4" stroke="#FE7216" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
                   <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
                     Drag &amp; drop media here
                   </span>
@@ -784,7 +1051,7 @@ export default function Contmodule() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '140px' }}>
               <button
                 onClick={() => handleCreatePost('pending_review')}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingMedia}
                 style={{
                   padding: '12px 0',
                   borderRadius: '10px',
@@ -794,8 +1061,8 @@ export default function Contmodule() {
                   fontFamily: 'Satoshi, system-ui, sans-serif',
                   fontSize: '14px',
                   fontWeight: '700',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: (isSubmitting || isUploadingMedia) ? 'not-allowed' : 'pointer',
+                  opacity: (isSubmitting || isUploadingMedia) ? 0.7 : 1,
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
@@ -807,7 +1074,7 @@ export default function Contmodule() {
                 onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(254,114,22,0.42)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(254,114,22,0.3)'; }}
               >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
+                {isSubmitting ? 'Submitting...' : isUploadingMedia ? 'Uploading media...' : 'Submit'}
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                   <path d="M2.5 6.5H10.5M7 3L10.5 6.5L7 10" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -815,7 +1082,7 @@ export default function Contmodule() {
 
               <button
                 onClick={() => handleCreatePost('draft')}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingMedia}
                 style={{
                   padding: '10px 0',
                   borderRadius: '10px',
@@ -825,38 +1092,193 @@ export default function Contmodule() {
                   fontFamily: 'Satoshi, system-ui, sans-serif',
                   fontSize: '13px',
                   fontWeight: '500',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: (isSubmitting || isUploadingMedia) ? 'not-allowed' : 'pointer',
+                  opacity: (isSubmitting || isUploadingMedia) ? 0.7 : 1,
                   width: '100%',
                   transition: 'background-color 0.15s ease, border-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(254,114,22,0.05)'; e.currentTarget.style.borderColor = '#FE7216'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
               >
-                Save as Draft
+                {isUploadingMedia ? 'Uploading...' : 'Save as Draft'}
               </button>
 
               <button
+                onClick={handleApplySEO}
+                disabled={isAnalyzingSeo}
                 style={{
                   padding: '10px 0',
                   borderRadius: '10px',
                   border: '1.5px solid rgba(0,0,0,0.1)',
-                  background: 'rgba(255,255,255,0.8)',
-                  color: '#1e1e1e',
+                  background: isAnalyzingSeo ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.8)',
+                  color: isAnalyzingSeo ? '#9ca3af' : '#1e1e1e',
                   fontFamily: 'Satoshi, system-ui, sans-serif',
                   fontSize: '13px',
                   fontWeight: '500',
-                  cursor: 'pointer',
+                  cursor: isAnalyzingSeo ? 'not-allowed' : 'pointer',
                   width: '100%',
                   transition: 'background-color 0.15s ease, border-color 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(254,114,22,0.05)'; e.currentTarget.style.borderColor = '#FE7216'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
+                onMouseEnter={(e) => { if (!isAnalyzingSeo) { e.currentTarget.style.backgroundColor = 'rgba(254,114,22,0.05)'; e.currentTarget.style.borderColor = '#FE7216'; } }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isAnalyzingSeo ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
               >
-                Apply GEO/SEO
+                {isAnalyzingSeo ? (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="6" cy="6" r="5" stroke="#9ca3af" strokeWidth="2" strokeDasharray="8 24" />
+                    </svg>
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <circle cx="5" cy="5" r="4" stroke="#1e1e1e" strokeWidth="1.4" />
+                      <path d="M8.5 8.5L11 11" stroke="#1e1e1e" strokeWidth="1.4" strokeLinecap="round" />
+                    </svg>
+                    Apply GEO/SEO
+                  </>
+                )}
               </button>
             </div>
           </div>
+
+          {/* ── SEO / GEO Result Panel ── */}
+          {showSeoPanel && seoResult && (
+            <div style={{
+              borderRadius: '14px',
+              border: '1.5px solid rgba(254,114,22,0.25)',
+              backgroundColor: 'rgba(254,114,22,0.04)',
+              padding: '16px',
+              animation: 'fadeSlideIn 0.25s ease',
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                    <circle cx="6.5" cy="6.5" r="5.5" stroke="#FE7216" strokeWidth="1.5" />
+                    <path d="M11 11L14 14" stroke="#FE7216" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e1e1e', fontFamily: 'Satoshi, system-ui, sans-serif' }}>
+                    SEO / GEO Suggestions
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={handleApplyAllSEO}
+                    style={{
+                      padding: '5px 12px', borderRadius: '8px',
+                      border: '1.5px solid #FE7216', background: '#FE7216',
+                      color: '#fff', fontSize: '12px', fontWeight: '600',
+                      fontFamily: 'Satoshi, system-ui, sans-serif', cursor: 'pointer',
+                    }}
+                  >
+                    Apply All
+                  </button>
+                  <button
+                    onClick={() => setShowSeoPanel(false)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#9ca3af', fontSize: '18px', lineHeight: 1, padding: '0 2px',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {/* SEO Keywords */}
+              {seoResult.seo_keywords.length > 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#7c7c7c', fontFamily: 'Satoshi, system-ui, sans-serif', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    SEO Keywords
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {seoResult.seo_keywords.map((kw, i) => {
+                      const applied = appliedKeywords.includes(kw);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleInsertKeyword(kw)}
+                          title={applied ? 'Already inserted' : 'Click to insert into body'}
+                          style={{
+                            padding: '4px 10px', borderRadius: '20px',
+                            border: applied ? '1.5px solid #22c55e' : '1.5px solid rgba(0,0,0,0.12)',
+                            background: applied ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.9)',
+                            color: applied ? '#16a34a' : '#1e1e1e',
+                            fontSize: '12px', fontFamily: 'Satoshi, system-ui, sans-serif',
+                            cursor: applied ? 'default' : 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {applied && '✓ '}{kw}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Hashtags */}
+              {seoResult.hashtags.length > 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '600', color: '#7c7c7c', fontFamily: 'Satoshi, system-ui, sans-serif', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Hashtags
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {seoResult.hashtags.map((tag, i) => {
+                      const applied = appliedHashtags.includes(tag);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleInsertHashtag(tag)}
+                          title={applied ? 'Already inserted' : 'Click to insert into body'}
+                          style={{
+                            padding: '4px 10px', borderRadius: '20px',
+                            border: applied ? '1.5px solid #3b82f6' : '1.5px solid rgba(59,130,246,0.3)',
+                            background: applied ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.04)',
+                            color: applied ? '#1d4ed8' : '#3b82f6',
+                            fontSize: '12px', fontFamily: 'Satoshi, system-ui, sans-serif',
+                            cursor: applied ? 'default' : 'pointer',
+                            fontWeight: '500',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {applied && '✓ '}{tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* GEO Tip */}
+              {seoResult.geo_tip && (
+                <div style={{
+                  backgroundColor: 'rgba(255,255,255,0.7)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(0,0,0,0.07)',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'flex-start',
+                }}>
+                  <span style={{ fontSize: '15px', flexShrink: 0 }}>💡</span>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#FE7216', fontFamily: 'Satoshi, system-ui, sans-serif', marginBottom: '3px' }}>
+                      GEO TIP
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#4b5563', fontFamily: 'Satoshi, system-ui, sans-serif', lineHeight: '1.5' }}>
+                      {seoResult.geo_tip}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -887,6 +1309,7 @@ export default function Contmodule() {
               Knowledge Base
             </span>
             <button
+              onClick={() => onNavigateTab?.('Prompt & Context')}
               disabled={!aiEnabled}
               style={{
                 background: 'none', border: 'none', fontSize: '12px', color: aiEnabled ? '#5c5c5c' : '#9ca3af',
@@ -925,6 +1348,7 @@ export default function Contmodule() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'space-between',
                     gap: '10px',
                     backgroundColor: 'rgba(254, 254, 254, 0.5)',
                     height: '25px',
@@ -936,7 +1360,8 @@ export default function Contmodule() {
                     opacity: aiEnabled ? 1 : 0.5,
                     transition: 'all 0.2s ease',
                     userSelect: 'none',
-                    position: 'relative'
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}  
                 >
                   <KBItem title={item.title} checked={item.checked} disabled={!aiEnabled} />
@@ -961,6 +1386,17 @@ export default function Contmodule() {
                   </span>
                 </div>
             ))}
+            {kbItems.filter(item => item.title.toLowerCase().includes(kbSearch.toLowerCase()) || (item.content || '').toLowerCase().includes(kbSearch.toLowerCase())).length === 0 && (
+              <div style={{
+                textAlign: 'center',
+                padding: '30px 10px',
+                fontSize: '12px',
+                color: '#9ca3af',
+                fontFamily: 'Satoshi, system-ui, sans-serif'
+              }}>
+                No knowledge base documents found.
+              </div>
+            )}
           </div>
 
           <div style={{ flexShrink: 0, position: 'relative', zIndex: 1 }}>
@@ -985,6 +1421,7 @@ export default function Contmodule() {
               Prompt Template
             </span>
             <button 
+              onClick={() => onNavigateTab?.('Prompt & Context')}
               disabled={!aiEnabled}
               style={{
                 background: 'none', border: 'none', fontSize: '12px', color: aiEnabled ? '#5c5c5c' : '#9ca3af',
@@ -1015,6 +1452,17 @@ export default function Contmodule() {
                 onSelect={() => handleSelectPrompt(pt)}
               />
           ))}
+          {promptTemplates.filter(pt => pt.title.toLowerCase().includes(promptSearch.toLowerCase()) || pt.description.toLowerCase().includes(promptSearch.toLowerCase())).length === 0 && (
+            <div style={{
+              textAlign: 'center',
+              padding: '24px 10px',
+              fontSize: '12px',
+              color: '#9ca3af',
+              fontFamily: 'Satoshi, system-ui, sans-serif'
+            }}>
+              No prompt templates found.
+            </div>
+          )}
 
           <SearchBar
             placeholder="Search Prompt Templates"
@@ -1031,7 +1479,7 @@ export default function Contmodule() {
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(4px)',
+          backdropFilter: 'blur(6px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1039,46 +1487,97 @@ export default function Contmodule() {
         }}>
           <div style={{
             backgroundColor: 'white',
-            borderRadius: '20px',
-            padding: '24px 28px',
-            width: '440px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-            fontFamily: 'Satoshi, system-ui, sans-serif'
+            borderRadius: '24px',
+            padding: '28px',
+            width: '480px',
+            maxWidth: '90vw',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+            fontFamily: 'Satoshi, system-ui, sans-serif',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1e1e1e' }}>{viewingKbItem.title}</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e1e1e' }}>{viewingKbItem.title}</h3>
               <button 
                 onClick={() => setViewingKbItem(null)}
-                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#888' }}
+                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#7c7c7c' }}
               >
                 ✕
               </button>
             </div>
             <div style={{
               backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '12px',
-              padding: '12px 14px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              borderRadius: '14px',
+              padding: '14px 16px',
               fontSize: '13px',
               color: '#334155',
               lineHeight: '1.6',
-              maxHeight: '220px',
-              overflowY: 'auto'
-            }}>
-              {viewingKbItem.content || `Knowledge base document contents and parameters for ${viewingKbItem.title}.`}
+              maxHeight: '260px',
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap'
+            }} className="custom-scroll">
+              {viewingKbItem.content || (
+                <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Không có nội dung văn bản trực tiếp. Vui lòng mở tệp đính kèm bên dưới.</span>
+              )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+
+            {viewingKbItem.file_path && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Attachment:</span>
+                <a
+                  href={viewingKbItem.file_path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    color: '#C2410C',
+                    backgroundColor: '#FFF7ED',
+                    border: '1px solid #FE7216',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    textDecoration: 'none'
+                  }}
+                >
+                  📎 {viewingKbItem.file_name || 'Open file'}
+                </a>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+              <button
+                onClick={(e) => handleDeleteKbItem(e, viewingKbItem.id)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #fecaca',
+                  backgroundColor: '#fef2f2',
+                  color: '#ef4444',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Delete
+              </button>
               <button
                 onClick={() => setViewingKbItem(null)}
                 style={{
-                  padding: '8px 18px',
+                  padding: '10px 22px',
                   borderRadius: '10px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #FE7216 0%, #f59e0b 100%)',
+                  backgroundColor: '#FE7216',
                   color: 'white',
                   fontWeight: '600',
                   fontSize: '13px',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(254,114,22,0.3)'
                 }}
               >
                 Close

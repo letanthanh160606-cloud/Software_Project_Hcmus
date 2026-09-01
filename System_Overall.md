@@ -1,10 +1,12 @@
 # 🌐 TỔNG QUAN TOÀN BỘ HỆ THỐNG (SYSTEM OVERALL ARCHITECTURE)
-## SOCIAL MEDIA MANAGEMENT & MULTI-CHANNEL DISTRIBUTION PLATFORM
+## SOCIAL MEDIA MANAGEMENT & MULTI-CHANNEL DISTRIBUTION PLATFORM (OMNI PLATFORMS)
 
 ---
 
 ## 📖 1. GIỚI THIỆU TỔNG QUAN (INTRODUCTION)
-Hệ thống là một nền tảng quản lý mạng xã hội tập trung (**Social Media Management Platform**), cho phép các cá nhân (**Individual**) và tổ chức doanh nghiệp (**Business / Team**) tạo nội dung, lên lịch, xét duyệt phân quyền (RBAC), xuất bản đa nền tảng (**Facebook, LinkedIn**,...) và theo dõi phân tích tương tác tự động thông qua **AI & Automation (n8n)**.
+**Omni Platforms** là hệ thống quản trị và phân phối nội dung mạng xã hội tập trung (**Social Media Management & Distribution Platform**) dành cho cả người dùng cá nhân (**Individual**) và tổ chức doanh nghiệp (**Business / Team Workspace**). 
+
+Hệ thống tích hợp trí tuệ nhân tạo **Google Gemini AI**, lưu trữ đám mây **Cloudflare R2**, tự động hóa **n8n**, cùng cơ chế phân quyền kiểm duyệt chặt chẽ (**RBAC**) để hỗ trợ toàn diện chu trình sống của nội dung số: từ khâu sáng tạo nội dung, tối ưu SEO, phân công công việc, phê duyệt đa cấp, xuất bản đồng thời lên **Facebook Page & LinkedIn**, đến theo dõi phân tích tương tác theo thời gian thực.
 
 ---
 
@@ -12,154 +14,201 @@ Hệ thống là một nền tảng quản lý mạng xã hội tập trung (**S
 
 ```mermaid
 flowchart TB
-    subgraph Client["Frontend Layer (React + Vite)"]
-        UI["Main Dashboard SPA"]
-        Cont["1. Content Creation"]
-        PM["2. Post Management"]
-        Dis["3. Channel Distribution"]
-        Sta["4. Statistics & AI Reports"]
-        Task["5. Task & Workspace"]
+    subgraph Client["Frontend Layer (React 18 + Vite SPA)"]
+        Dashboard["0. Main Dashboard & Summary"]
+        Cont["1. AI Content Creation & SEO"]
+        PM["2. Post Management & Review Lifecycle"]
+        Dis["3. Multi-Channel Distribution (OAuth 2.0)"]
+        Sta["4. Analytics & AI Strategic Reports"]
+        WS["5. Team Workspace & Task Management"]
+        Cal["6. Calendar & Scheduling"]
+        PC["7. Prompt & Knowledge Base Context"]
     end
 
     subgraph Gateway["API Gateway & Security Layer"]
-        FastAPI["FastAPI Application (Port 8000)"]
-        JWT["JWT Auth & RBAC Middleware"]
-        Fernet["Fernet AES-256 Token Crypto"]
+        FastAPI["FastAPI Backend (Port 8000)"]
+        JWT["JWT Auth Middleware (7-Day Token Lifetime)"]
+        RBAC["Role-Based Access Control (Manager / Member / Individual)"]
+        Fernet["Fernet AES-256 Token Encryption"]
     end
 
-    subgraph CoreServices["Backend Core Services"]
-        PostSvc["Post Management Service"]
-        DistSvc["Distribution Engine (OAuth2)"]
-        StatSvc["Analytics Aggregation Service"]
-        AIEngine["Google Gemini AI Report Engine"]
+    subgraph CoreServices["Backend Core Services & Logic"]
+        PostSvc["Post Management & Workflow Engine"]
+        TaskSvc["Task Lifecycle & Assignment Service"]
+        DistSvc["Multi-Platform Distribution Service"]
+        AISvc["Gemini AI Content & SEO Service"]
+        StatSvc["Analytics Aggregation & Ingestion Engine"]
+        R2Svc["Cloudflare R2 Object Storage Service"]
     end
 
-    subgraph DataLayer["Persistence & Database Layer"]
+    subgraph DataLayer["Persistence & Database Layer (PostgreSQL)"]
         PG[("PostgreSQL Database")]
-        AuthSchema["Schema: auth (Users, Sessions)"]
-        WSSchema["Schema: workspaces (Posts, Channels, Tasks)"]
-        StatSchema["Schema: analytics (Metrics, Reports)"]
+        AuthSchema["Schema: auth (Users, OTP, Sessions)"]
+        WSSchema["Schema: workspaces (Workspaces, Members, Posts, Reviews, Tasks)"]
+        DistSchema["Schema: distribution (SocialAccounts, Distributions)"]
+        StatSchema["Schema: analytics (Metrics, IngestionRuns, Reports)"]
     end
 
-    subgraph External["External Integrations"]
-        FB["Facebook Graph API (Pages, Posts)"]
-        LI["LinkedIn REST API (UGC, Community)"]
-        n8n["n8n Automation Ingestion Worker"]
+    subgraph External["External Services & APIs"]
+        FB["Facebook Graph API (Pages, Posts, Insights)"]
+        LI["LinkedIn REST API (UGC Posts, Community Stats)"]
         Gemini["Google Gemini AI API"]
+        R2["Cloudflare R2 (S3-Compatible Media Bucket)"]
+        n8n["n8n Workflow Automation Engine"]
     end
 
-    UI --> Cont & PM & Dis & Sta & Task
-    Cont & PM & Dis & Sta & Task -->|REST API Requests| FastAPI
-    FastAPI --> JWT
-    FastAPI --> PostSvc & DistSvc & StatSvc & AIEngine
+    Client -->|REST API Requests / Bearer JWT| FastAPI
+    FastAPI --> JWT --> RBAC
+    RBAC --> PostSvc & TaskSvc & DistSvc & AISvc & StatSvc & R2Svc
 
-    DistSvc -->|Encrypt / Decrypt| Fernet
-    DistSvc -->|Publish & OAuth| FB & LI
-    AIEngine -->|Generate Strategic Reports| Gemini
+    DistSvc -->|Encrypt / Decrypt Tokens| Fernet
+    DistSvc -->|Publish Posts & Connect Pages| FB & LI
+    AISvc -->|Generate Content & SEO Suggestions| Gemini
+    R2Svc -->|Presigned Upload URL / Media URL| R2
     n8n -->|Batch Sync Post Metrics| StatSvc
 
-    PostSvc & DistSvc & StatSvc --> PG
-    PG --- AuthSchema & WSSchema & StatSchema
+    PostSvc & TaskSvc & DistSvc & StatSvc --> PG
+    PG --- AuthSchema & WSSchema & DistSchema & StatSchema
 ```
 
 ---
 
-## 🧩 3. CÁC MODULE CHỨC NĂNG CHÍNH (CORE FUNCTIONAL MODULES)
+## 🧩 3. CHI TIẾT CÁC MODULE CHỨC NĂNG (CORE FUNCTIONAL MODULES)
 
-### 1️⃣ Module Xác thực & Không gian làm việc (Authentication & Workspace)
-* **Phân quyền người dùng (RBAC)**:
-  * 👑 **Manager (Quản lý)**: Toàn quyền duyệt bài (`Approve & Publish`), từ chối bài kèm lý do (`Reject with feedback`), kết nối kênh phân phối (`Distribution`), quản lý thành viên và xuất báo cáo.
-  * 👤 **Member (Thành viên)**: Tạo bài viết (`Submit for review`), lưu nháp (`Save as Draft`), xem phản hồi bài bị từ chối (`Rejected Comments`), quản lý bài viết cá nhân.
-  * 🚀 **Individual (Cá nhân độc lập)**: Không gian làm việc đơn, xuất bản bài viết trực tiếp không qua quy trình phê duyệt nhóm.
-* **Bảo mật**: Mã hóa mật khẩu an toàn với thuật toán `bcrypt`, cấp phát phiên làm việc qua `JWT Access Token`.
-
----
-
-### 2️⃣ Module Sáng tạo nội dung (Content Module - `Contmodule.jsx`)
-* **Trình tạo nội dung thông minh**: Hỗ trợ viết bài kèm đính kèm Prompt Template, kho tri thức (Knowledge Base) và bộ từ khóa SEO / Hashtags.
-* **Lựa chọn nền tảng đích linh hoạt (`Target Platforms`)**:
-  * Tích chọn linh hoạt Facebook, LinkedIn hoặc cả hai.
-  * Hệ thống lưu trữ mảng `target_platforms` trong cơ sở dữ liệu làm căn cứ kiểm soát phân phối.
-* **2 Luồng lưu trữ rõ ràng**:
-  * 🟠 **Submit**: Gửi bài viết sang trạng thái **`Pending`** (`pending_review`) chờ Manager duyệt.
-  * ⚪ **Save as Draft**: Lưu bài viết ở trạng thái **`Drafts`** (`draft`) để tiếp tục chỉnh sửa.
-
----
-
-### 3️⃣ Module Quản lý bài đăng (Post Management - `PMmodule.jsx`)
-* **Bộ chọn tài khoản phân cấp thông minh (`TargetAccountSelector.jsx`)**:
-  * **Strict Scoping**: Chỉ hiển thị các tài khoản thuộc những nền tảng đã được tích chọn trong `Target Platforms` (loại bỏ hoàn toàn tài khoản ngoài phạm vi).
-  * **Tính năng chuyên sâu**: Ô tìm kiếm tài khoản thời gian thực (Search), nút chọn tất cả *"All Accounts on Selected Platforms"*, phân nhóm tài khoản theo từng Platform kèm số lượng (`Facebook (2/2)`, `LinkedIn (4/10)`), hỗ trợ mở rộng không giới hạn (Scalable).
-  * **Tự động làm sạch**: Khi Manager bỏ chọn 1 Platform, các tài khoản thuộc platform đó sẽ tự động bị loại bỏ ngay lập tức.
-* **Quy trình Duyệt & Từ chối bài viết chuyên nghiệp**:
-  * 🟢 **Approve & Publish**: Xuất bản bài viết đồng thời đến toàn bộ danh sách tài khoản đã chọn. Sau khi đăng, hiển thị trực tiếp đường dẫn bài đăng thật (`View Post ↗` trên Facebook & LinkedIn).
-  * 🔴 **Reject with Feedback**: Mặc định ẩn ô nhập lý do. Khi bấm **Reject**, hiển thị khung nhập lý do từ chối, gửi API `PATCH` lưu trạng thái `rejected` và `reject_reason` xuống CSDL để Member xem được đầy đủ lý do trong tab **Rejected**.
-  * ✏️ **Edit & Delete**: Chỉnh sửa bản nháp hoặc xóa bài viết trực quan.
+### 1️⃣ Module Xác thực & Quản trị Workspace (Authentication & Team Workspace)
+* **Xác thực an toàn (OTP & JWT)**:
+  * Đăng ký tài khoản qua quy trình xác minh mã OTP 6 số gửi về Email (`smtp.gmail.com`).
+  * Cấp phát `JWT Access Token` với thời hạn bảo mật 7 ngày (10.080 phút), hỗ trợ tự động xác thực phiên qua `/auth/me`.
+* **Phân quyền người dùng (Role-Based Access Control - RBAC)**:
+  * 👑 **Manager (Quản lý Workspace)**:
+    * Quản lý thành viên (Duyệt yêu cầu tham gia, Kick out thành viên).
+    * Giao việc (Tạo Task, gán deadline, mức độ ưu tiên, tệp đính kèm).
+    * Xóa Task (`🗑 Delete`) kèm hộp thoại xác nhận.
+    * Duyệt bài viết (`Approve & Publish`) hoặc Từ chối (`Reject with Feedback`).
+    * Quản lý kết nối kênh phân phối (`Distribution`) và xuất báo cáo chiến lược.
+  * 👤 **Member (Thành viên Workspace)**:
+    * Nhận Task được giao ở trạng thái **`Doing`**, chuyển trạng thái sang **`✓ Done`** khi hoàn thành (không có quyền xóa Task).
+    * Sáng tạo nội dung và nộp duyệt bài viết (`Submit for review`) hoặc lưu nháp cá nhân (`Save as Draft`).
+    * Xem phản hồi bài viết bị từ chối và chỉnh sửa lại.
+  * 🚀 **Individual (Tài khoản Cá nhân)**:
+    * Không gian làm việc độc lập, xuất bản bài viết trực tiếp không qua quy trình kiểm duyệt nhóm.
 
 ---
 
-### 4️⃣ Module Kênh phân phối (Distribution Module - `Dismodule.jsx` & `service.py`)
-* **Kết nối đa kênh qua chuẩn OAuth 2.0**:
+### 2️⃣ Module Sáng tạo nội dung AI & SEO (Our Content - `Contmodule.jsx`)
+* **Tạo nội dung thông minh với Google Gemini AI**:
+  * Nhập ý tưởng/chủ đề hoặc chọn Prompt Template & Knowledge Base doanh nghiệp.
+  * Bấm **`✨ Generate with AI`** để tạo bài viết có bố cục chuyên nghiệp, phù hợp với tone giọng mạng xã hội.
+* **Tối ưu SEO & Hashtags tự động**:
+  * Tự động trích xuất bộ từ khóa SEO cốt lõi và danh sách Hashtags chuẩn xu hướng (`#Trending`).
+* **Quản lý đa phương tiện (Cloudflare R2 Media)**:
+  * Tải ảnh trực tiếp lên Cloudflare R2 qua Presigned URL bảo mật, tự động liên kết với bài viết (`PostMedia`).
+* **Lựa chọn nền tảng & Luồng nộp bài thông minh**:
+  * Tích chọn linh hoạt Facebook, LinkedIn.
+  * **Manager / Individual**: Bấm **Submit** ➔ Đăng ngay và chuyển sang `Published`.
+  * **Member**: Bấm **Submit** ➔ Gửi yêu cầu duyệt sang trạng thái `Pending` (`pending_review`).
+  * Cả hai vai trò đều có nút **Save as Draft** để lưu bản nháp vào `Drafts`.
+
+---
+
+### 3️⃣ Module Quản lý vòng đời bài viết (Post Management - `PMmodule.jsx`)
+* **Quản lý trạng thái bài viết phân tầng**:
+  * 📑 **All Posts**: Toàn bộ bài viết trong hệ thống/workspace.
+  * 📝 **Drafts**: Bài viết đang soạn thảo, lưu tạm.
+  * ⏳ **Pending**: Bài viết Member đã nộp, chờ Manager duyệt.
+  * ❌ **Rejected**: Bài viết bị từ chối kèm nhận xét chỉnh sửa từ Manager.
+  * 🚀 **Published**: Bài viết đã xuất bản thành công trên Facebook/LinkedIn kèm liên kết bài viết thực tế (`Live Post ↗`).
+  * ⚠️ **Failed**: Bài viết gặp lỗi phân phối (hỗ trợ thử lại).
+* **Bộ chọn tài khoản phân cấp (`TargetAccountSelector.jsx`)**:
+  * **Strict Scoping**: Chỉ hiển thị các tài khoản thuộc những nền tảng đã được tích chọn trong bài viết.
+  * Tích hợp tìm kiếm tài khoản thời gian thực, chọn nhanh tất cả hoặc chọn từng Fanpage/Profile cụ thể.
+* **Quy trình Phê duyệt & Nhận xét (Approval Workflow)**:
+  * **Approve & Publish**: Phân phối trực tiếp bài viết đến tất cả tài khoản đã chọn và cập nhật trạng thái `Published`.
+  * **Reject with Feedback**: Mở khung phản hồi, nhập lý do từ chối gửi về cho Member để hoàn thiện lại nội dung.
+
+---
+
+### 4️⃣ Module Phân công & Quản trị công việc (Task Management)
+* **Quy trình vòng đời công việc**:
+  * Khi Manager giao việc ➔ Trạng thái mặc định: **`Doing`** (Badge xanh dương).
+  * Khi Member hoàn thành công việc ➔ Bấm nút **`✓ Done`** ➔ Trạng thái chuyển sang **`Done`** (Badge xanh lá).
+* **Phân quyền thao tác**:
+  * **Manager**: Tạo việc, xem toàn bộ danh sách, có nút **`🗑 Delete`** để xóa công việc.
+  * **Member**: Không có quyền xóa Task (Backend chặn `403 Forbidden`), chỉ có nút thao tác **`✓ Done`**.
+* **Cửa sổ `See all >` toàn diện**:
+  * Hiển thị bảng chi tiết công việc với thanh tìm kiếm nhanh theo tiêu đề, trạng thái, người được giao.
+  * Tải xuống tệp tài liệu đính kèm (`Attachment Download ↗`) và thao tác trực tiếp.
+
+---
+
+### 5️⃣ Module Kênh phân phối mạng xã hội (Distribution - `Dismodule.jsx`)
+* **Kết nối chuẩn OAuth 2.0**:
   * **Facebook Page**: Tích hợp Facebook Graph API (`pages_manage_posts`, `pages_read_engagement`).
-  * **LinkedIn Profile & Page**: Tích hợp LinkedIn OAuth 2.0 (`w_member_social`, `r_liteprofile`).
-* **Bảo mật mã hóa Token lưu trữ (Data at Rest)**:
-  * Toàn bộ `access_token` và `refresh_token` được mã hóa đối xứng bằng thuật toán chuẩn quân đội **AES-256 (Fernet)** trước khi lưu vào CSDL PostgreSQL.
+  * **LinkedIn Profile / Company Page**: Tích hợp LinkedIn OAuth 2.0 (`w_member_social`, `r_liteprofile`).
+* **Bảo mật mã hóa Token lưu trữ**:
+  * Toàn bộ token xác thực được mã hóa đối xứng **AES-256 (Fernet)** trước khi lưu vào CSDL PostgreSQL.
 * **Cơ chế an toàn (Conflict Guard)**:
-  * Ngăn chặn xóa kênh phân phối (`HTTP 409 Conflict`) nếu kênh đó đang có bài viết ở trạng thái chờ duyệt hoặc đang xuất bản.
+  * Chặn xóa kênh phân phối nếu kênh đó đang có bài viết chờ xuất bản (`HTTP 409 Conflict`).
 
 ---
 
-### 5️⃣ Module Thống kê & Báo cáo AI (Statistics Module - `Stamodule.jsx` & `ai_engine.py`)
-* **Trực quan hóa chỉ số tương tác (Interactive Visualizations)**:
-  * 📈 **MultiLine Time-series Chart**: Thống kê tương tác theo các mốc `Weekly`, `Monthly`, `Yearly` (phân loại theo Facebook và LinkedIn).
-  * 🍩 **Doughnut Market Share**: Tỷ lệ thị phần tương tác giữa các nền tảng (Facebook 75% vs LinkedIn 25%).
-  * ⚡ **Today Card**: Cập nhật số lượng tương tác phát sinh trong ngày theo vai trò người dùng.
-  * 🏆 **Top 7 Engaging Posts**: Danh sách 7 bài viết có lượng tương tác cao nhất hệ thống.
-* **AI Strategic Report Engine (Google Gemini)**:
-  * Tự động phân tích sâu bức tranh dữ liệu, phát hiện xu hướng nội dung thịnh hành và đề xuất giải pháp tối ưu hóa tương tác.
-  * Tích hợp cơ chế **Resilient Offline Fallback** (`RuleBasedReportProvider`) đảm bảo hệ thống không bao giờ bị lỗi khi mất kết nối Internet hoặc lỗi API Key.
-  * Cho phép lưu báo cáo vào lịch sử CSDL và tải về máy dưới dạng tài liệu hoàn chỉnh.
+### 6️⃣ Module Thống kê & Báo cáo chiến lược AI (Statistics - `Stamodule.jsx`)
+* **Trực quan hóa chỉ số tương tác**:
+  * 📈 **Time-Series Chart**: Tương tác theo tuần, tháng, năm (phân tách Facebook vs LinkedIn).
+  * 🍩 **Market Share Chart**: Tỷ lệ đóng góp tương tác giữa các nền tảng.
+  * ⚡ **Today Card & Top 7 Posts**: Chỉ số tức thời trong ngày và 7 bài viết viral nhất.
+* **Tự động hóa với n8n & Gemini AI Report**:
+  * n8n Workflow định kỳ thu thập chỉ số (Likes, Comments, Shares, Impressions) đẩy về endpoint `/api/v1/analytics/ingest`.
+  * Google Gemini AI phân tích dữ liệu, tự động tạo báo cáo chiến lược phát triển nội dung kèm cơ chế **Offline Fallback** không bao giờ sập.
 
 ---
 
-### 6️⃣ Tự động hóa đồng bộ dữ liệu với n8n (Automation Workflow)
-* **Cronjob định kỳ**: n8n Workflow tự động gọi API Facebook & LinkedIn theo lịch trình để lấy các chỉ số tương tác mới nhất (Likes, Shares, Comments, Impressions).
-* **Batch Ingestion**: Đẩy toàn bộ dữ liệu thô về endpoint `POST /api/v1/analytics/ingest` để lưu trữ và tổng hợp tự động vào bảng `EngagementMetric`.
-
----
-
-## 🗄️ 4. SƠ ĐỒ THỰC THỂ CƠ SỞ DỮ LIỆU (DATABASE ERD)
+## 🗄️ 4. SƠ ĐỒ CƠ SỞ DỮ LIỆU TOÀN DIỆN (DATABASE ERD)
 
 ```mermaid
 erDiagram
     USERS ||--o{ WORKSPACE_MEMBERS : "joins"
     USERS ||--o{ POSTS : "authors"
-    USERS ||--o{ SOCIAL_ACCOUNTS : "connects"
+    USERS ||--o{ TASKS : "assigned / created"
+    USERS ||--o{ NOTIFICATIONS : "receives"
     USERS ||--o{ REPORTS : "generates"
 
     WORKSPACES ||--o{ WORKSPACE_MEMBERS : "contains"
     WORKSPACES ||--o{ POSTS : "owns"
     WORKSPACES ||--o{ SOCIAL_ACCOUNTS : "binds"
+    WORKSPACES ||--o{ TASKS : "manages"
     WORKSPACES ||--o{ ENGAGEMENT_METRICS : "tracks"
     WORKSPACES ||--o{ REPORTS : "archives"
 
     POSTS ||--o{ POST_DISTRIBUTIONS : "distributes to"
     POSTS ||--o{ POST_REVIEWS : "has feedback"
+    POSTS ||--o| POST_MEDIA : "attaches"
     SOCIAL_ACCOUNTS ||--o{ POST_DISTRIBUTIONS : "receives"
+    TASKS ||--o| TASK_ATTACHMENTS : "attaches"
 
     USERS {
         uuid users_uuid PK
+        string username
         string email
         string password_hash
-        string role "manager | member | individual"
+        string account_type "individual | business"
         datetime created_at
     }
 
     WORKSPACES {
         string workspace_uuid PK
-        string name
+        string workspacename
+        string pin
         uuid manager_id FK
         datetime created_at
+    }
+
+    WORKSPACE_MEMBERS {
+        uuid id PK
+        string workspace_id FK
+        uuid user_id FK
+        string status "pending | active | rejected"
+        datetime joined_at
     }
 
     POSTS {
@@ -168,7 +217,7 @@ erDiagram
         uuid author_id FK
         string title
         text content
-        string status "draft | pending_review | rejected | ready_for_distribution | published"
+        string status "draft | pending_review | rejected | ready_for_distribution | published | failed"
         jsonb target_platforms
         jsonb target_account_ids
         string target_accounts_mode "ALL_SELECTED_PLATFORMS | SELECTED"
@@ -176,10 +225,32 @@ erDiagram
         uuid reviewed_by FK
         datetime reviewed_at
         datetime published_at
+        datetime created_at
+    }
+
+    POST_MEDIA {
+        uuid id PK
+        uuid post_id FK
+        string image_url
+        int position
+        datetime created_at
+    }
+
+    TASKS {
+        uuid id PK
+        string workspace_id FK
+        string title
+        text content
+        string priority "low | medium | high | urgent"
+        string status "doing | done"
+        uuid assigned_to FK
+        uuid created_by FK
+        datetime due_date
+        datetime created_at
     }
 
     SOCIAL_ACCOUNTS {
-        uuid id PK
+        uuid social_acc_id PK
         string workspace_id FK
         string platform "facebook | linkedin"
         string platform_account_id
@@ -193,144 +264,106 @@ erDiagram
         string workspace_id FK
         uuid post_id FK
         uuid channel_id FK
-        string platform "facebook | linkedin"
-        string external_post_id
+        string platform
         date metric_date
-        int impressions
-        int reach
         int views
         int likes
         int comments
         int shares
-        int clicks
         int engagements
-        float engagement_rate
         datetime snapshot_time
-    }
-
-    INGESTION_RUNS {
-        uuid id PK
-        string platform
-        string status "running | success | partial | failed"
-        int total_records
-        int success_count
-        int error_count
-        text error_message
-        datetime started_at
-        datetime finished_at
-    }
-
-    REPORTS {
-        uuid id PK
-        string workspace_id FK
-        uuid created_by FK
-        string timeframe "Weekly | Monthly | Yearly"
-        string title
-        text summary
-        jsonb report_data
-        string saved_date
-        datetime created_at
     }
 ```
 
 ---
 
-## 📁 5. CẤU TRÚC THƯ MỤC DỰ ÁN (PROJECT DIRECTORY TREE)
+## 📁 5. CẤU TRÚC THƯ MỤC DỰ ÁN (PROJECT DIRECTORY STRUCTURE)
 
 ```text
 Software_Project_Hcmus/
-├── docker-compose.yml                    # Khởi tạo n8n self-hosted automation container
-├── adjust_ui.md                          # Nhật ký chi tiết mọi thay đổi UI & lý do
-├── System_Overall.md                     # Tài liệu tổng quan toàn bộ hệ thống
-├── n8n/                                  # Cấu hình & Kịch bản Workflow n8n
-│   ├── README.md                         # Hướng dẫn setup và import workflows
-│   └── workflows/                        # Các mẫu Workflow JSON sẵn sàng import
-│       ├── 01_main_scheduler.json        # Lịch chạy cron quét bài viết cần sync
-│       ├── 02_facebook_sync.json         # Lấy số liệu Facebook Graph API /insights
-│       ├── 03_linkedin_sync.json         # Lấy số liệu LinkedIn REST API stats
-│       └── 04_manual_sync_webhook.json   # Webhook đồng bộ tức thời khi bấm Refresh
+├── docker-compose.yml                    # Container hóa n8n automation
+├── adjust_ui.md                          # Nhật ký thay đổi UI & lý do chi tiết (61 mục)
+├── Feature_New_Update.md                 # Tài liệu tính năng cập nhật mới nhất
+├── System_Overall.md                     # Tài liệu tổng quan kiến trúc hệ thống
+├── n8n/                                  # Workflows tự động hóa đồng bộ chỉ số MXH
+│   ├── README.md
+│   └── workflows/
+│       ├── 01_main_scheduler.json
+│       ├── 02_facebook_sync.json
+│       ├── 03_linkedin_sync.json
+│       └── 04_manual_sync_webhook.json
 ├── src/
 │   ├── backend/                          # Backend FastAPI (Python 3.11+)
 │   │   ├── app/
-│   │   │   ├── analytics/                # Module Thống kê & Báo cáo AI
-│   │   │   │   ├── ai_engine.py          # Google Gemini AI & Rule-based fallback
-│   │   │   │   ├── ingest_router.py      # Cổng nhận dữ liệu tự động từ n8n (Internal Auth)
-│   │   │   │   ├── models.py             # CSDL Models cho Analytics, Runs & Reports
-│   │   │   │   ├── router.py             # REST API Endpoints thống kê, báo cáo & sync
-│   │   │   │   ├── schemas.py            # Pydantic Schemas cho Analytics
-│   │   │   │   └── service.py            # Business logic tính toán chỉ số & UPSERT
-│   │   │   ├── distribution/             # Module Kênh phân phối & Đăng bài
-│   │   │   │   ├── crypto.py             # Mã hóa Fernet AES-128 Token
-│   │   │   │   ├── repository.py         # Truy vấn CSDL kênh phân phối
-│   │   │   │   ├── router.py             # REST API OAuth2 & Publish Endpoints
-│   │   │   │   ├── schemas.py            # Pydantic Schemas Distribution
-│   │   │   │   └── service.py            # Facebook Graph API & LinkedIn REST API
-│   │   │   ├── routers/                  # Các Router chính (Auth, Posts, Workspaces, Calendar)
-│   │   │   │   ├── auth.py
-│   │   │   │   ├── calendar.py
-│   │   │   │   ├── posts.py
-│   │   │   │   └── workspaces.py
-│   │   │   ├── config.py                 # Đọc biến môi trường (.env)
-│   │   │   ├── crud.py                   # Các hàm thao tác CSDL PostgreSQL
-│   │   │   ├── database.py               # Kết nối SQLAlchemy Engine & Session
-│   │   │   ├── dependencies.py           # Dependency Injection & Token Auth
-│   │   │   ├── main.py                   # Điểm khởi tạo FastAPI App chính
-│   │   │   ├── models.py                 # SQLAlchemy Core Models (User, Post, Workspace, PostDistribution)
-│   │   │   ├── r2.py                     # Cloudflare R2 Storage Upload Integration
-│   │   │   └── schemas.py                # Core Pydantic Schemas
+│   │   │   ├── analytics/                # Module Thống kê & Báo cáo AI (Gemini)
+│   │   │   ├── distribution/             # Module Phân phối Facebook & LinkedIn
+│   │   │   ├── routers/                  # API Routers (Auth, Posts, Workspaces, Calendar)
+│   │   │   ├── services/                 # AI Content & SEO Generation Services
+│   │   │   ├── config.py                 # Cấu hình biến môi trường & JWT 7 ngày
+│   │   │   ├── crud.py                   # Business Logic & Truy vấn cơ sở dữ liệu
+│   │   │   ├── database.py               # Kết nối PostgreSQL SQLAlchemy Engine
+│   │   │   ├── dependencies.py           # Dependency Injection & Token RBAC
+│   │   │   ├── models.py                 # SQLAlchemy Database Models
+│   │   │   ├── r2.py                     # Cloudflare R2 Object Storage Integration
+│   │   │   ├── schemas.py                # Pydantic Request & Response Schemas
+│   │   │   └── security.py               # Mã hóa mật khẩu Argon2 & JWT
 │   │   ├── test_distribution.py          # Unit & Integration tests cho Distribution
-│   │   ├── test_analytics.py             # Unit & Integration tests cho Statistics & AI
-│   │   └── test_analytics_n8n.py         # Unit & Integration tests cho n8n Ingestion
-│   └── frontend/                         # Frontend React + Vite SPA
+│   │   └── test_analytics.py             # Unit & Integration tests cho Analytics & Ingestion
+│   └── frontend/                         # Frontend React 18 + Vite SPA
 │       ├── src/
 │       │   ├── component/
-│       │   │   ├── Calenmodule.jsx       # Giao diện Lịch & Phân công Task
-│       │   │   ├── Contentmodule.jsx     # Giao diện Tạo nội dung
+│       │   │   ├── DBultils/             # Các Widgets Dashboard (AssignedTaskList, Stats)
+│       │   │   ├── Calenmodule.jsx       # Giao diện Lịch & Kế hoạch nội dung
+│       │   │   ├── Contmodule.jsx        # Giao diện Sáng tạo nội dung & AI/SEO
+│       │   │   ├── Dismodule.jsx         # Giao diện Kết nối Kênh phân phối OAuth
 │       │   │   ├── PMmodule.jsx          # Giao diện Quản lý Bài viết & Phê duyệt
-│       │   │   ├── Stamodule.jsx         # Giao diện Thống kê & Báo cáo AI
-│       │   │   ├── WSmodule.jsx          # Giao diện Quản lý Không gian làm việc
-│       │   │   └── TargetAccountSelector.jsx # Bộ chọn tài khoản đích phân cấp
-
+│       │   │   ├── Stamodule.jsx         # Giao diện Thống kê & Báo cáo chiến lược
+│       │   │   ├── WSmodule.jsx          # Giao diện Không gian làm việc nhóm & Task
+│       │   │   ├── P&Cmodule.jsx         # Giao diện Quản lý Prompt & Knowledge Base
+│       │   │   └── TargetAccountSelector.jsx # Bộ chọn tài khoản đích đa kênh
 │       │   ├── page/
 │       │   │   ├── MainDashboard.jsx     # Trang Dashboard điều hướng chính
-│       │   │   └── Signin_Signup.jsx     # Trang Đăng nhập / Đăng ký
-│       │   ├── App.jsx                   # Component Root & Toast Provider
-│       │   └── index.css                 # Design Tokens, Font Satoshi, Animations
-│       └── package.json                  # Cấu hình thư viện Vite, React, Lucide
+│       │   │   ├── SignIn.jsx            # Trang Đăng nhập
+│       │   │   └── SignUp.jsx            # Trang Đăng ký & OTP Verification
+│       │   ├── App.jsx                   # Root Component & Toaster Provider
+│       │   └── index.css                 # Hệ thống Design Tokens & Font Satoshi
+│       └── package.json                  # Cấu hình thư viện Vite, React, Hot-toast
 ```
 
 ---
 
-## 🛠️ 6. HƯỚNG DẪN KHỞI CHẠY HỆ THỐNG (LOCAL RUN GUIDE)
+## 🛠️ 6. HƯỚNG DẪN KHỞI CHẠY HỆ THỐNG (RUN GUIDE)
 
 ### Bước 1: Khởi động Backend (FastAPI)
 ```bash
 cd src/backend
-# Kích hoạt môi trường ảo
-.venv\Scripts\activate
-# Chạy server FastAPI với Live Reload
+# Kích hoạt virtualenv
+.\.venv\Scripts\activate
+# Khởi chạy server FastAPI
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-* Swagger API Documentation: `http://localhost:8000/docs`
+* **Swagger API Docs**: `http://localhost:8000/docs`
 
 ### Bước 2: Khởi động Frontend (React + Vite)
 ```bash
 cd src/frontend
 npm run dev
 ```
-* Ứng dụng chạy tại: `http://localhost:5173`
+* **Giao diện Web**: `http://localhost:5173`
 
-### Bước 3: Chạy toàn bộ Test Suites tự động
+### Bước 3: Kiểm tra Build & Chạy Test Suites
 ```bash
-cd src/backend
-.venv\Scripts\python.exe test_distribution.py
-.venv\Scripts\python.exe test_analytics.py
+# Kiểm tra build frontend
+cd src/frontend && npm run build
+
+# Chạy test backend
+cd src/backend && .\.venv\Scripts\python.exe test_distribution.py
 ```
-*(Kết quả: 15/15 test cases PASS 100% 👍)*
 
 ---
 
-## 🏆 7. TIÊU CHUẨN THIẾT KẾ VÀ ĐẶC ĐIỂM NỔI BẬT (HIGHLIGHTS)
-1. **Tuân thủ quy tắc UI Design Tokens**: Toàn bộ giao diện sử dụng font chữ cao cấp **Satoshi**, bảng màu tối ưu (Primary Orange `#FE7216`, Success Green `#22c55e`, Alert Red `#ef4444`), micro-animations và hiệu ứng hover mượt mà.
-2. **Khả năng mở rộng không giới hạn (Future-proof)**: Thiết kế trừu tượng hóa cho phép tích hợp thêm các mạng xã hội mới (Instagram, TikTok, X, YouTube, Threads,...) mà không phải thay đổi cấu trúc cốt lõi.
-3. **Bảo mật tuyệt đối**: Token mã hóa đối xứng cấp độ ngân hàng, kiểm soát chéo phân quyền (RBAC) nghiêm ngặt tại mọi tầng API.
+## 🏆 7. ĐẶC ĐIỂM NỔI BẬT & ĐIỂM CỘNG DỰ ÁN (KEY HIGHLIGHTS)
+1. **Thiết kế giao diện hiện đại (UI Excellence)**: Chuẩn thẩm mỹ cao cấp với font chữ **Satoshi**, hiệu ứng kính mờ (Glassmorphism), bảng màu hài hòa (Orange `#FE7216`, Success Green, Slate Blue) và vi tương tác mượt mà.
+2. **Kiểm soát phân quyền chặt chẽ (RBAC)**: Phân tách rõ ràng quyền hạn giữa Manager, Member và Individual ở cả tầng giao diện lẫn backend middleware.
+3. **Khả năng tích hợp mở rộng cao (Scalable Architecture)**: Thiết kế mô-đun hóa cho phép dễ dàng tích hợp thêm mạng xã hội mới (Instagram, TikTok, YouTube, Threads) và công cụ AI khác.
+4. **Bảo mật cấp cao**: Mã hóa khóa kết nối AES-256 Fernet, mã hóa mật khẩu Argon2, xác thực OTP và JWT Token 7 ngày.
