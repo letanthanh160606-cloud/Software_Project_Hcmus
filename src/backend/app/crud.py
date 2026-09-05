@@ -168,13 +168,35 @@ def list_distributors(db: Session, workspace_id: str) -> list[SocialAccount]:
     ).all()
 
 def list_posts_for_role(db: Session, workspace_id: str, user_id, role: str) -> list[Post]:
-    query = select(Post).where(Post.workspace_id == workspace_id).options(selectinload(Post.attachment))
     if role == "member":
-        query = query.where(
-            and_(Post.author_id == user_id, Post.status != "cancel") | (Post.status.in_(["ready_for_distribution", "published"]))
+        query = (
+            select(Post)
+            .where(
+                or_(
+                    and_(Post.author_id == user_id, Post.status != "cancel"),
+                    and_(Post.workspace_id == workspace_id, Post.status.in_(["ready_for_distribution", "published"]))
+                )
+            )
+            .options(selectinload(Post.attachment))
         )
     elif role == "manager":
-        query = query.where(Post.status != "cancel")
+        query = (
+            select(Post)
+            .where(
+                or_(
+                    Post.workspace_id == workspace_id,
+                    Post.author_id == user_id,
+                ),
+                Post.status != "cancel"
+            )
+            .options(selectinload(Post.attachment))
+        )
+    else:
+        query = (
+            select(Post)
+            .where(Post.author_id == user_id, Post.status != "cancel")
+            .options(selectinload(Post.attachment))
+        )
     return db.scalars(query.order_by(Post.created_at.desc())).all()
 
 def list_posts_for_user(db: Session, user_id) -> list[Post]:
@@ -187,7 +209,7 @@ def list_posts_for_user(db: Session, user_id) -> list[Post]:
 
     return db.scalars(
         select(Post)
-        .where(Post.author_id == user_id)
+        .where(Post.author_id == user_id, Post.status != "cancel")
         .options(selectinload(Post.attachment))
         .order_by(Post.created_at.desc())
     ).all()
@@ -374,13 +396,9 @@ def create_post(
     # Validate workspace_id actually exists in database before attaching
     valid_ws_id = None
     if workspace_id:
-        try:
-            ws_uuid = uuid.UUID(str(workspace_id))
-            ws = db.get(Workspace, ws_uuid)
-            if ws:
-                valid_ws_id = ws.workspace_uuid
-        except (ValueError, TypeError):
-            valid_ws_id = None
+        ws = db.get(Workspace, str(workspace_id))
+        if ws:
+            valid_ws_id = ws.workspace_uuid
 
     if post_id is not None:
         existing_post = db.get(Post, post_id)
@@ -641,26 +659,42 @@ def update_post(db: Session, post: Post, updates: dict) -> Post:
     return post
 
 
-def create_prompt_template(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None, title: str, content: str, tag: str | None, created_by: uuid.UUID) -> PromptTemplate:
+def create_prompt_template(db: Session, *, owner_workspace_id: str | None, owner_user_id: uuid.UUID | None, title: str, content: str, tag: str | None, created_by: uuid.UUID) -> PromptTemplate:
     prompt_template = PromptTemplate(
         owner_workspace_id=owner_workspace_id,
         owner_user_id=owner_user_id,
         title=title,
         content=content,
-        tag=tag,
-        created_by=created_by
+        created_by=created_by,
+        tag=tag
     )
     db.add(prompt_template)
     db.commit()
     db.refresh(prompt_template)
     return prompt_template
 
-def get_list_prompt_templates(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None) -> list[PromptTemplate]:
-    query = select(PromptTemplate).where(or_(PromptTemplate.owner_workspace_id == owner_workspace_id, PromptTemplate.owner_user_id == owner_user_id))
+def get_list_prompt_templates(db: Session, *, owner_workspace_id: str | None, owner_user_id: uuid.UUID | None) -> list[PromptTemplate]:
+    if owner_workspace_id:
+        query = select(PromptTemplate).where(
+            PromptTemplate.is_deleted == False,
+            or_(
+                PromptTemplate.owner_workspace_id == owner_workspace_id,
+                and_(
+                    PromptTemplate.owner_user_id == owner_user_id,
+                    PromptTemplate.owner_workspace_id.is_(None)
+                )
+            )
+        ).order_by(PromptTemplate.created_at.desc())
+    else:
+        query = select(PromptTemplate).where(
+            PromptTemplate.is_deleted == False,
+            PromptTemplate.owner_user_id == owner_user_id,
+            PromptTemplate.owner_workspace_id.is_(None)
+        ).order_by(PromptTemplate.created_at.desc())
     return db.scalars(query).all()
 
 
-def create_knowledge_base(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None, title: str, content: str | None = None, file_path: str | None = None, file_size_bytes: int | None = None, mime_type: str | None = None, created_by: uuid.UUID, file_name: str | None = None, tag: str | None = None) -> tuple[KnowledgeBase, str | None]:
+def create_knowledge_base(db: Session, *, owner_workspace_id: str | None, owner_user_id: uuid.UUID | None, title: str, content: str | None = None, file_path: str | None = None, file_size_bytes: int | None = None, mime_type: str | None = None, created_by: uuid.UUID, file_name: str | None = None, tag: str | None = None) -> tuple[KnowledgeBase, str | None]:
     knowledge_base = KnowledgeBase(
         owner_workspace_id=owner_workspace_id,
         owner_user_id=owner_user_id,
@@ -688,27 +722,43 @@ def create_knowledge_base(db: Session, *, owner_workspace_id: uuid.UUID | None, 
     db.refresh(knowledge_base)
     return knowledge_base, upload_url
 
-def get_list_knowledge_bases(db: Session, *, owner_workspace_id: uuid.UUID | None, owner_user_id: uuid.UUID | None) -> list[KnowledgeBase]:
-    query = select(KnowledgeBase).where(or_(KnowledgeBase.owner_workspace_id == owner_workspace_id, KnowledgeBase.owner_user_id == owner_user_id))
+def get_list_knowledge_bases(db: Session, *, owner_workspace_id: str | None, owner_user_id: uuid.UUID | None) -> list[KnowledgeBase]:
+    if owner_workspace_id:
+        query = select(KnowledgeBase).where(
+            KnowledgeBase.is_deleted == False,
+            or_(
+                KnowledgeBase.owner_workspace_id == owner_workspace_id,
+                and_(
+                    KnowledgeBase.owner_user_id == owner_user_id,
+                    KnowledgeBase.owner_workspace_id.is_(None)
+                )
+            )
+        ).order_by(KnowledgeBase.created_at.desc())
+    else:
+        query = select(KnowledgeBase).where(
+            KnowledgeBase.is_deleted == False,
+            KnowledgeBase.owner_user_id == owner_user_id,
+            KnowledgeBase.owner_workspace_id.is_(None)
+        ).order_by(KnowledgeBase.created_at.desc())
     return db.scalars(query).all()
 
-def delete_prompt_template(db: Session, *, template_id: uuid.UUID, owner_user_id: uuid.UUID | None = None) -> bool:
+def delete_prompt_template(db: Session, *, template_id: uuid.UUID) -> bool:
     template = db.scalar(
-        select(PromptTemplate).where(PromptTemplate.id == template_id)
+        select(PromptTemplate).where(PromptTemplate.id == template_id, PromptTemplate.is_deleted == False)
     )
     if not template:
         return False
-    db.delete(template)
+    template.is_deleted = True
     db.commit()
     return True
 
-def delete_knowledge_base(db: Session, *, kb_id: uuid.UUID, owner_user_id: uuid.UUID | None = None) -> bool:
+def delete_knowledge_base(db: Session, *, kb_id: uuid.UUID) -> bool:
     kb = db.scalar(
-        select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
+        select(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.is_deleted == False)
     )
     if not kb:
         return False
-    db.delete(kb)
+    kb.is_deleted = True
     db.commit()
     return True
 

@@ -782,3 +782,526 @@ def update_kpi_goal(db: Session, workspace_id: str, payload: KpiGoalRequest) -> 
     )
 
 
+# ---------------------------------------------------------
+# INDIVIDUAL ANALYTICS & REPORTS METHODS
+# ---------------------------------------------------------
+
+def _get_individual_selectors(db: Session, user_uuid: uuid.UUID):
+    post_ids = select(Post.id).where(Post.author_id == user_uuid)
+    channel_ids = select(SocialAccount.id).where(
+        SocialAccount.owner_type == "individual",
+        SocialAccount.owner_id == str(user_uuid),
+    )
+    return post_ids, channel_ids
+
+
+def get_individual_monthly_interactions(db: Session, user_uuid: uuid.UUID, month_year: str) -> int:
+    try:
+        year, month = map(int, month_year.split("-"))
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, month + 1, 1)
+    except Exception:
+        start_date = date.today().replace(day=1)
+        end_date = date.today()
+
+    post_ids, channel_ids = _get_individual_selectors(db, user_uuid)
+
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where(
+            (EngagementMetric.post_id.in_(post_ids)) | (EngagementMetric.channel_id.in_(channel_ids)),
+            EngagementMetric.metric_date >= start_date,
+            EngagementMetric.metric_date < end_date,
+        )
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
+    latest_metrics = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
+    ).all()
+    return sum(m.engagements for m in latest_metrics)
+
+
+def get_individual_timeline(db: Session, current_user: User, timeframe: str = "Weekly") -> TimelineResponse:
+    timeframe_clean = timeframe.capitalize()
+    labels_map = {
+        "Weekly": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "Monthly": ["Week 1", "Week 2", "Week 3", "Week 4"],
+        "Yearly": ["Jan", "Mar", "May", "Jul", "Sep", "Nov"],
+    }
+    labels = labels_map.get(timeframe_clean, labels_map["Weekly"])
+
+    now = datetime.now(timezone.utc)
+    if timeframe_clean == "Weekly":
+        start_date = (now - timedelta(days=now.weekday())).date()
+        end_date = start_date + timedelta(days=7)
+    elif timeframe_clean == "Monthly":
+        start_date = date(now.year, now.month, 1)
+        end_date = date(now.year + 1, 1, 1) if now.month == 12 else date(now.year, now.month + 1, 1)
+    else:
+        start_date = date(now.year, 1, 1)
+        end_date = date(now.year + 1, 1, 1)
+
+    post_ids, channel_ids = _get_individual_selectors(db, current_user.users_uuid)
+
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            EngagementMetric.metric_date,
+            func.max(EngagementMetric.snapshot_time).label("max_snapshot"),
+        )
+        .where(
+            (EngagementMetric.post_id.in_(post_ids)) | (EngagementMetric.channel_id.in_(channel_ids)),
+            EngagementMetric.metric_date >= start_date,
+            EngagementMetric.metric_date < end_date,
+        )
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id, EngagementMetric.metric_date)
+        .subquery()
+    )
+
+    rows = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.metric_date,
+                EngagementMetric.snapshot_time == subq.c.max_snapshot,
+            ),
+        )
+    ).all()
+
+    fb_metrics = [r for r in rows if r.platform.lower() == "facebook"]
+    li_metrics = [r for r in rows if r.platform.lower() == "linkedin"]
+
+    if fb_metrics or li_metrics:
+        if timeframe_clean == "Weekly":
+            fb_buckets = [0] * 7
+            li_buckets = [0] * 7
+            for r in fb_metrics:
+                idx = r.metric_date.weekday()
+                if 0 <= idx < 7:
+                    fb_buckets[idx] += r.engagements
+            for r in li_metrics:
+                idx = r.metric_date.weekday()
+                if 0 <= idx < 7:
+                    li_buckets[idx] += r.engagements
+            fb_series = fb_buckets
+            li_series = li_buckets
+        elif timeframe_clean == "Monthly":
+            fb_buckets = [0] * 4
+            li_buckets = [0] * 4
+            for r in fb_metrics:
+                w_idx = min((r.metric_date.day - 1) // 7, 3)
+                fb_buckets[w_idx] += r.engagements
+            for r in li_metrics:
+                w_idx = min((r.metric_date.day - 1) // 7, 3)
+                li_buckets[w_idx] += r.engagements
+            fb_series = fb_buckets
+            li_series = li_buckets
+        else:
+            fb_buckets = [0] * 6
+            li_buckets = [0] * 6
+            for r in fb_metrics:
+                m_idx = min((r.metric_date.month - 1) // 2, 5)
+                fb_buckets[m_idx] += r.engagements
+            for r in li_metrics:
+                m_idx = min((r.metric_date.month - 1) // 2, 5)
+                li_buckets[m_idx] += r.engagements
+            fb_series = fb_buckets
+            li_series = li_buckets
+    else:
+        fb_series = [0] * len(labels)
+        li_series = [0] * len(labels)
+
+    return TimelineResponse(
+        timeframe=timeframe_clean,
+        labels=labels,
+        series={"facebook": fb_series, "linkedin": li_series},
+    )
+
+
+def get_individual_overview(db: Session, current_user: User) -> OverviewResponse:
+    post_ids, channel_ids = _get_individual_selectors(db, current_user.users_uuid)
+
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where((EngagementMetric.post_id.in_(post_ids)) | (EngagementMetric.channel_id.in_(channel_ids)))
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
+    metrics = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
+    ).all()
+
+    fb_records = [m for m in metrics if m.platform.lower() == "facebook"]
+    li_records = [m for m in metrics if m.platform.lower() == "linkedin"]
+
+    fb_attraction = sum((m.impressions or m.views) for m in fb_records)
+    fb_engagements = sum(m.engagements for m in fb_records)
+
+    li_attraction = sum((m.impressions or m.views) for m in li_records)
+    li_engagements = sum(m.engagements for m in li_records)
+
+    total_attraction = fb_attraction + li_attraction
+    fb_pct = round((fb_attraction / total_attraction) * 100) if total_attraction > 0 else 0
+    li_pct = round((li_attraction / total_attraction) * 100) if total_attraction > 0 else 0
+
+    total_engagements = fb_engagements + li_engagements
+    fb_eng_pct = round((fb_engagements / total_engagements) * 100) if total_engagements > 0 else 0
+    li_eng_pct = round((li_engagements / total_engagements) * 100) if total_engagements > 0 else 0
+
+    now = datetime.now(timezone.utc)
+    current_month_str = now.strftime("%Y-%m")
+    first_day_current = now.replace(day=1)
+    prev_month_date = first_day_current - timedelta(days=1)
+    prev_month_str = prev_month_date.strftime("%Y-%m")
+
+    cur_month_eng = get_individual_monthly_interactions(db, current_user.users_uuid, current_month_str)
+    prev_month_eng = get_individual_monthly_interactions(db, current_user.users_uuid, prev_month_str)
+
+    if prev_month_eng > 0:
+        gain_percentage = round(((cur_month_eng - prev_month_eng) / prev_month_eng) * 100)
+        is_increase = gain_percentage >= 0
+    elif cur_month_eng > 0:
+        gain_percentage = 100
+        is_increase = True
+    else:
+        gain_percentage = 0
+        is_increase = False
+
+    from app.analytics.schemas import MonthlyGainOverview
+
+    monthly_gain = MonthlyGainOverview(
+        current_month=current_month_str,
+        current_month_engagements=cur_month_eng,
+        prev_month=prev_month_str,
+        prev_month_engagements=prev_month_eng,
+        gain_percentage=gain_percentage,
+        is_increase=is_increase,
+    )
+
+    return OverviewResponse(
+        facebook=PlatformOverview(
+            total_attraction=fb_attraction,
+            percentage=fb_pct,
+            total_engagements=fb_engagements,
+            engagement_percentage=fb_eng_pct,
+        ),
+        linkedin=PlatformOverview(
+            total_attraction=li_attraction,
+            percentage=li_pct,
+            total_engagements=li_engagements,
+            engagement_percentage=li_eng_pct,
+        ),
+        monthly_gain=monthly_gain,
+    )
+
+
+def get_individual_today_stats(db: Session, current_user: User) -> TodayStatsResponse:
+    today_date = datetime.now(timezone.utc).date()
+    post_ids, channel_ids = _get_individual_selectors(db, current_user.users_uuid)
+
+    today_metrics = db.scalars(
+        select(EngagementMetric).where(
+            (EngagementMetric.post_id.in_(post_ids)) | (EngagementMetric.channel_id.in_(channel_ids)),
+            EngagementMetric.metric_date == today_date,
+        )
+    ).all()
+
+    total_interactions = sum(m.engagements for m in today_metrics)
+    return TodayStatsResponse(
+        role="individual",
+        total_interactions_today=total_interactions,
+        user_contribution_today=total_interactions,
+        date=today_date.strftime("%Y-%m-%d"),
+    )
+
+
+def get_individual_top_posts(db: Session, current_user: User, limit: int = 7) -> TopPostsResponse:
+    posts = db.scalars(
+        select(Post)
+        .where(
+            Post.author_id == current_user.users_uuid,
+            Post.status.in_(["published", "ready_for_distribution"]),
+        )
+        .options(selectinload(Post.attachment))
+        .order_by(desc(Post.created_at))
+        .limit(limit * 2)
+    ).all()
+
+    if not posts:
+        return TopPostsResponse(posts=[])
+
+    post_ids = [p.id for p in posts]
+    subq = (
+        select(
+            EngagementMetric.post_id,
+            EngagementMetric.channel_id,
+            func.max(EngagementMetric.metric_date).label("max_date"),
+        )
+        .where(EngagementMetric.post_id.in_(post_ids))
+        .group_by(EngagementMetric.post_id, EngagementMetric.channel_id)
+        .subquery()
+    )
+    latest_metrics = db.scalars(
+        select(EngagementMetric)
+        .join(
+            subq,
+            and_(
+                EngagementMetric.post_id == subq.c.post_id,
+                EngagementMetric.channel_id == subq.c.channel_id,
+                EngagementMetric.metric_date == subq.c.max_date,
+            ),
+        )
+    ).all()
+
+    metrics_by_post: dict[uuid.UUID, list[EngagementMetric]] = {}
+    for m in latest_metrics:
+        metrics_by_post.setdefault(m.post_id, []).append(m)
+
+    items: list[TopPostItem] = []
+    for p in posts:
+        dist = db.scalar(select(PostDistribution).where(PostDistribution.post_id == p.id))
+        pub_url = dist.published_url if dist else None
+
+        post_m_list = metrics_by_post.get(p.id, [])
+        total_eng = sum(m.engagements for m in post_m_list)
+        total_imp = sum((m.impressions or m.views) for m in post_m_list)
+        eng_rate = round((total_eng / total_imp) * 100, 2) if total_imp > 0 else 0.0
+        platform = (
+            post_m_list[0].platform
+            if post_m_list
+            else (p.target_platforms[0] if p.target_platforms and len(p.target_platforms) > 0 else "linkedin")
+        )
+
+        thumb = p.attachment.image_url if p.attachment else None
+
+        items.append(
+            TopPostItem(
+                id=p.id,
+                title=p.title or p.content[:40] or "Untitled Post",
+                platform=platform,
+                published_url=pub_url,
+                total_engagements=total_eng,
+                engagement_rate=eng_rate,
+                thumbnail_url=thumb,
+            )
+        )
+
+    items.sort(key=lambda x: x.total_engagements, reverse=True)
+    return TopPostsResponse(posts=items[:limit])
+
+
+def get_individual_kpi_goal(db: Session, current_user: User, month_year: str | None = None) -> KpiGoalResponse:
+    if not month_year:
+        month_year = datetime.now(timezone.utc).strftime("%Y-%m")
+
+    ws_identifier = str(current_user.users_uuid)
+    goal_record = db.scalar(
+        select(WorkspaceKpiGoal).where(
+            WorkspaceKpiGoal.workspace_id == ws_identifier,
+            WorkspaceKpiGoal.month_year == month_year,
+        )
+    )
+    target = goal_record.target_interactions if goal_record else 500
+    current_interactions = get_individual_monthly_interactions(db, current_user.users_uuid, month_year)
+    progress_percentage = (
+        min(100, round((current_interactions / target) * 100)) if target > 0 else 0
+    )
+
+    return KpiGoalResponse(
+        workspace_id=ws_identifier,
+        month_year=month_year,
+        target_interactions=target,
+        current_interactions=current_interactions,
+        progress_percentage=progress_percentage,
+    )
+
+
+def update_individual_kpi_goal(db: Session, current_user: User, payload: KpiGoalRequest) -> KpiGoalResponse:
+    month_year = payload.month_year or datetime.now(timezone.utc).strftime("%Y-%m")
+    ws_identifier = str(current_user.users_uuid)
+    goal_record = db.scalar(
+        select(WorkspaceKpiGoal).where(
+            WorkspaceKpiGoal.workspace_id == ws_identifier,
+            WorkspaceKpiGoal.month_year == month_year,
+        )
+    )
+    if goal_record:
+        goal_record.target_interactions = payload.target_interactions
+    else:
+        goal_record = WorkspaceKpiGoal(
+            workspace_id=ws_identifier,
+            month_year=month_year,
+            target_interactions=payload.target_interactions,
+        )
+        db.add(goal_record)
+
+    db.commit()
+    db.refresh(goal_record)
+
+    current_interactions = get_individual_monthly_interactions(db, current_user.users_uuid, month_year)
+    progress_percentage = (
+        min(100, round((current_interactions / goal_record.target_interactions) * 100))
+        if goal_record.target_interactions > 0
+        else 0
+    )
+
+    return KpiGoalResponse(
+        workspace_id=ws_identifier,
+        month_year=month_year,
+        target_interactions=goal_record.target_interactions,
+        current_interactions=current_interactions,
+        progress_percentage=progress_percentage,
+        message="KPI Goal updated successfully",
+    )
+
+
+async def generate_individual_ai_report(
+    db: Session, current_user: User, timeframe: str = "Monthly", period: str | None = None
+) -> GenerateReportResponse:
+    ov = get_individual_overview(db, current_user)
+    period_label = period or datetime.now(timezone.utc).strftime("%B %Y")
+
+    context = {
+        "workspace_id": f"individual_{current_user.username}",
+        "timeframe": timeframe,
+        "period": period_label,
+        "totals": {
+            "total_impressions": ov.facebook.total_attraction + ov.linkedin.total_attraction,
+            "total_engagements": ov.facebook.total_engagements + ov.linkedin.total_engagements,
+        },
+        "platforms": {
+            "facebook": {
+                "impressions": ov.facebook.total_attraction,
+                "engagements": ov.facebook.total_engagements,
+                "share_pct": ov.facebook.percentage,
+            },
+            "linkedin": {
+                "impressions": ov.linkedin.total_attraction,
+                "engagements": ov.linkedin.total_engagements,
+                "share_pct": ov.linkedin.percentage,
+            },
+        },
+    }
+
+    result = await ai_report_engine.generate_report(context)
+    return GenerateReportResponse(
+        timeframe=result.get("timeframe", timeframe),
+        title=result.get("title", f"[{timeframe} report for {period_label}]"),
+        summary=result.get("summary", ""),
+        structured_insights=result.get("structured_insights", {}),
+    )
+
+
+def save_individual_report(
+    db: Session, current_user: User, req: SaveReportRequest
+) -> ReportItemResponse:
+    today_str = datetime.now(timezone.utc).strftime("%b %d, %Y")
+    report = Report(
+        workspace_id=None,
+        created_by=current_user.users_uuid,
+        timeframe=req.timeframe,
+        title=req.title,
+        summary=req.summary,
+        report_data=req.report_data,
+        saved_date=today_str,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    return ReportItemResponse(
+        id=report.id,
+        name=report.title,
+        savedDate=report.saved_date,
+        data="Document",
+        timeframe=report.timeframe,
+        download_url=f"/api/v1/reports/individual/{report.id}/download",
+    )
+
+
+def list_individual_reports(
+    db: Session, current_user: User, start_date: str | None = None, end_date: str | None = None
+) -> ReportListResponse:
+    query = (
+        select(Report)
+        .where(
+            Report.created_by == current_user.users_uuid,
+            Report.workspace_id.is_(None),
+        )
+        .order_by(desc(Report.created_at))
+    )
+    reports = db.scalars(query).all()
+    items = [
+        ReportItemResponse(
+            id=r.id,
+            name=r.title,
+            savedDate=r.saved_date,
+            data="Document",
+            timeframe=r.timeframe,
+            download_url=f"/api/v1/reports/individual/{r.id}/download",
+        )
+        for r in reports
+    ]
+    return ReportListResponse(reports=items)
+
+
+def download_individual_report(
+    db: Session, current_user: User, report_id: uuid.UUID
+):
+    from fastapi import HTTPException, Response, status
+    import re
+
+    report = db.get(Report, report_id)
+    if not report or report.created_by != current_user.users_uuid:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+
+    content = (
+        f"# {report.title}\n\n"
+        f"**Saved Date:** {report.saved_date}\n"
+        f"**Timeframe:** {report.timeframe}\n"
+        f"**Author:** {current_user.username}\n\n"
+        f"---\n\n"
+        f"## Executive Summary & AI Insights\n\n"
+        f"{report.summary}\n"
+    )
+    safe_filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', report.title) or "Report"
+    return Response(
+        content=content,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}.md"'},
+    )
+
+
+

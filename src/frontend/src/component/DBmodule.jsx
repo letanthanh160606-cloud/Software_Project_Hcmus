@@ -34,7 +34,7 @@ ChartJS.register(
   Filler
 );
 
-export default function DBmodule({ user }) {
+export default function DBmodule({ user, onNavigateTab }) {
   const componentGap = '20px';
   const userName = user?.username;
   const workspaceId =
@@ -67,7 +67,8 @@ export default function DBmodule({ user }) {
 
   useEffect(() => {
     const fetchDashboardAnalytics = async () => {
-      if (!workspaceId) {
+      const isIndividual = user?.account_type === 'individual' || (!workspaceId && user?.role === 'individual');
+      if (!workspaceId && !isIndividual) {
         setDoughnutDataValues([0, 0]);
         setMonthlyGraphData([0, 0, 0, 0, 0, 0, 0]);
         setMonthlyIncrease(0);
@@ -75,12 +76,15 @@ export default function DBmodule({ user }) {
         setNetGainPct(0);
         return;
       }
+      const analyticsBase = isIndividual
+        ? 'http://localhost:8000/api/v1/analytics/individual'
+        : `http://localhost:8000/api/v1/analytics/${workspaceId}`;
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       try {
         // 1. Overview
-        const ovRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/overview`, { headers });
+        const ovRes = await fetch(`${analyticsBase}/overview`, { headers });
         if (ovRes.ok) {
           const ovData = await ovRes.json();
           const fbEng = ovData.facebook?.total_engagements || 0;
@@ -110,7 +114,7 @@ export default function DBmodule({ user }) {
         }
 
         // 2. Timeline (Weekly)
-        const tlRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=Weekly`, { headers });
+        const tlRes = await fetch(`${analyticsBase}/timeline?timeframe=Weekly`, { headers });
         if (tlRes.ok) {
           const tlData = await tlRes.json();
           setMonthlyGraphLabels(tlData.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
@@ -123,7 +127,7 @@ export default function DBmodule({ user }) {
         }
 
         // 3. Today stats
-        const tdRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/today`, { headers });
+        const tdRes = await fetch(`${analyticsBase}/today`, { headers });
         if (tdRes.ok) {
           const tdData = await tdRes.json();
           if (tdData.total_interactions_today > 0) {
@@ -132,7 +136,7 @@ export default function DBmodule({ user }) {
         }
 
         // 4. KPI Goal
-        const kpiRes = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/kpi`, { headers });
+        const kpiRes = await fetch(`${analyticsBase}/kpi`, { headers });
         if (kpiRes.ok) {
           const kpiData = await kpiRes.json();
           setKpiTarget(kpiData.target_interactions || 500);
@@ -146,7 +150,7 @@ export default function DBmodule({ user }) {
     };
 
     fetchDashboardAnalytics();
-  }, [workspaceId, token]);
+  }, [workspaceId, token, user]);
 
   const AddButton = ({ onClick }) => (
     <button
@@ -709,6 +713,30 @@ export default function DBmodule({ user }) {
                         />
                       </div>
 
+                      {/* View Full Stats Link */}
+                      <div style={{ marginBottom: '16px', textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowKPIPopup(false);
+                            if (onNavigateTab) onNavigateTab('Statistics');
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#FE7216',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontFamily: 'Satoshi',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          View Full Statistics &gt;
+                        </button>
+                      </div>
+
                       {/* Buttons */}
                       <div style={{
                         display: 'flex',
@@ -930,7 +958,7 @@ export default function DBmodule({ user }) {
               overflow: 'hidden'
             }}>
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <AssignedTasksTable user={user}/>
+                <AssignedTasksTable user={user} onNavigateTab={onNavigateTab}/>
               </div>
             </div>}
 
@@ -947,7 +975,7 @@ export default function DBmodule({ user }) {
               overflow: 'hidden'
             }}>
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <RecentlyApproveP user={user}/>
+                <RecentlyApproveP user={user} onNavigateTab={onNavigateTab}/>
               </div>
             </div>
         </div>
@@ -962,37 +990,39 @@ export default function DBmodule({ user }) {
             flexDirection: 'column',
             gap: componentGap
         }}>
+          {user?.account_type === 'business' && (
+            <div style={{
+              width: '100%',
+              height: '325px',
+              backgroundColor: 'rgba(255, 255, 255, 0.5)',
+              borderRadius: '15px',
+              padding: '15px',
+              boxSizing: 'border-box'
+            }}>
+              <ApprovalRequests user={user} onNavigateTab={onNavigateTab} />
+            </div>
+          )}
+
           <div style={{
             width: '100%',
-            height: '325px',
+            height: user?.account_type === 'business' ? '325px' : '478px',
             backgroundColor: 'rgba(255, 255, 255, 0.5)',
             borderRadius: '15px',
             padding: '15px',
             boxSizing: 'border-box'
           }}>
-            <ApprovalRequests user={user} />
+            <MyCalendar user={user} onNavigateTab={onNavigateTab} />
           </div>
 
           <div style={{
             width: '100%',
-            height: '325px',
+            height: user?.account_type === 'business' ? '325px' : '478px',
             backgroundColor: 'rgba(255, 255, 255, 0.5)',
             borderRadius: '15px',
             padding: '15px',
             boxSizing: 'border-box'
           }}>
-            <MyCalendar user={user} />
-          </div>
-
-          <div style={{
-            width: '100%',
-            height: '325px',
-            backgroundColor: 'rgba(255, 255, 255, 0.5)',
-            borderRadius: '15px',
-            padding: '15px',
-            boxSizing: 'border-box'
-          }}>
-            <ChannelList user={user} />
+            <ChannelList user={user} onNavigateTab={onNavigateTab} />
           </div>
         </div>
       </div>

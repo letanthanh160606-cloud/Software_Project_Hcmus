@@ -158,10 +158,10 @@ class Report(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()")
     )
-    workspace_id: Mapped[str] = mapped_column(
+    workspace_id: Mapped[str | None] = mapped_column(
         String(16),
         ForeignKey("workspaces.workspaces.workspace_uuid", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -222,7 +222,7 @@ class WorkspaceKpiGoal(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()")
     )
-    workspace_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False)
     month_year: Mapped[str] = mapped_column(String(7), nullable=False)  # e.g. '2026-08'
     target_interactions: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
     created_at: Mapped[datetime] = mapped_column(

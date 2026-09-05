@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import fbicon from '../../assets/fblg.png';
+import linkedinicon from '../../assets/linkedinlg.png';
 
-export default function RecentlyApproveP({ user }) {
+export default function RecentlyApproveP({ user, onNavigateTab }) {
   const [approvedPosts, setApprovedPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -21,15 +22,19 @@ export default function RecentlyApproveP({ user }) {
         if (res.ok) {
           const data = await res.json();
           const postsList = Array.isArray(data) ? data : [];
-          setApprovedPosts(postsList.map(p => ({
-            id: p.id,
-            name: p.title || 'Untitled Post',
-            PublisedDate: p.published_at
-              ? new Date(p.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : (p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'),
-            attachment: 'Content Document',
-            Flatform: fbicon,
-          })));
+          setApprovedPosts(postsList.map(p => {
+            const rawPlats = Array.isArray(p.target_platforms) && p.target_platforms.length > 0 ? p.target_platforms : ['facebook'];
+            const platforms = rawPlats.map(x => typeof x === 'string' ? x.toLowerCase().trim() : '');
+            return {
+              id: p.id,
+              name: p.title || 'Untitled Post',
+              PublisedDate: p.published_at
+                ? new Date(p.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : (p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'),
+              attachment: 'Content Document',
+              platforms: platforms,
+            };
+          }));
         }
       } catch (err) {
         console.error('Error fetching recent posts:', err);
@@ -55,7 +60,12 @@ export default function RecentlyApproveP({ user }) {
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>{user?.role === 'manager' ? 'Recently Approved' : 'Recent'} Posts</h2>
-        <span style={{ fontSize: '13px', color: '#554E43', cursor: 'pointer', fontWeight: '500' }}>See all &gt;</span>
+        <span 
+          onClick={() => onNavigateTab && onNavigateTab('Post Management')}
+          style={{ fontSize: '13px', color: '#554E43', cursor: 'pointer', fontWeight: '500' }}
+        >
+          See all &gt;
+        </span>
       </div>
 
       {/* Table Header (Static) */}
@@ -92,13 +102,24 @@ export default function RecentlyApproveP({ user }) {
                 {/* Attachment */}
                 <td style={{ width: '18%', padding: '8px 5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{post.attachment}</td>
 
-                {/* Assignee Avatar */}
+                {/* Platform Icons */}
                 <td style={{ width: '12%', padding: '8px 5px', textAlign: 'right' }}>
-                  <img
-                    src={post.Flatform}
-                    alt="Flatform"
-                    style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                    {post.platforms?.includes('linkedin') && (
+                      <img
+                        src={linkedinicon}
+                        alt="LinkedIn"
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                      />
+                    )}
+                    {post.platforms?.includes('facebook') && (
+                      <img
+                        src={fbicon}
+                        alt="Facebook"
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                      />
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

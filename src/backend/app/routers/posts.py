@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from app.schemas import (
     AIContentGenerateResponse,
     PostCreate,
     PostResponse,
+    PostUpdateRequest,
     PostMediaUploadResponse,
     SEOSuggestRequest,
     SEOSuggestResponse,
@@ -42,6 +44,15 @@ def create_post(
         user_ws = crud.get_workspace_for_user(db, current_user)
         if user_ws:
             ws_id = user_ws.workspace_uuid
+        elif current_user.account_type == "business":
+            from app.models import WorkspaceMember
+            pending_membership = db.scalar(
+                select(WorkspaceMember).where(
+                    WorkspaceMember.user_id == current_user.users_uuid,
+                )
+            )
+            if pending_membership:
+                ws_id = pending_membership.workspace_id
 
     is_manager = False
     if ws_id is not None:
@@ -50,22 +61,8 @@ def create_post(
             ws_id,
         )
 
-        if workspace is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workspace not found",
-            )
-
-        if not crud.user_can_access_workspace(
-            db,
-            user=current_user,
-            workspace_id=ws_id,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have access to this workspace",
-            )
-        is_manager = (workspace.manager_id == current_user.users_uuid)
+        if workspace is not None:
+            is_manager = (workspace.manager_id == current_user.users_uuid)
 
     # Cross-validation between target_platforms and target_account_ids
     if payload.target_account_ids and len(payload.target_account_ids) > 0:
@@ -84,8 +81,8 @@ def create_post(
 
     if is_manager:
         post_status = "draft" if payload.status == "draft" else "ready_for_distribution"
-    elif ws_id is not None:
-        # Member submitting to workspace
+    elif current_user.account_type == "business" or ws_id is not None:
+        # Business member submitting to workspace -> pending_review
         post_status = "draft" if payload.status == "draft" else "pending_review"
     else:
         # Individual account
@@ -299,3 +296,28 @@ async def seo_suggest(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"SEO analysis failed: {exc}",
         ) from exc
+
+
+@router.patch(
+    "/{post_id}",
+    response_model=PostResponse,
+    status_code=status.HTTP_200_OK,
+)
+def update_post_endpoint(
+    post_id: uuid.UUID,
+    payload: PostUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Post:
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    user_ws = crud.get_workspace_for_user(db, current_user)
+    is_manager = bool(user_ws and user_ws.manager_id == current_user.users_uuid)
+    if post.author_id != current_user.users_uuid and not is_manager:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this post")
+
+    updates = payload.model_dump(exclude_unset=True)
+    updated_post = crud.update_post(db, post, updates)
+    return updated_post

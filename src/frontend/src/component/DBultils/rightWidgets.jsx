@@ -39,9 +39,17 @@ const AddButton = ({ onClick }) => (
   </button>
 );
 
-// 1. Approval Requests Widget
-export function ApprovalRequests({ user }) {
+// 1. Approval Requests Widget (For Business: Manager / Member)
+export function ApprovalRequests({ user, onNavigateTab }) {
+  const isIndividual = user?.account_type === 'individual' || user?.role === 'individual';
+  if (isIndividual) return null;
+
   const [requests, setRequests] = useState([]);
+  const isMember = user?.role === 'member';
+
+  const widgetTitle = isMember ? 'Pending Approvals' : 'Approval Requests';
+  const actionLabel = 'View request';
+  const emptyMessage = isMember ? 'No posts pending approval.' : 'No pending approval requests.';
 
   useEffect(() => {
     const fetchPendingPosts = async () => {
@@ -49,7 +57,7 @@ export function ApprovalRequests({ user }) {
         const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const workspaceId = user?.workspace_id || user?.workspace?.workspace_uuid || null;
         let url = 'http://localhost:8000/posts';
-        if (workspaceId) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
+        if (workspaceId && !isIndividual) url = `http://localhost:8000/workspaces/${workspaceId}/posts`;
 
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -57,21 +65,19 @@ export function ApprovalRequests({ user }) {
         const res = await fetch(url, { headers });
         if (res.ok) {
           const data = await res.json();
-          const pending = (Array.isArray(data) ? data : [])
-            .filter(p => p.status === 'pending_review' || p.status === 'draft')
-            .slice(0, 5)
-            .map(p => ({
-              id: p.id,
-              title: p.title || 'Untitled Post',
-            }));
-          setRequests(pending);
+          const list = Array.isArray(data) ? data : [];
+          const filtered = list.filter(p => p.status === 'pending_review');
+          setRequests(filtered.slice(0, 5).map(p => ({
+            id: p.id,
+            title: p.title || 'Untitled Post',
+          })));
         }
       } catch (err) {
         console.error('Error fetching pending posts:', err);
       }
     };
     fetchPendingPosts();
-  }, [user]);
+  }, [user, isIndividual, isMember]);
 
   return (
     <div style={{
@@ -88,22 +94,11 @@ export function ApprovalRequests({ user }) {
         marginBottom: '15px'
       }}>
         <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>
-          Approval Requests
+          {widgetTitle}
         </h2>
-        <span
-          style={{
-            fontSize: '13px',
-            color: '#554E43',
-            cursor: 'pointer',
-            fontWeight: '500',
-            opacity: 0.8,
-            fontFamily: 'Satoshi'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-          onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
-        >
-          See all &gt;
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AddButton onClick={() => onNavigateTab && onNavigateTab(isIndividual ? 'Content' : 'Post Management')} />
+        </div>
       </div>
 
       {/* Requests List */}
@@ -115,46 +110,63 @@ export function ApprovalRequests({ user }) {
           paddingRight: '4px',
           minHeight: '0px'
       }}>
-        {requests.map((req, idx) => (
-          <div
-            key={req.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: 'rgba(254, 254, 254, 0.5)',
-              height: '25px',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              marginBottom: '8px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-            }}
-          >
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#554E43' }}>
-              {req.title}
-            </span>
-            <span
+        {requests.length > 0 ? (
+          requests.map((req) => (
+            <div
+              key={req.id}
               style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: 'rgba(254, 254, 254, 0.5)',
+                height: '25px',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                marginBottom: '8px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+              }}
+            >
+              <span style={{
                 fontSize: '13px',
                 fontWeight: '600',
-                color: '#FE7216',
-                cursor: 'pointer',
-                transition: 'opacity 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-            >
-              View request
-            </span>
+                color: '#554E43',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '180px'
+              }}>
+                {req.title}
+              </span>
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#FE7216',
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                  whiteSpace: 'nowrap',
+                  marginLeft: '8px'
+                }}
+                onClick={() => onNavigateTab && onNavigateTab(isIndividual ? 'Content' : 'Post Management')}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              >
+                {actionLabel}
+              </span>
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: '30px 0', textAlign: 'center', color: '#7E7A72', fontSize: '12px', fontWeight: '500' }}>
+            {emptyMessage}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 }
 
 // 2. My Calendar Widget
-export function MyCalendar({ user }) {
+export function MyCalendar({ user, onNavigateTab }) {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
@@ -203,7 +215,7 @@ export function MyCalendar({ user }) {
         <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>
           My Calendar
         </h2>
-        <AddButton />
+        <AddButton onClick={() => onNavigateTab && onNavigateTab('Calendar')} />
       </div>
 
       {/* Events Scroll Container */}
@@ -274,7 +286,7 @@ export function MyCalendar({ user }) {
 }
 
 // 3. Channel Widget
-export function ChannelList({ user }) {
+export function ChannelList({ user, onNavigateTab }) {
   const [channels, setChannels] = useState([]);
 
   useEffect(() => {
@@ -323,7 +335,7 @@ export function ChannelList({ user }) {
         <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#554E43' }}>
           Channel
         </h2>
-        <AddButton />
+        <AddButton onClick={() => onNavigateTab && onNavigateTab('Distribution')} />
       </div>
 
       {/* Channels Scroll Container */}
@@ -353,7 +365,7 @@ export function ChannelList({ user }) {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
                 <img
-                  src={fbicon}
+                  src={chan.platform?.toLowerCase() === 'linkedin' ? linkedinicon : fbicon}
                   alt={chan.platform}
                   style={{ width: '12px', height: '12px', objectFit: 'contain' }}
                 />

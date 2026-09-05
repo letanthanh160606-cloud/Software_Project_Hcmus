@@ -112,6 +112,14 @@ export default function Stamodule({ user }) {
     user?.workspace?.workspace_uuid ||
     (typeof user?.workspace === 'string' ? user.workspace : null);
 
+  const isIndividual = user?.account_type === 'individual' || (!workspaceId && user?.role === 'individual');
+  const analyticsBase = isIndividual
+    ? 'http://localhost:8000/api/v1/analytics/individual'
+    : `http://localhost:8000/api/v1/analytics/${workspaceId}`;
+  const reportsBase = isIndividual
+    ? 'http://localhost:8000/api/v1/reports/individual'
+    : `http://localhost:8000/api/v1/reports/${workspaceId}`;
+
   const [graphTimeframe, setGraphTimeframe] = useState('Weekly');
   const [timelineSeries, setTimelineSeries] = useState(null);
   const [timelineLabels, setTimelineLabels] = useState(null);
@@ -154,7 +162,7 @@ export default function Stamodule({ user }) {
   // 1. Fetch Timeline Analytics
   const fetchTimeline = async (tf) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/timeline?timeframe=${tf}`, {
+      const res = await fetch(`${analyticsBase}/timeline?timeframe=${tf}`, {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -170,7 +178,7 @@ export default function Stamodule({ user }) {
   // 2. Fetch Overview Analytics
   const fetchOverview = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/overview`, {
+      const res = await fetch(`${analyticsBase}/overview`, {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -190,7 +198,7 @@ export default function Stamodule({ user }) {
   // 3. Fetch Today Interactions
   const fetchTodayStats = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/today`, {
+      const res = await fetch(`${analyticsBase}/today`, {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -208,7 +216,7 @@ export default function Stamodule({ user }) {
   // 4. Fetch Top Posts
   const fetchTopPosts = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/analytics/${workspaceId}/top-posts?limit=7`, {
+      const res = await fetch(`${analyticsBase}/top-posts?limit=7`, {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -223,8 +231,7 @@ export default function Stamodule({ user }) {
   // 5. Fetch Reports History
   const fetchReports = async () => {
     try {
-      let url = `http://localhost:8000/api/v1/reports/${workspaceId}`;
-      const res = await fetch(url, { headers: getAuthHeaders() });
+      const res = await fetch(reportsBase, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setReportHistoryList(data.reports || []);
@@ -236,13 +243,13 @@ export default function Stamodule({ user }) {
 
   // 6. Generate AI Report manually on demand
   const handleCreateReport = async (tf = reportTimeframe) => {
-    if (!workspaceId) {
+    if (!workspaceId && !isIndividual) {
       toast.error('Workspace ID is not available.');
       return;
     }
     setIsGeneratingReport(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/generate`, {
+      const res = await fetch(`${reportsBase}/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ timeframe: tf }),
@@ -265,7 +272,7 @@ export default function Stamodule({ user }) {
   };
 
   useEffect(() => {
-    if (!workspaceId) {
+    if (!workspaceId && !isIndividual) {
       setTimelineSeries(null);
       setOverviewStats({ fb_pct: 0, fb_attraction: 0, li_pct: 0, li_attraction: 0 });
       setTodayData({ total_interactions: 0, user_contribution: 0 });
@@ -278,12 +285,12 @@ export default function Stamodule({ user }) {
     fetchTodayStats();
     fetchTopPosts();
     fetchReports();
-  }, [workspaceId]);
+  }, [workspaceId, isIndividual]);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    if (!workspaceId && !isIndividual) return;
     fetchTimeline(graphTimeframe);
-  }, [graphTimeframe, workspaceId]);
+  }, [graphTimeframe, workspaceId, isIndividual]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -356,7 +363,7 @@ export default function Stamodule({ user }) {
     const newTitle = reportTitle || `[${reportTimeframe} report for ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}]`;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}`, {
+      const res = await fetch(reportsBase, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -385,7 +392,10 @@ export default function Stamodule({ user }) {
         toast.error('Invalid report ID');
         return;
       }
-      const res = await fetch(`http://localhost:8000/api/v1/reports/${workspaceId}/${reportId}/download`, {
+      const downloadUrl = item.download_url
+        ? (item.download_url.startsWith('http') ? item.download_url : `http://localhost:8000${item.download_url}`)
+        : `${reportsBase}/${reportId}/download`;
+      const res = await fetch(downloadUrl, {
         headers: getAuthHeaders(),
       });
       if (!res.ok) {

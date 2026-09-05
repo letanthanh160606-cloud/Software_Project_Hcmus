@@ -423,7 +423,7 @@ export default function Contmodule({ onNavigateTab }) {
           knowledge_base_context: kbContext,
           existing_title: existingTitleText,
           existing_content: existingContentText,
-          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['linkedin'],
+          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : (platforms.length > 0 ? [platforms[0].name.toLowerCase()] : []),
         }),
       });
 
@@ -538,7 +538,7 @@ export default function Contmodule({ onNavigateTab }) {
         body: JSON.stringify({
           title: title.trim() || null,
           content: body.trim() || null,
-          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['linkedin', 'facebook'],
+          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : (platforms.length > 0 ? platforms.map(p => p.name.toLowerCase()) : []),
         }),
       });
       const data = await res.json();
@@ -629,7 +629,7 @@ export default function Contmodule({ onNavigateTab }) {
           title: title.trim() || 'Untitled Post',
           content: body.trim(),
           status: statusType,
-          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : ['facebook'],
+          target_platforms: selectedPlatformNames.length > 0 ? selectedPlatformNames : (platforms.length > 0 ? [platforms[0].name.toLowerCase()] : []),
           seo_keywords: seoResult ? seoResult.seo_keywords : [],
           seo_hashtags: seoResult ? seoResult.hashtags : [],
           image_url: finalImageUrl || null,

@@ -823,7 +823,7 @@ export default function MainDashboard() {
       }}>
         <div style={{ fontFamily: 'Satoshi, sans-serif', fontWeight: '500', color: '#1e1e1e', width: '100%', padding: '0px' }}>
           {activeTab === 'Dashboard' ? (
-            <DBmodule user={user} />
+            <DBmodule user={user} onNavigateTab={setActiveTab} />
           ) : activeTab === 'Content' ? (
             <Contmodule onNavigateTab={setActiveTab} />
           ) : activeTab === 'Statistics' ? (

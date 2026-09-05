@@ -142,7 +142,7 @@ class KpiGoalRequest(BaseModel):
 
 
 class KpiGoalResponse(BaseModel):
-    workspace_id: str
+    workspace_id: str | None = None
     month_year: str
     target_interactions: int
     current_interactions: int

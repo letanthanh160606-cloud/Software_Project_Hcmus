@@ -929,22 +929,170 @@ Tài liệu này ghi nhận chi tiết tất cả các vị trí điều chỉnh
 * **Lý do thay đổi**:
   * Đáp ứng đúng quy tắc nghiệp vụ người dùng yêu cầu: Member không được xóa Task, chỉ có quyền bấm Done khi xong việc, và công việc được giao mặc định hiển thị trạng thái Doing.
 
----
-
-## 📌 61. File: `WSmodule.jsx`, `AssignedTaskList.jsx` — Hiển thị Status & Nút bấm Done tại Team Workspace (My Tasks) và Modal See All
+## 📌 62. File: `PMmodule.jsx` & Backend `crud.py`, `routers/posts.py` — Khắc phục hiển thị Tab và Trạng thái Pending cho Member
 
 * **Vị trí**:
-  * `src/frontend/src/component/WSmodule.jsx` (bảng My Tasks / Tasks Assigned to Others và Modal See all).
-  * `src/frontend/src/component/DBultils/AssignedTaskList.jsx` (bảng Assigned Tasks trực tiếp trên Dashboard).
+  * `src/frontend/src/component/PMmodule.jsx`: Dòng 648 – 656 (`isIndividual`, `filters`, `rawPosts`).
+  * `src/backend/app/routers/posts.py`: Dòng 40 – 95 (`create_post`, `ws_id` resolution).
+  * `src/backend/app/crud.py`: Dòng 170 – 195 (`list_posts_for_role`, `list_posts_for_user`).
 * **Thay đổi**:
-  * **Team Workspace (`WSmodule.jsx`)**:
-    * Bổ sung cột **Status** (`Doing` badge xanh dương / `Done` badge xanh lá) cho bảng Task ở cả màn hình Member và Manager.
-    * Bổ sung cột **Action** cho Member với nút bấm trực tiếp **`✓ Done`** (màu xanh lá) giúp chuyển trạng thái công việc sang `Done` ngay lập tức.
-    * Kích hoạt nút **`See all >`** để mở Modal xem toàn bộ công việc với đầy đủ thanh tìm kiếm, trạng thái Doing/Done, tệp đính kèm và nút thao tác (Manager: `🗑 Delete`, Member: `✓ Done`).
-  * **Dashboard (`AssignedTaskList.jsx`)**:
-    * Cho phép Member thao tác bấm nút **`✓ Done`** trực tiếp tại hàng công việc trên bảng Dashboard (không nhất thiết phải mở Modal).
+  * **Frontend (`PMmodule.jsx`)**:
+    * Sửa điều kiện xác định `isIndividual`: `const isIndividual = accountType === 'individual' && role !== 'manager' && role !== 'member';`
+    * Đảm bảo mọi tài khoản thuộc loại **Business** (đặc biệt là Member) luôn hiển thị đầy đủ 6 tab: `All Posts`, `Drafts`, `Pending`, `Rejected`, `Published`, `Failed`, và không bị lọc bỏ bài viết `Pending`/`Rejected`.
+  * **Backend**:
+    * Trong `create_post`: Tự động tìm `workspace_id` từ `workspace_members` khi Member nộp bài, và luôn gán trạng thái `pending_review` cho tài khoản Business Member.
+    * Trong `list_posts_for_role` & `list_posts_for_user`: Tinh chỉnh logic query CSDL với `or_` chuẩn để luôn lấy đầy đủ tất cả bài viết do Member tự tạo (kể cả đang ở `pending_review`, `draft`, `rejected`) cùng các bài viết `published` của Workspace.
 * **Lý do thay đổi**:
-  * Đáp ứng phản hồi của người dùng: Member cần thấy rõ trạng thái `Doing` và có nút bấm trực tiếp `✓ Done` ngay trong mục My Tasks ở tab Team Workspace lẫn Dashboard, đồng thời nút `See all >` ở Team Workspace hoạt động đồng bộ với Dashboard.
+  * Đáp ứng yêu cầu người dùng: Member khi tạo bài viết và gửi duyệt sẽ thấy bài viết xuất hiện ngay lập tức tại tab **`Pending`** trong Post Management.
+
+---
+
+## 📌 63. Files: `RecentlyApprovedP.jsx`, `rightWidgets.jsx`, `PMmodule.jsx` — Khắc phục hiển thị biểu tượng mạng xã hội (Facebook / LinkedIn) trên Dashboard và Post Management
+
+* **Vị trí**:
+  * `src/frontend/src/component/DBultils/RecentlyApprovedP.jsx`: Dòng 1 – 35, 95 – 115.
+  * `src/frontend/src/component/DBultils/rightWidgets.jsx`: Dòng 350 – 365.
+  * `src/frontend/src/component/PMmodule.jsx`: Dòng 100 – 125 (`PlatformIcons`).
+* **Thay đổi**:
+  * **`RecentlyApprovedP.jsx`**:
+    * Import `linkedinicon` từ `../../assets/linkedinlg.png`.
+    * Thay thế đoạn mã hardcode `Flatform: fbicon` bằng việc ánh xạ động `platforms` dựa trên `p.target_platforms`.
+    * Cột **Flatform** hiện hiển thị linh hoạt cả biểu tượng LinkedIn và Facebook theo đúng nền tảng đích của bài viết (hỗ trợ hiển thị 1 icon hoặc cả 2 icon khi bài viết nhắm đến cả 2 nền tảng).
+  * **`rightWidgets.jsx`**:
+    * Trong danh sách kênh (`ChannelList`), sửa lỗi hardcode `src={fbicon}` thành `src={chan.platform?.toLowerCase() === 'linkedin' ? linkedinicon : fbicon}`, giúp kênh LinkedIn hiển thị đúng logo LinkedIn thay vì logo Facebook.
+  * **`PMmodule.jsx`**:
+    * Trong component `PlatformIcons`, chuẩn hóa mảng `platforms` sang chữ thường (`.toLowerCase().trim()`) trước khi kiểm tra, đảm bảo hiển thị đúng icon kể cả khi dữ liệu trả về có viết hoa (`LinkedIn`, `Facebook`).
+* **Lý do thay đổi**:
+  * Sửa lỗi logic hiển thị hình ảnh mạng xã hội trên Dashboard theo yêu cầu kiểm tra của người dùng, đảm bảo giữ nguyên 100% bố cục, kích thước và phong cách thiết kế hiện tại.
+
+---
+
+## 📌 64. Files: `MainDashboard.jsx`, `DBmodule.jsx`, `rightWidgets.jsx`, `RecentlyApprovedP.jsx` — Bổ sung chuyển hướng các nút dấu cộng Dashboard và điều chỉnh widget Approval Requests cho role Individual
+
+* **Vị trí**:
+  * `src/frontend/src/page/MainDashboard.jsx`: Dòng 825 – 830.
+  * `src/frontend/src/component/DBmodule.jsx`: Dòng 35 – 45, dòng 705 – 735, dòng 925 – 995.
+  * `src/frontend/src/component/DBultils/rightWidgets.jsx`: Dòng 42 – 165 (`ApprovalRequests`), dòng 195 – 215 (`MyCalendar`), dòng 315 – 335 (`ChannelList`).
+  * `src/frontend/src/component/DBultils/RecentlyApprovedP.jsx`: Dòng 5 – 25, dòng 60 – 70.
+* **Thay đổi**:
+  * **Chuyển hướng cho các nút dấu cộng (`AddButton`)**:
+    * Trong `MyCalendar`: Nút `+` (`AddButton`) được gán `onClick={() => onNavigateTab('Calendar')}`, giúp chuyển hướng ngay lập tức sang trang **Calendar** khi người dùng click ở cả 3 role (Individual, Member, Manager).
+    * Trong `ChannelList`: Nút `+` (`AddButton`) được gán `onClick={() => onNavigateTab('Distribution')}`, giúp chuyển hướng người dùng sang trang **Distribution** để kết nối và quản lý các kênh mạng xã hội.
+    * Trong widget đầu tiên (Bản nháp / Phê duyệt): Thêm nút `+` (`AddButton`) ở phần tiêu đề, chuyển hướng sang trang **Content** để tạo bài viết mới.
+    * Trong popup điều chỉnh KPI Goal (`DBmodule.jsx`): Bổ sung liên kết "View Full Statistics >" chuyển hướng nhanh đến trang **Statistics**.
+    * Nút "See all >" trên các widget `Recent Posts`, `Recent Drafts`, `Approval Requests` được kết nối chuyển hướng đến trang **Post Management**.
+  * **Điều chỉnh widget "Approval Requests" phù hợp cho role Individual**:
+    * Đối với role **Individual**: Không có quy trình phê duyệt nhóm, widget được đổi tên thành **"Recent Drafts"** (Bản nháp gần đây), nút thao tác đổi thành **"Edit"** (chuyển hướng sang Post Management/Content), chỉ lọc các bài viết trạng thái `draft` cá nhân và hiển thị trạng thái rỗng "No drafts yet." khi chưa có bản nháp.
+    * Đối với role **Member**: Tiêu đề hiển thị là **"Pending Approvals"**, chỉ lọc các bài viết `pending_review` (loại bỏ việc lọc nhầm `draft`).
+    * Đối với role **Manager**: Tiêu đề giữ nguyên **"Approval Requests"**, chỉ lọc các bài viết `pending_review` của các thành viên gửi lên cần duyệt (loại bỏ việc lọc nhầm `draft`).
+* **Lý do thay đổi**:
+  * Đáp ứng đúng yêu cầu của người dùng: bổ sung tính năng chuyển hướng khi click các nút dấu cộng trên Dashboard cho cả 3 role (Individual, Member, Manager); đồng thời khắc phục điểm bất hợp lý khi tài khoản Individual hiển thị widget "Approval Requests" và gán nhầm bản nháp thành yêu cầu phê duyệt.
+  * Giữ nguyên 100% bố cục, hình ảnh, kích thước và màu sắc thiết kế giao diện gốc.
+
+---
+
+## 📌 65. Files: `DBmodule.jsx`, `rightWidgets.jsx` — Ẩn hoàn toàn thẻ Recent Drafts / Approval Requests đối với role Individual
+
+* **Vị trí**:
+  * `src/frontend/src/component/DBmodule.jsx`: Dòng 985 – 1015 (`Right Canvas`).
+  * `src/frontend/src/component/DBultils/rightWidgets.jsx`: Dòng 42 – 55 (`ApprovalRequests`).
+* **Thay đổi**:
+  * **Ẩn thẻ đầu tiên cho role Individual**:
+    * Trong `DBmodule.jsx`, đặt điều kiện `{user?.account_type === 'business' && <ApprovalRequests ... />}` để widget `ApprovalRequests` (hoặc `Recent Drafts`) chỉ xuất hiện khi tài khoản thuộc loại `business` (Manager / Member).
+    * Đối với role `Individual`, thẻ này bị loại bỏ hoàn toàn khỏi cột bên phải.
+  * **Cân đối lại kích thước cột bên phải**:
+    * Đối với `Individual`, 2 widget còn lại là **My Calendar** và **Channel** được nâng chiều cao từ `325px` lên `478px` mỗi thẻ.
+    * Tổng chiều cao 2 thẻ cộng khoảng cách (`478px + 20px + 478px = 976px`) khớp hoàn hảo (1-1) với tổng chiều cao cột bên trái (`Recent Posts` cao `477px`), tạo nên bố cục cân xứng, không bị hụt đáy và không có khoảng trống thừa.
+  * **Bảo vệ component trong `rightWidgets.jsx`**:
+    * Trong `ApprovalRequests`, kiểm tra sớm `if (isIndividual) return null;` để đảm bảo tuyệt đối không render gì cho role cá nhân.
+* **Lý do thay đổi**:
+  * Thực hiện theo đúng yêu cầu của người dùng: loại bỏ hoàn toàn thẻ Recent Drafts cho role Individual.
+  * Giữ nguyên thẻ Approval Requests / Pending Approvals cho Manager và Member trong Team Workspace để duy trì quy trình kiểm duyệt bài viết.
+  * Đảm bảo trải nghiệm Dashboard của Individual tinh gọn, chuyên nghiệp và sạch sẽ 100%.
+
+---
+
+## 📌 66. Files: `Stamodule.jsx`, `DBmodule.jsx`, Backend `router.py`, `service.py`, `models.py`, `schemas.py` — Thống kê (Statistics) & Báo cáo AI riêng cho Role Individual
+
+* **Vị trí**:
+  * **Frontend**:
+    * `src/frontend/src/component/Stamodule.jsx`: Dòng 110 – 300, 360 – 410.
+    * `src/frontend/src/component/DBmodule.jsx`: Dòng 68 – 150.
+  * **Backend**:
+    * `src/backend/app/analytics/router.py`: Dòng 25 – 155.
+    * `src/backend/app/analytics/service.py`: Dòng 780 – 1300.
+    * `src/backend/app/analytics/models.py`: Dòng 160 – 225.
+    * `src/backend/app/analytics/schemas.py`: Dòng 140 – 152.
+* **Thay đổi**:
+  * **Backend**:
+    * Cung cấp các API chuyên biệt dành riêng cho cá nhân tại `/api/v1/analytics/individual/...` và `/api/v1/reports/individual/...`:
+      * `GET /analytics/individual/timeline`: Biểu đồ tương tác thời gian (Weekly / Monthly / Yearly) cho Facebook và LinkedIn.
+      * `GET /analytics/individual/overview`: Tỷ lệ phần trăm và tổng lượt thu hút (impressions), tổng tương tác của từng nền tảng, mức tăng trưởng tháng (Month-over-Month gain).
+      * `GET /analytics/individual/today`: Số lượt tương tác ghi nhận trong ngày của tài khoản cá nhân.
+      * `GET /analytics/individual/top-posts`: Danh sách bài viết cá nhân có tương tác cao nhất (Highest-engaging posts) kèm URL bài đăng thực tế và thumbnail.
+      * `GET & PUT /analytics/individual/kpi`: Theo dõi và cập nhật mục tiêu KPI tương tác cá nhân theo từng tháng.
+      * `POST /reports/individual/generate`: Tự động khởi tạo báo cáo phân tích chiến lược định kỳ bằng Google Gemini AI Engine dựa trên dữ liệu thực tế của cá nhân.
+      * `POST & GET /reports/individual`: Lưu trữ và liệt kê lịch sử báo cáo cá nhân.
+      * `GET /reports/individual/{id}/download`: Tải file báo cáo phân tích Markdown về máy tính.
+    * Cập nhật `Report.workspace_id` thành nullable và nới rộng `WorkspaceKpiGoal.workspace_id` thành `String(64)` để lưu trữ trực tiếp UUID cá nhân.
+  * **Frontend**:
+    * **`Stamodule.jsx`**:
+      * Nhận diện vai trò `isIndividual` (`user?.account_type === 'individual' || (!workspaceId && user?.role === 'individual')`).
+      * Tự động chuyển đổi endpoint cơ sở sang `analyticsBase` và `reportsBase` (`/analytics/individual` và `/reports/individual`).
+      * Loại bỏ hoàn toàn thông báo lỗi chặn `Workspace ID is not available.` khi tài khoản cá nhân truy cập tab Statistics.
+      * Tự động nạp dữ liệu timeline, overview, today interactions, top posts và lịch sử báo cáo khi mở tab Statistics.
+      * Kết nối đầy đủ luồng tạo báo cáo AI bằng nút **+ Create Report**, lưu trữ vào bảng **Report History** và tải xuống tệp tin.
+    * **`DBmodule.jsx`**:
+      * Tích hợp gọi API `/analytics/individual/...` cho các widget trang chủ Dashboard của Individual (biểu đồ tròn Doughnut phân bổ tương tác, biểu đồ đường tuần This Week, số tương tác hôm nay, và thanh tiến độ KPI).
+  * **Bảo tồn giao diện**:
+    * Giữ nguyên 100% cấu trúc, bố cục, màu sắc, font chữ Satoshi, animations và các component biểu đồ chuẩn của hệ thống, không gây ảnh hưởng hay xáo trộn giao diện của Manager / Member.
+* **Lý do thay đổi**:
+  * Đáp ứng đúng yêu cầu của người dùng: "Tôi muốn cả role Individual cũng có Statictis riêng của chính nó".
+  * Giúp người dùng cá nhân (Content Creator, Freelancer) nắm bắt toàn diện hiệu quả phân phối nội dung mạng xã hội của riêng mình một cách trực quan và chuyên nghiệp.
+
+---
+
+## 📌 67. File: `src/frontend/src/component/DBultils/rightWidgets.jsx` — Xóa nhãn "See all >" tại thẻ Approval Requests
+
+* **Vị trí**: Component `ApprovalRequests`, dòng 95 – 110.
+* **Thay đổi**:
+  * Loại bỏ thẻ `<span onClick={() => onNavigateTab('Post Management')}>See all &gt;</span>` khỏi header của thẻ `Approval Requests`.
+  * Giữ lại nút dấu cộng màu cam `AddButton` chuyển hướng trực tiếp tới tab Post Management.
+* **Lý do thay đổi**:
+  * Thực hiện chính xác theo yêu cầu trực tiếp của người dùng: *"Xóa giúp tôi cái "See all>" ở đây"*.
+  * Đồng bộ hóa phong cách tiêu đề giữa cả 3 thẻ tại cột bên phải (Approval Requests, My Calendar, Channel), đảm bảo bố cục gọn gàng, đồng nhất chỉ với tiêu đề và nút chức năng `+`.
+
+---
+
+## 📌 68. File: `PMmodule.jsx`, `Contmodule.jsx`, `posts.py`, `schemas.py` — Khắc phục hiển thị sai nền tảng Facebook khi Workspace chưa kết nối (Dynamic Targeted Platforms)
+
+* **Vị trí**:
+  * `src/frontend/src/component/PMmodule.jsx`: Dòng 297 – 327 (Khởi tạo state `connectedPlatforms`, `primaryPlatform` & scoping), dòng 385 – 400 (`fetchConnectedChannels`), dòng 485 – 535 (`fetchPosts` & `handlePublishToFacebook`), dòng 630 – 645 (Publish reload), dòng 705 – 720 (`handleOpenEditModal`), dòng 1730 – 1780 (Modal **Edit Post** - Targeted Platforms list), dòng 1850 – 1885 (Nút **Save Changes** & gọi API đồng bộ backend).
+  * `src/frontend/src/component/Contmodule.jsx`: Dòng 425 – 430 (`handleGenerateAI`), dòng 540 – 545 (`handleAnalyzeSeo`), dòng 630 – 635 (`handleSavePost`).
+  * `src/backend/app/schemas.py`: Dòng 260 – 268 (`PostUpdateRequest`).
+  * `src/backend/app/routers/posts.py`: Dòng 300 – 325 (Endpoint `PATCH /posts/{post_id}`).
+* **Thay đổi**:
+  * **Frontend (`PMmodule.jsx`)**:
+    * **Xóa bỏ các giá trị mặc định hardcode `['facebook']`**: State `connectedPlatforms` chuyển từ `['facebook']` sang `[]`; `primaryPlatform` chuyển sang `null`.
+    * **Đồng bộ chuẩn hóa kênh kết nối**: Hàm `fetchConnectedChannels` tự động lấy các nền tảng đã kết nối thực tế từ Backend và chuẩn hóa chữ thường.
+    * **Khử fallback cứng trong danh sách bài viết**: Khi mapping bài viết (`fetchPosts` và sau khi publish), nền tảng chỉ lấy từ `target_platforms` thực tế của bài viết hoặc fallback vào `connectedPlatforms` của Workspace, tuyệt đối không tự động gán `['facebook']`.
+    * **Giao diện Modal Edit Post động (Dynamic Targeted Platforms)**: Thay thế hoàn toàn mảng tĩnh `['facebook', 'linkedin'].map(...)` bằng danh sách nền tảng thực tế đã kết nối (`activePlatforms`). Nếu Workspace chỉ kết nối LinkedIn thì chỉ xuất hiện lựa chọn LinkedIn; không hiển thị Facebook nếu chưa kết nối Facebook. Nếu chưa kết nối nền tảng nào sẽ hiển thị thông báo hướng dẫn kết nối tại Distribution Channels.
+    * **Lọc nền tảng khi mở modal**: Hàm `handleOpenEditModal` tự động thanh lọc các nền tảng không thuộc danh sách đã kết nối để đảm bảo dữ liệu chuẩn xác.
+    * **Đồng bộ lưu bài viết xuống Backend**: Khi bấm **Save Changes** trong modal Edit Post, hệ thống gửi request `PATCH /posts/{id}` để cập nhật trực tiếp tiêu đề, nội dung và các `target_platforms` vào cơ sở dữ liệu.
+  * **Frontend (`Contmodule.jsx`)**:
+    * Xóa bỏ fallback mặc định `['facebook']` khi tạo bài viết mới hoặc phân tích AI/SEO nếu không có nền tảng nào được chọn, thay bằng việc lấy kênh kết nối khả dụng đầu tiên hoặc mảng rỗng `[]`.
+  * **Backend**:
+    * Bổ sung trường `target_platforms: list[str] | None = None` vào schema `PostUpdateRequest`.
+    * Xây dựng endpoint `PATCH /posts/{post_id}` có kiểm tra phân quyền tác giả/manager để hỗ trợ cập nhật bài viết và nền tảng đích.
+* **Lý do thay đổi**:
+  * Thực hiện chuẩn xác theo báo cáo lỗi của người dùng: *"Hiện tại đang bị lỗi ở khúc Post Management bởi vì Workspace chưa nhập Facebook mà xuất hiện platforms facebook"*.
+  * Đảm bảo tính nhất quán giữa trạng thái liên kết kênh xã hội thực tế của Workspace và các giao diện quản lý / chỉnh sửa bài viết trong hệ thống.
+
+
+
+
+
+
 
 
 

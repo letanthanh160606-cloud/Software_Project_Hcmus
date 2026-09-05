@@ -24,7 +24,130 @@ router = APIRouter(prefix="/api/v1", tags=["analytics-and-reports"])
 
 
 # ---------------------------------------------------------
-# ANALYTICS METRICS ENDPOINTS
+# INDIVIDUAL ANALYTICS & REPORTS ENDPOINTS
+# ---------------------------------------------------------
+
+@router.get("/analytics/individual/timeline", response_model=TimelineResponse)
+def get_individual_timeline_analytics(
+    timeframe: str = Query("Weekly", description="Weekly | Monthly | Yearly"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns time-series performance data for Facebook and LinkedIn for the authenticated individual user.
+    """
+    return service.get_individual_timeline(db, current_user, timeframe)
+
+
+@router.get("/analytics/individual/overview", response_model=OverviewResponse)
+def get_individual_overview_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns total audience attraction, percentage share, and total engagements for the authenticated individual user.
+    """
+    return service.get_individual_overview(db, current_user)
+
+
+@router.get("/analytics/individual/today", response_model=TodayStatsResponse)
+def get_individual_today_interactions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns total interactions recorded today for the authenticated individual user.
+    """
+    return service.get_individual_today_stats(db, current_user)
+
+
+@router.get("/analytics/individual/top-posts", response_model=TopPostsResponse)
+def get_individual_top_engaging_posts(
+    limit: int = Query(7, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns highest-engaging published posts created by the authenticated individual user.
+    """
+    return service.get_individual_top_posts(db, current_user, limit)
+
+
+@router.get("/analytics/individual/kpi", response_model=KpiGoalResponse)
+def get_individual_kpi_goal(
+    month_year: str | None = Query(None, description="Month-Year format YYYY-MM"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns monthly target interactions, current interactions, and progress percentage for the individual user.
+    """
+    return service.get_individual_kpi_goal(db, current_user, month_year)
+
+
+@router.put("/analytics/individual/kpi", response_model=KpiGoalResponse)
+def update_individual_kpi_goal(
+    payload: KpiGoalRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Sets or updates the monthly KPI target interactions for the authenticated individual user.
+    """
+    return service.update_individual_kpi_goal(db, current_user, payload)
+
+
+@router.post("/reports/individual/generate", response_model=GenerateReportResponse)
+async def generate_individual_statistical_report(
+    req: GenerateReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generates a structured executive statistical report using AI Report Engine for individual user.
+    """
+    return await service.generate_individual_ai_report(db, current_user, req.timeframe, req.period)
+
+
+@router.post("/reports/individual", response_model=ReportItemResponse, status_code=status.HTTP_201_CREATED)
+def save_individual_statistical_report(
+    req: SaveReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Saves an AI-generated or custom report into the individual user's report history.
+    """
+    return service.save_individual_report(db, current_user, req)
+
+
+@router.get("/reports/individual", response_model=ReportListResponse)
+def list_individual_saved_reports(
+    start_date: str | None = Query(None, description="YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lists saved reports for the authenticated individual user.
+    """
+    return service.list_individual_reports(db, current_user, start_date, end_date)
+
+
+@router.get("/reports/individual/{report_id}/download")
+def download_individual_report_document(
+    report_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Exports and streams the individual report document for download.
+    """
+    return service.download_individual_report(db, current_user, report_id)
+
+
+# ---------------------------------------------------------
+# ANALYTICS METRICS ENDPOINTS (WORKSPACE)
 # ---------------------------------------------------------
 
 @router.get("/analytics/{workspace_id}/timeline", response_model=TimelineResponse)

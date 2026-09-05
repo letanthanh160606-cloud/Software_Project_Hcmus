@@ -261,6 +261,7 @@ class PostUpdateRequest(BaseModel):
     title: str | None = None
     content: str | None = None
     reject_reason: str | None = None
+    target_platforms: list[str] | None = None
     status: Literal[
         "draft", "pending_review", "rejected", "ready_for_distribution", "published", "failed", "cancel",
     ] | None = None
@@ -342,7 +343,7 @@ class PromptTemplateResponse(BaseModel):
 class PromptTemplateCreateRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    owner_workspace_id: uuid.UUID | None = None
+    owner_workspace_id: str | None = None
     owner_user_id: uuid.UUID | None = None
     title: str
     content: str
@@ -365,7 +366,7 @@ class KnowledgeBaseResponse(BaseModel):
 class KnowledgeBaseCreateRequest(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    owner_workspace_id: uuid.UUID | None = None
+    owner_workspace_id: str | None = None
     owner_user_id: uuid.UUID | None = None
     title: str
     content: str | None = None

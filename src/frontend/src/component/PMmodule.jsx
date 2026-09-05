@@ -100,9 +100,12 @@ function StatusBadge({ status }) {
 }
 
 function PlatformIcons({ platforms }) {
+  const norm = Array.isArray(platforms)
+    ? platforms.map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''))
+    : [];
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      {platforms.includes('linkedin') && (
+      {norm.includes('linkedin') && (
         <img
           src={linkedin}
           alt="LinkedIn"
@@ -113,7 +116,7 @@ function PlatformIcons({ platforms }) {
           }}
         />
       )}
-      {platforms.includes('facebook') && (
+      {norm.includes('facebook') && (
         <img
           src={facebook}
           alt="Facebook"
@@ -291,8 +294,8 @@ export default function PMmodule({ user }) {
   const [sortBy, setSortBy] = useState('date-desc');
   const [realPosts, setRealPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectedPlatforms, setConnectedPlatforms] = useState(['facebook']);
-  const [primaryPlatform, setPrimaryPlatform] = useState('facebook');
+  const [connectedPlatforms, setConnectedPlatforms] = useState([]);
+  const [primaryPlatform, setPrimaryPlatform] = useState(null);
   const [connectedChannelsList, setConnectedChannelsList] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [selectedAccountIds, setSelectedAccountIds] = useState([]);
@@ -311,7 +314,11 @@ export default function PMmodule({ user }) {
       setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
       return;
     }
-    const postPlatforms = (selectedPost.platforms || ['facebook']).map(p => p.toLowerCase().trim());
+    const postPlatforms = (
+      (Array.isArray(selectedPost.platforms) && selectedPost.platforms.length > 0)
+        ? selectedPost.platforms
+        : connectedPlatforms
+    ).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
     const scoped = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
     if (selectedPost.target_account_ids && Array.isArray(selectedPost.target_account_ids) && selectedPost.target_account_ids.length > 0) {
       setSelectedAccountIds(selectedPost.target_account_ids);
@@ -320,7 +327,7 @@ export default function PMmodule({ user }) {
       setSelectedAccountIds(scoped.map(c => c.id));
       setTargetAccountsMode('ALL_SELECTED_PLATFORMS');
     }
-  }, [selectedPost, connectedChannelsList]);
+  }, [selectedPost, connectedChannelsList, connectedPlatforms]);
 
   useEffect(() => {
     const fetchPublishedUrls = async () => {
@@ -379,11 +386,14 @@ export default function PMmodule({ user }) {
           const data = await res.json();
           const channels = data.channels || [];
           setConnectedChannelsList(channels);
+          const pList = [...new Set(channels.map(c => (c.platform || '').toLowerCase().trim()).filter(Boolean))];
+          setConnectedPlatforms(pList);
           if (channels.length > 0) {
-            const pList = channels.map(c => c.platform);
-            setConnectedPlatforms(pList);
             setPrimaryPlatform(pList[0]);
             setSelectedChannelId(channels.length > 1 ? 'all' : channels[0].id);
+          } else {
+            setPrimaryPlatform(null);
+            setSelectedChannelId(null);
           }
         }
       } catch (err) {
@@ -480,8 +490,8 @@ export default function PMmodule({ user }) {
               thumbnail: p.attachment?.image_url || null,
               attachment: p.attachment || null,
               platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
-                ? p.target_platforms
-                : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
+                ? p.target_platforms.map(plat => (typeof plat === 'string' ? plat.toLowerCase().trim() : ''))
+                : (connectedPlatforms.length > 0 ? connectedPlatforms : []),
               status: statusLabel,
               publishedDate: p.published_at || createdDate,
               engagement: p.engagement || p.total_engagements || 0,
@@ -511,7 +521,11 @@ export default function PMmodule({ user }) {
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       // 1. Strictly scope to selectedPost.platforms
-      const postPlatforms = (selectedPost?.platforms || ['facebook']).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
+      const postPlatforms = (
+        (selectedPost?.platforms && selectedPost.platforms.length > 0)
+          ? selectedPost.platforms
+          : connectedPlatforms
+      ).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
       const scopedChannels = connectedChannelsList.filter(c => postPlatforms.includes((c.platform || '').toLowerCase().trim()));
 
       let targetList = [];
@@ -622,8 +636,8 @@ export default function PMmodule({ user }) {
             thumbnail: p.attachment?.image_url || null,
             attachment: p.attachment || null,
             platforms: (Array.isArray(p.target_platforms) && p.target_platforms.length > 0)
-              ? p.target_platforms
-              : (connectedPlatforms.length > 0 ? connectedPlatforms : ['facebook']),
+              ? p.target_platforms.map(plat => (typeof plat === 'string' ? plat.toLowerCase().trim() : ''))
+              : (connectedPlatforms.length > 0 ? connectedPlatforms : []),
             status: statusLabel,
             publishedDate: p.published_at || createdDate,
             engagement: p.engagement || p.total_engagements || 0,
@@ -646,7 +660,7 @@ export default function PMmodule({ user }) {
     }
   };
 
-  const isIndividual = role === 'individual' || accountType === 'individual';
+  const isIndividual = accountType === 'individual' && role !== 'manager' && role !== 'member';
   const filters = isIndividual
     ? ['All Posts', 'Drafts', 'Published', 'Failed']
     : ['All Posts', 'Drafts', 'Pending', 'Rejected', 'Published', 'Failed'];
@@ -689,11 +703,19 @@ export default function PMmodule({ user }) {
   const [newCommentText, setNewCommentText] = useState('');
 
   const handleOpenEditModal = (post) => {
+    let plats = (Array.isArray(post.platforms) && post.platforms.length > 0)
+      ? post.platforms.map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''))
+      : [];
+    if (connectedPlatforms.length > 0) {
+      const conn = connectedPlatforms.map(cp => (typeof cp === 'string' ? cp.toLowerCase().trim() : ''));
+      const validPlats = plats.filter(p => conn.includes(p));
+      plats = validPlats.length > 0 ? validPlats : [conn[0]];
+    }
     setEditingPost({
       id: post.id,
       title: post.title || '',
       content: post.content || '',
-      platforms: post.platforms ? [...post.platforms] : ['facebook']
+      platforms: plats
     });
   };
 
@@ -1706,44 +1728,60 @@ export default function PMmodule({ user }) {
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
                 Targeted Platforms
               </label>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                {['facebook', 'linkedin'].map((plat) => {
-                  const isSelected = editingPost.platforms.includes(plat);
-                  const iconSrc = plat === 'linkedin' ? linkedin : facebook;
-                  const labelName = plat === 'linkedin' ? 'LinkedIn' : 'Facebook';
-                  return (
-                    <div
-                      key={plat}
-                      onClick={() => {
-                        setEditingPost((prev) => {
-                          const exists = prev.platforms.includes(plat);
-                          let nextPlats = exists
-                            ? prev.platforms.filter((p) => p !== plat)
-                            : [...prev.platforms, plat];
-                          if (nextPlats.length === 0) nextPlats = [plat];
-                          return { ...prev, platforms: nextPlats };
-                        });
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 14px',
-                        borderRadius: '10px',
-                        border: isSelected ? '1.5px solid #FE7216' : '1.5px solid #e5e7eb',
-                        backgroundColor: isSelected ? '#FFF7ED' : '#f9fafb',
-                        cursor: 'pointer',
-                        flex: 1,
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <img src={iconSrc} alt={labelName} style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
-                      <span style={{ fontSize: '13px', fontWeight: isSelected ? '700' : '500', color: isSelected ? '#FE7216' : '#374151' }}>
-                        {labelName}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {(() => {
+                  const activePlatforms = connectedPlatforms.length > 0
+                    ? [...new Set(connectedPlatforms.map(p => (typeof p === 'string' ? p.toLowerCase().trim() : '')))].filter(p => p === 'facebook' || p === 'linkedin')
+                    : (editingPost.platforms || []).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : '')).filter(p => p === 'facebook' || p === 'linkedin');
+
+                  if (activePlatforms.length === 0) {
+                    return (
+                      <div style={{ fontSize: '13px', color: '#6b7280', fontStyle: 'italic', padding: '6px 0' }}>
+                        No social accounts connected yet. Please connect Facebook or LinkedIn in Distribution Channels.
+                      </div>
+                    );
+                  }
+
+                  return activePlatforms.map((plat) => {
+                    const isSelected = (editingPost.platforms || []).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : '')).includes(plat);
+                    const iconSrc = plat === 'linkedin' ? linkedin : facebook;
+                    const labelName = plat === 'linkedin' ? 'LinkedIn' : 'Facebook';
+                    return (
+                      <div
+                        key={plat}
+                        onClick={() => {
+                          setEditingPost((prev) => {
+                            const cur = (prev.platforms || []).map(p => (typeof p === 'string' ? p.toLowerCase().trim() : ''));
+                            const exists = cur.includes(plat);
+                            let nextPlats = exists
+                              ? cur.filter((p) => p !== plat)
+                              : [...cur, plat];
+                            if (nextPlats.length === 0) nextPlats = [plat];
+                            return { ...prev, platforms: nextPlats };
+                          });
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: isSelected ? '1.5px solid #FE7216' : '1.5px solid #e5e7eb',
+                          backgroundColor: isSelected ? '#FFF7ED' : '#f9fafb',
+                          cursor: 'pointer',
+                          flex: activePlatforms.length > 1 ? 1 : 'none',
+                          minWidth: '140px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <img src={iconSrc} alt={labelName} style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+                        <span style={{ fontSize: '13px', fontWeight: isSelected ? '700' : '500', color: isSelected ? '#FE7216' : '#374151' }}>
+                          {labelName}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -1810,24 +1848,47 @@ export default function PMmodule({ user }) {
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  const targetId = editingPost.id;
+                  const updatedTitle = editingPost.title;
+                  const updatedContent = editingPost.content;
+                  const updatedPlatforms = editingPost.platforms;
+
                   setRealPosts((prev) =>
                     prev.map((p) =>
-                      p.id === editingPost.id
-                        ? { ...p, title: editingPost.title, content: editingPost.content, platforms: editingPost.platforms }
+                      p.id === targetId
+                        ? { ...p, title: updatedTitle, content: updatedContent, platforms: updatedPlatforms }
                         : p
                     )
                   );
-                  if (selectedPost && selectedPost.id === editingPost.id) {
+                  if (selectedPost && selectedPost.id === targetId) {
                     setSelectedPost((prev) => ({
                       ...prev,
-                      title: editingPost.title,
-                      content: editingPost.content,
-                      platforms: editingPost.platforms
+                      title: updatedTitle,
+                      content: updatedContent,
+                      platforms: updatedPlatforms
                     }));
                   }
                   setEditingPost(null);
                   toast.success('Post updated successfully');
+
+                  try {
+                    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+                    await fetch(`http://localhost:8000/posts/${targetId}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({
+                        title: updatedTitle,
+                        content: updatedContent,
+                        target_platforms: updatedPlatforms
+                      })
+                    });
+                  } catch (e) {
+                    console.error('Failed to sync post update to backend:', e);
+                  }
                 }}
                 style={{
                   padding: '8px 18px',
